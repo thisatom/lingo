@@ -1,6 +1,16 @@
 import { useState } from 'react'
-import { Calendar, Check, Clock, List, ListFilter, Pin } from 'lucide-react'
+import { ArrowDownAZ, ArrowUpAZ, Calendar, Check, Clock, List, ListFilter } from 'lucide-react'
+import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
+import {
+  SIDEBAR_CHAT_SORT_OPTIONS,
+  type SidebarChatSort
+} from '@/shared/lib/chat-sidebar'
+import {
+  sidebarMenuItemClass,
+  sidebarMenuLabelClass,
+  sidebarMenuSurfaceClass
+} from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import {
@@ -9,21 +19,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/shared/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
-
-const menuSurfaceClass = 'border-border/60 bg-[#181818] text-popover-foreground shadow-lg'
-
-const menuItemClass =
-  'h-6 min-h-6 cursor-pointer gap-2 py-0 pr-2 pl-2 text-xs leading-none'
-
-const menuLabelClass = 'px-2 py-1 text-xs font-normal leading-none text-muted-foreground'
-
-const menuSubTriggerClass = cn(menuItemClass, 'pr-7')
 
 function FilterMenuItem({
   icon: Icon,
@@ -37,7 +35,7 @@ function FilterMenuItem({
   onSelect: () => void
 }) {
   return (
-    <DropdownMenuItem className={menuItemClass} onSelect={onSelect}>
+    <DropdownMenuItem className={sidebarMenuItemClass} onSelect={onSelect}>
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <Check className={cn('ml-1 size-3 shrink-0', selected ? 'opacity-100' : 'opacity-0')} />
@@ -45,13 +43,31 @@ function FilterMenuItem({
   )
 }
 
+function sortIcon(sort: SidebarChatSort) {
+  if (sort.startsWith('name')) {
+    return sort === 'name-asc' ? ArrowDownAZ : ArrowUpAZ
+  }
+  if (sort.startsWith('created')) {
+    return Calendar
+  }
+  return Clock
+}
+
 export function SidebarFilterMenu() {
   const sidebarShowDateGroups = useSettingsStore((s) => s.sidebarShowDateGroups)
   const setSidebarShowDateGroups = useSettingsStore((s) => s.setSidebarShowDateGroups)
+  const sidebarChatSort = useSettingsStore((s) => s.sidebarChatSort)
+  const setSidebarChatSort = useSettingsStore((s) => s.setSidebarChatSort)
+  const resortChats = useChatsStore((s) => s.resortChats)
   const [menuOpen, setMenuOpen] = useState(false)
   const [tooltipOpen, setTooltipOpen] = useState(false)
 
   const showTooltip = tooltipOpen && !menuOpen
+
+  const applySort = (sort: SidebarChatSort) => {
+    setSidebarChatSort(sort)
+    resortChats()
+  }
 
   return (
     <DropdownMenu
@@ -68,7 +84,10 @@ export function SidebarFilterMenu() {
               type="button"
               variant="ghost"
               size="icon"
-              className="size-7 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
+              className={cn(
+                'size-7 shrink-0 text-muted-foreground hover:text-foreground',
+                menuOpen && 'bg-sidebar-accent text-sidebar-accent-foreground'
+              )}
               aria-label="Filter chats"
               onPointerEnter={() => setTooltipOpen(true)}
               onPointerLeave={() => setTooltipOpen(false)}
@@ -88,9 +107,26 @@ export function SidebarFilterMenu() {
         side="top"
         align="start"
         sideOffset={6}
-        className={cn('w-52 p-1', menuSurfaceClass)}
+        className={cn('w-52 p-1', sidebarMenuSurfaceClass)}
       >
-        <DropdownMenuLabel className={menuLabelClass}>Group by</DropdownMenuLabel>
+        <DropdownMenuLabel className={sidebarMenuLabelClass}>Sort by</DropdownMenuLabel>
+
+        {SIDEBAR_CHAT_SORT_OPTIONS.map((option) => {
+          const Icon = sortIcon(option.value)
+          return (
+            <FilterMenuItem
+              key={option.value}
+              icon={Icon}
+              label={option.label}
+              selected={sidebarChatSort === option.value}
+              onSelect={() => applySort(option.value)}
+            />
+          )
+        })}
+
+        <DropdownMenuSeparator className="my-1 bg-border/60" />
+
+        <DropdownMenuLabel className={sidebarMenuLabelClass}>Group by</DropdownMenuLabel>
 
         <FilterMenuItem
           icon={Clock}
@@ -104,44 +140,6 @@ export function SidebarFilterMenu() {
           selected={!sidebarShowDateGroups}
           onSelect={() => setSidebarShowDateGroups(false)}
         />
-
-        <DropdownMenuSeparator className="my-1 bg-border/60" />
-
-        <DropdownMenuLabel className={menuLabelClass}>Show</DropdownMenuLabel>
-
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className={menuSubTriggerClass}>
-            <Pin className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">Pinned</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent sideOffset={4} className={cn('w-44 p-1', menuSurfaceClass)}>
-            <DropdownMenuItem disabled className={menuItemClass}>
-              <Check className="size-3 opacity-100" />
-              Always visible
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className={menuSubTriggerClass}>
-            <Calendar className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">Date groups</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent sideOffset={4} className={cn('w-44 p-1', menuSurfaceClass)}>
-            <FilterMenuItem
-              icon={Calendar}
-              label="Section headers"
-              selected={sidebarShowDateGroups}
-              onSelect={() => setSidebarShowDateGroups(true)}
-            />
-            <FilterMenuItem
-              icon={List}
-              label="Hide headers"
-              selected={!sidebarShowDateGroups}
-              onSelect={() => setSidebarShowDateGroups(false)}
-            />
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   )

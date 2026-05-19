@@ -23,8 +23,7 @@ export function VoiceCaptureBar({
   onConfirm,
   className
 }: VoiceCaptureBarProps) {
-  const { levels, isReceiving, permissionDenied, durationLabel, peakLevel } =
-    useAudioLevelMonitor({
+  const { levels, isReceiving, durationLabel } = useAudioLevelMonitor({
       active,
       deviceId,
       deviceLabel,
@@ -44,32 +43,8 @@ export function VoiceCaptureBar({
     >
       <MicLevelVisualizer levels={levels} isReceiving={isReceiving} />
 
-      <span
-        className={cn(
-          'shrink-0 font-mono text-xs tabular-nums',
-          isReceiving ? 'text-foreground' : 'text-muted-foreground'
-        )}
-      >
+      <span className="inline-block w-10 shrink-0 text-center text-xs leading-none tabular-nums text-foreground">
         {durationLabel}
-      </span>
-
-      <span
-        className={cn(
-          'hidden shrink-0 text-[10px] sm:inline',
-          permissionDenied
-            ? 'text-destructive'
-            : isReceiving
-              ? 'text-emerald-500/90'
-              : 'text-muted-foreground'
-        )}
-      >
-        {permissionDenied
-          ? 'No access'
-          : isReceiving
-            ? 'Signal OK'
-            : peakLevel > 0.01
-              ? 'Quiet'
-              : 'Speak…'}
       </span>
 
       <Button

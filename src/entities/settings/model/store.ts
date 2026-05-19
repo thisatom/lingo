@@ -5,6 +5,7 @@ import {
   type MicNoiseSuppression
 } from '@/features/speech-to-text/lib/mic-noise-suppression'
 import { openRouterConfig } from '@/shared/config/openrouter'
+import { isSidebarChatSort, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
 
 export type { MicNoiseSuppression }
 
@@ -25,6 +26,7 @@ interface SettingsState {
   chatComposerMode: ChatComposerMode
   webSearchEnabled: boolean
   sidebarShowDateGroups: boolean
+  sidebarChatSort: SidebarChatSort
   setPracticeLanguage: (lang: string) => void
   setModelId: (modelId: string) => void
   setDisplayName: (displayName: string) => void
@@ -35,6 +37,7 @@ interface SettingsState {
   setChatComposerMode: (mode: ChatComposerMode) => void
   setWebSearchEnabled: (enabled: boolean) => void
   setSidebarShowDateGroups: (show: boolean) => void
+  setSidebarChatSort: (sort: SidebarChatSort) => void
 }
 
 type PersistedSettings = Pick<
@@ -51,6 +54,7 @@ type PersistedSettings = Pick<
   | 'chatComposerMode'
   | 'webSearchEnabled'
   | 'sidebarShowDateGroups'
+  | 'sidebarChatSort'
 >
 
 export const useSettingsStore = create<SettingsState>()(
@@ -68,6 +72,7 @@ export const useSettingsStore = create<SettingsState>()(
       chatComposerMode: 'text',
       webSearchEnabled: true,
       sidebarShowDateGroups: true,
+      sidebarChatSort: 'updated-desc',
       setPracticeLanguage: (practiceLanguage) => set({ practiceLanguage }),
       setModelId: (modelId) => set({ modelId }),
       setDisplayName: (displayName) => set({ displayName }),
@@ -79,11 +84,12 @@ export const useSettingsStore = create<SettingsState>()(
       setTtsEnabled: (ttsEnabled) => set({ ttsEnabled }),
       setChatComposerMode: (chatComposerMode) => set({ chatComposerMode }),
       setWebSearchEnabled: (webSearchEnabled) => set({ webSearchEnabled }),
-      setSidebarShowDateGroups: (sidebarShowDateGroups) => set({ sidebarShowDateGroups })
+      setSidebarShowDateGroups: (sidebarShowDateGroups) => set({ sidebarShowDateGroups }),
+      setSidebarChatSort: (sidebarChatSort) => set({ sidebarChatSort })
     }),
     {
       name: 'lingo-settings',
-      version: 7,
+      version: 8,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
         modelId: state.modelId,
@@ -96,12 +102,13 @@ export const useSettingsStore = create<SettingsState>()(
         ttsEnabled: state.ttsEnabled,
         chatComposerMode: state.chatComposerMode,
         webSearchEnabled: state.webSearchEnabled,
-        sidebarShowDateGroups: state.sidebarShowDateGroups
+        sidebarShowDateGroups: state.sidebarShowDateGroups,
+        sidebarChatSort: state.sidebarChatSort
       }),
       migrate: (persisted, version) => {
-        const state = (persisted ?? {}) as Record<string, unknown>
+        let state = (persisted ?? {}) as Record<string, unknown>
         if (version < 6) {
-          return {
+          state = {
             ...state,
             microphoneLabel: typeof state.microphoneLabel === 'string' ? state.microphoneLabel : '',
             speakerDeviceId: '',
@@ -109,11 +116,19 @@ export const useSettingsStore = create<SettingsState>()(
           }
         }
         if (version < 7) {
-          return {
+          state = {
             ...state,
             micNoiseSuppression: isMicNoiseSuppression(state.micNoiseSuppression)
               ? state.micNoiseSuppression
               : 'light'
+          }
+        }
+        if (version < 8) {
+          state = {
+            ...state,
+            sidebarChatSort: isSidebarChatSort(state.sidebarChatSort)
+              ? state.sidebarChatSort
+              : 'updated-desc'
           }
         }
         return state
@@ -125,7 +140,10 @@ export const useSettingsStore = create<SettingsState>()(
           ...saved,
           micNoiseSuppression: isMicNoiseSuppression(saved.micNoiseSuppression)
             ? saved.micNoiseSuppression
-            : current.micNoiseSuppression
+            : current.micNoiseSuppression,
+          sidebarChatSort: isSidebarChatSort(saved.sidebarChatSort)
+            ? saved.sidebarChatSort
+            : current.sidebarChatSort
         }
       }
     }

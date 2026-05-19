@@ -7,4 +7,6 @@ export interface Chat {
   createdAt: number
   updatedAt: number
   pinned?: boolean
+  /** Last failed assistant request in this chat (sidebar red dot). */
+  hasError?: boolean
 }

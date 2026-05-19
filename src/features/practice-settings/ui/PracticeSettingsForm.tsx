@@ -46,7 +46,7 @@ export function PracticeSettingsForm() {
 
   return (
     <ItemGroup className="gap-4">
-      <Item size="sm" className="flex-col items-stretch rounded-lg border border-border p-3">
+      <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
         <ItemContent className="gap-1.5">
           <Label htmlFor="lang" className="text-xs font-medium">
             Practice language (ISO)

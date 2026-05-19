@@ -112,7 +112,7 @@ export function DevicesSettingsForm() {
 
   return (
     <ItemGroup className="gap-4">
-      <Item size="sm" className="flex-col items-stretch rounded-lg border border-border p-3">
+      <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
         <ItemContent className="gap-1.5">
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="devices-microphone" className="text-xs font-medium">
@@ -205,7 +205,7 @@ export function DevicesSettingsForm() {
         </ItemContent>
       </Item>
 
-      <Item size="sm" className="flex-col items-stretch rounded-lg border border-border p-3">
+      <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
         <ItemContent className="gap-1.5">
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="devices-speaker" className="text-xs font-medium">
@@ -260,7 +260,7 @@ export function DevicesSettingsForm() {
         </ItemContent>
       </Item>
 
-      <Item size="sm" className="flex-col items-stretch rounded-lg border border-border p-3">
+      <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
         <ItemContent className="gap-3">
           <div>
             <Label className="text-xs font-medium">Microphone test</Label>

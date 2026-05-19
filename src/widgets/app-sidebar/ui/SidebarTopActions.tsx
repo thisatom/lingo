@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, PanelLeft, Search } from 'lucide-react'
+import { ArrowLeft, ArrowRight, PanelLeft, Search } from 'lucide-react'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { Kbd, KbdGroup } from '@/shared/ui/kbd'
@@ -61,7 +61,7 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
         tooltip="Previous chat"
         onClick={goBackInChatHistory}
       >
-        <ChevronLeft className="size-4" />
+        <ArrowLeft className="size-4" />
       </TooltipIconButton>
       <TooltipIconButton
         variant="ghost"
@@ -71,7 +71,7 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
         tooltip="Next chat"
         onClick={goForwardInChatHistory}
       >
-        <ChevronRight className="size-4" />
+        <ArrowRight className="size-4" />
       </TooltipIconButton>
     </div>
   )

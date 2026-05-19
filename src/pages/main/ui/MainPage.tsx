@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAiChat } from '@/features/ai-chat/model/useAiChat'
 import { useChatContextUsage } from '@/features/chat-context/model/useChatContextUsage'
@@ -11,8 +11,12 @@ import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { ChatComposer } from '@/widgets/chat-composer/ui/ChatComposer'
 import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
+import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
+import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
 import { ConversationPanel } from '@/widgets/conversation-panel/ui/ConversationPanel'
 import { VoiceCaptureBar } from '@/features/audio-devices/ui/VoiceCaptureBar'
+import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
+import { cn } from '@/shared/lib/utils'
 import { SidebarExpandButton } from '@/widgets/app-sidebar/ui/SidebarExpandButton'
 
 function isErrorRetryable(message: string): boolean {
@@ -20,6 +24,10 @@ function isErrorRetryable(message: string): boolean {
 }
 
 export function MainPage() {
+  const [chatAtBottom, setChatAtBottom] = useState(true)
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false)
+  const scrollToLatestRef = useRef<(() => void) | null>(null)
+
   const {
     messages,
     stage,
@@ -29,7 +37,6 @@ export function MainPage() {
     commitVoiceUserMessage,
     cancelVoiceUserMessage,
     submitEditedUserMessage,
-    regenerateAssistantMessage,
     stopAgent,
     retryLastRequest,
     clearError
@@ -48,8 +55,10 @@ export function MainPage() {
   const modelId = useSettingsStore((s) => s.modelId)
   const microphoneDeviceId = useSettingsStore((s) => s.microphoneDeviceId)
   const microphoneLabel = useSettingsStore((s) => s.microphoneLabel)
-  const { percent: contextUsagePercent, resetContext, showIndicator } =
-    useChatContextUsage(messages, modelId)
+  const { usage: contextUsage, resetContext, showIndicator } = useChatContextUsage(
+    messages,
+    modelId
+  )
 
   useChatComposerModeHotkey()
 
@@ -147,10 +156,20 @@ export function MainPage() {
     voice
   ])
 
-  const handleStopAgent = useCallback(() => {
+  const stopAgentSpeechSession = useCallback(() => {
     liveConversation.stopLiveConversation()
+    void voice.cancel()
+    if (voiceMessageIdRef.current) {
+      cancelVoiceUserMessage(voiceMessageIdRef.current)
+      voiceMessageIdRef.current = ''
+    }
     stopAgent()
-  }, [liveConversation, stopAgent])
+    setSpeechError(null)
+  }, [cancelVoiceUserMessage, liveConversation, setSpeechError, stopAgent, voice])
+
+  const handleStopAgent = useCallback(() => {
+    stopAgentSpeechSession()
+  }, [stopAgentSpeechSession])
 
   const onVoicePress = useCallback(() => {
     if (!status?.isSet || !voice.supported) return
@@ -170,9 +189,7 @@ export function MainPage() {
         handleStopAgent()
         return
       }
-      liveConversation.stopLiveConversation()
-      void voice.cancel()
-      setSpeechError(null)
+      stopAgentSpeechSession()
       return
     }
 
@@ -186,15 +203,19 @@ export function MainPage() {
     handleStopAgent,
     liveConversation,
     onVoiceStop,
-    setSpeechError,
     startVoiceCapture,
     status?.isSet,
+    stopAgentSpeechSession,
     voice
   ])
 
   const onVoiceCancel = useCallback(() => {
+    if (chatComposerMode === 'conversation' && liveConversation.isLiveConversationActive) {
+      stopAgentSpeechSession()
+      return
+    }
     void voice.cancel()
-  }, [voice])
+  }, [chatComposerMode, liveConversation.isLiveConversationActive, stopAgentSpeechSession, voice])
 
   const chatComposerModeRef = useRef(chatComposerMode)
   useEffect(() => {
@@ -203,10 +224,9 @@ export function MainPage() {
     if (prev === chatComposerMode) return
 
     if (chatComposerMode === 'text') {
-      liveConversation.stopLiveConversation()
-      if (voice.isBusy) void voice.cancel()
+      stopAgentSpeechSession()
     }
-  }, [chatComposerMode, liveConversation, voice])
+  }, [chatComposerMode, stopAgentSpeechSession])
 
   const onSend = useCallback(async () => {
     if (!status?.isSet) return
@@ -218,11 +238,12 @@ export function MainPage() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      <header className="relative z-10 flex shrink-0 items-center gap-2 bg-background px-4 py-2">
+      <header className="relative z-10 flex shrink-0 items-center gap-2 bg-background p-2">
         <SidebarExpandButton />
-        <h1 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+        <h1 className="min-w-0 flex-1 truncate text-[13px] font-normal leading-[1.5] text-foreground">
           {activeChat?.title ?? 'New chat'}
         </h1>
+        <ChatHeaderMenu chatId={activeChatId} messages={messages} />
       </header>
 
       {!status?.isSet && (
@@ -245,8 +266,10 @@ export function MainPage() {
           activeChatId={activeChat?.id ?? null}
           actionsDisabled={actionsDisabled}
           onSubmitEditedUserMessage={submitEditedUserMessage}
-          onRegenerateAssistantMessage={(messageId) => {
-            void regenerateAssistantMessage(messageId)
+          onAtBottomChange={setChatAtBottom}
+          onShowScrollToLatestChange={setShowScrollToLatest}
+          onScrollToLatestReady={(scrollToLatest) => {
+            scrollToLatestRef.current = scrollToLatest
           }}
         />
 
@@ -255,8 +278,20 @@ export function MainPage() {
           aria-hidden
         />
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
-          <div className="pointer-events-auto mx-auto w-full max-w-3xl space-y-2 px-4 pb-3">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
+          <div
+            className={cn(
+              'pointer-events-auto mx-auto w-full px-4 pb-3 sm:px-6',
+              CHAT_COLUMN_MAX_WIDTH_CLASS
+            )}
+          >
+            <div className="relative">
+              <ScrollToLatestButton
+                show={showScrollToLatest}
+                onClick={() => scrollToLatestRef.current?.()}
+                className="absolute bottom-full right-0 z-50 mb-2 shrink-0"
+              />
+              <div className="space-y-2">
             {showSpeechError && speechError && (
               <div
                 role="status"
@@ -293,25 +328,27 @@ export function MainPage() {
               />
             )}
 
-            <ChatComposer
-              value={draft}
-              onChange={setDraft}
-              onSend={() => void onSend()}
-              onStop={handleStopAgent}
-              disabled={!status?.isSet}
-              agentBusy={agentBusy}
-              voiceBusy={voiceBusy}
-              voiceSupported={voice.supported}
-              isListening={voice.isRecording}
-              onVoicePress={onVoicePress}
-              onVoiceStop={onVoiceStop}
-              voiceInteractionMode="toggle"
-              liveConversationActive={liveConversation.isLiveConversationActive}
-              placeholder={status?.isSet ? 'Send follow-up' : 'Add API key in Settings…'}
-              contextUsagePercent={showIndicator ? contextUsagePercent : undefined}
+              <ChatComposer
+                value={draft}
+                onChange={setDraft}
+                onSend={() => void onSend()}
+                onStop={handleStopAgent}
+                disabled={!status?.isSet}
+                agentBusy={agentBusy}
+                voiceBusy={voiceBusy}
+                voiceSupported={voice.supported}
+                isListening={voice.isRecording}
+                onVoicePress={onVoicePress}
+                onVoiceStop={onVoiceStop}
+                voiceInteractionMode="toggle"
+                liveConversationActive={liveConversation.isLiveConversationActive}
+                placeholder={status?.isSet ? 'Send follow-up' : 'Add API key in Settings…'}
+              contextUsage={showIndicator ? contextUsage : null}
               onResetContext={showIndicator ? resetContext : undefined}
-              overlay
-            />
+                overlay
+              />
+              </div>
+            </div>
           </div>
         </div>
       </div>

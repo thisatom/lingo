@@ -14,6 +14,8 @@ const THUMB_COLOR = '#313131'
 const THUMB_HOVER_COLOR = '#424242'
 const THUMB_MIN_HEIGHT_PX = 32
 const HIDE_DELAY_MS = 500
+const SCROLL_IDLE_MS = 250
+const AT_BOTTOM_THRESHOLD_PX = 80
 
 type ThumbMetrics = {
   thumbHeight: number
@@ -38,15 +40,30 @@ function measureThumb(viewport: HTMLDivElement): ThumbMetrics {
   return { thumbHeight, thumbTop, canScroll: true }
 }
 
+function isViewportAtBottom(viewport: HTMLDivElement): boolean {
+  return (
+    viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
+    AT_BOTTOM_THRESHOLD_PX
+  )
+}
+
 interface AgentChatScrollAreaProps {
   children: ReactNode
   className?: string
+  onAtBottomChange?: (atBottom: boolean) => void
+  onShowScrollToLatestChange?: (show: boolean) => void
 }
 
-export function AgentChatScrollArea({ children, className }: AgentChatScrollAreaProps) {
+export function AgentChatScrollArea({
+  children,
+  className,
+  onAtBottomChange,
+  onShowScrollToLatestChange
+}: AgentChatScrollAreaProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dragRef = useRef<{ startY: number; startScrollTop: number } | null>(null)
 
   const [metrics, setMetrics] = useState<ThumbMetrics>({
@@ -82,24 +99,72 @@ export function AgentChatScrollArea({ children, className }: AgentChatScrollArea
     }, HIDE_DELAY_MS)
   }, [clearHideTimer])
 
+  const clearScrollIdleTimer = useCallback(() => {
+    if (scrollIdleTimerRef.current) {
+      clearTimeout(scrollIdleTimerRef.current)
+      scrollIdleTimerRef.current = null
+    }
+  }, [])
+
+  const reportAtBottom = useCallback(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    onAtBottomChange?.(isViewportAtBottom(viewport))
+  }, [onAtBottomChange])
+
+  const updateScrollToLatestVisibility = useCallback(() => {
+    const viewport = viewportRef.current
+    if (!viewport || !onShowScrollToLatestChange) return
+
+    if (isViewportAtBottom(viewport)) {
+      clearScrollIdleTimer()
+      onShowScrollToLatestChange(false)
+      return
+    }
+
+    onShowScrollToLatestChange(true)
+    clearScrollIdleTimer()
+    scrollIdleTimerRef.current = setTimeout(() => {
+      onShowScrollToLatestChange(false)
+    }, SCROLL_IDLE_MS)
+  }, [clearScrollIdleTimer, onShowScrollToLatestChange])
+
   useEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) return
 
     syncMetrics()
 
-    const observer = new ResizeObserver(syncMetrics)
+    const observer = new ResizeObserver(() => {
+      syncMetrics()
+      reportAtBottom()
+      updateScrollToLatestVisibility()
+    })
     observer.observe(viewport)
     if (viewport.firstElementChild) observer.observe(viewport.firstElementChild)
 
-    return () => observer.disconnect()
-  }, [syncMetrics, children])
+    reportAtBottom()
+    updateScrollToLatestVisibility()
+
+    return () => {
+      observer.disconnect()
+      clearScrollIdleTimer()
+    }
+  }, [syncMetrics, children, reportAtBottom, updateScrollToLatestVisibility, clearScrollIdleTimer])
 
   const onViewportScroll = useCallback(() => {
     revealScrollbar()
     syncMetrics()
     scheduleHideScrollbar()
-  }, [revealScrollbar, scheduleHideScrollbar, syncMetrics])
+    reportAtBottom()
+    updateScrollToLatestVisibility()
+  }, [
+    revealScrollbar,
+    scheduleHideScrollbar,
+    syncMetrics,
+    reportAtBottom,
+    updateScrollToLatestVisibility
+  ])
 
   const scrollToThumbPosition = useCallback((clientY: number) => {
     const viewport = viewportRef.current

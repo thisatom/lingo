@@ -22,10 +22,11 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
   const chats = useChatsStore((s) => s.chats)
   const selectChat = useChatsStore((s) => s.selectChat)
   const sidebarShowDateGroups = useSettingsStore((s) => s.sidebarShowDateGroups ?? true)
+  const sidebarChatSort = useSettingsStore((s) => s.sidebarChatSort)
 
   const orderedChats = useMemo(
-    () => flattenSidebarChats(chats, sidebarShowDateGroups),
-    [chats, sidebarShowDateGroups]
+    () => flattenSidebarChats(chats, sidebarShowDateGroups, sidebarChatSort),
+    [chats, sidebarShowDateGroups, sidebarChatSort]
   )
 
   const pickChat = (id: string) => {

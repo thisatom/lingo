@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, X } from 'lucide-react'
-import { UserMessageActions } from './MessageActions'
+import { UserQuestionContextMenu } from './chat-context-menu/UserQuestionContextMenu'
+import { MessageBodyClamp } from './MessageBodyClamp'
+import { UserMessageEditButton } from './UserMessageEditButton'
 import { userMessageBubbleClass, userMessageTextClass } from './agent-layout'
 import { cn } from '@/shared/lib/utils'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
@@ -16,6 +18,7 @@ function resizeTextarea(el: HTMLTextAreaElement) {
 interface UserMessageProps {
   messageId: string
   content: string
+  chatId: string | null
   disabled?: boolean
   isEditing: boolean
   onEnterEdit: () => void
@@ -26,6 +29,7 @@ interface UserMessageProps {
 export function UserMessage({
   messageId,
   content,
+  chatId,
   disabled,
   isEditing,
   onEnterEdit,
@@ -97,7 +101,7 @@ export function UserMessage({
             style={{ height: INPUT_MIN_HEIGHT_PX }}
             className={cn(
               'max-h-40 min-h-[42px] w-full resize-none bg-transparent px-1',
-              'text-sm leading-5 text-foreground placeholder:text-muted-foreground',
+              'text-[13px] leading-[1.5] text-foreground placeholder:text-muted-foreground',
               'outline-none disabled:cursor-not-allowed',
               'py-[11px]'
             )}
@@ -135,16 +139,12 @@ export function UserMessage({
 
   return (
     <div className="w-full min-w-0 max-w-full">
-      <div className={cn(userMessageBubbleClass, 'group/message relative')}>
-        <p className={cn(userMessageTextClass, 'whitespace-pre-wrap pr-12')}>{content}</p>
-        <UserMessageActions
-          compact
-          className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
-          content={content}
-          disabled={disabled}
-          onEdit={onEnterEdit}
-        />
-      </div>
+      <UserQuestionContextMenu prompt={content} chatId={chatId} className={userMessageBubbleClass}>
+        <MessageBodyClamp bodyClassName="pr-9">
+          <p className={cn(userMessageTextClass, 'whitespace-pre-wrap')}>{content}</p>
+        </MessageBodyClamp>
+        <UserMessageEditButton disabled={disabled} onEdit={onEnterEdit} />
+      </UserQuestionContextMenu>
     </div>
   )
 }

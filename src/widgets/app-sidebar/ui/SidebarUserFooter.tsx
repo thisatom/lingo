@@ -17,7 +17,7 @@ export function SidebarUserFooter() {
 
   return (
     <SidebarFooter className="p-2">
-      <div className="flex items-center gap-2 rounded-lg p-1.5">
+      <div className="flex items-center gap-2 rounded-[8px] p-1.5">
         <Avatar className="size-8 shrink-0" aria-hidden>
           <AvatarFallback className="bg-muted text-xs font-medium text-foreground">{initials}</AvatarFallback>
         </Avatar>

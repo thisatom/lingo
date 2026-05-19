@@ -1,5 +1,38 @@
 import type { Chat } from '@/entities/chat/model/types'
 
+export type SidebarChatSort =
+  | 'updated-desc'
+  | 'updated-asc'
+  | 'name-asc'
+  | 'name-desc'
+  | 'created-desc'
+  | 'created-asc'
+
+const SIDEBAR_CHAT_SORT_VALUES: SidebarChatSort[] = [
+  'updated-desc',
+  'updated-asc',
+  'name-asc',
+  'name-desc',
+  'created-desc',
+  'created-asc'
+]
+
+export function isSidebarChatSort(value: unknown): value is SidebarChatSort {
+  return typeof value === 'string' && SIDEBAR_CHAT_SORT_VALUES.includes(value as SidebarChatSort)
+}
+
+export const SIDEBAR_CHAT_SORT_OPTIONS: {
+  value: SidebarChatSort
+  label: string
+}[] = [
+  { value: 'updated-desc', label: 'Newest first' },
+  { value: 'updated-asc', label: 'Oldest first' },
+  { value: 'name-asc', label: 'Name (A–Z)' },
+  { value: 'name-desc', label: 'Name (Z–A)' },
+  { value: 'created-desc', label: 'Recently created' },
+  { value: 'created-asc', label: 'Oldest created' }
+]
+
 export interface ChatDateGroup {
   dateKey: string
   label: string
@@ -22,17 +55,41 @@ export function formatChatDateLabel(timestamp: number): string {
   return dateLabelFormatter.format(new Date(timestamp))
 }
 
-export function sortChatsForSidebar(chats: Chat[]): Chat[] {
+function compareChats(a: Chat, b: Chat, sort: SidebarChatSort): number {
+  switch (sort) {
+    case 'name-asc':
+      return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+    case 'name-desc':
+      return b.title.localeCompare(a.title, undefined, { sensitivity: 'base' })
+    case 'created-asc':
+      return a.createdAt - b.createdAt
+    case 'created-desc':
+      return b.createdAt - a.createdAt
+    case 'updated-asc':
+      return a.updatedAt - b.updatedAt
+    case 'updated-desc':
+    default:
+      return b.updatedAt - a.updatedAt
+  }
+}
+
+export function sortChatsForSidebar(
+  chats: Chat[],
+  sort: SidebarChatSort = 'updated-desc'
+): Chat[] {
   return [...chats].sort((a, b) => {
     const aPinned = Boolean(a.pinned)
     const bPinned = Boolean(b.pinned)
     if (aPinned !== bPinned) return aPinned ? -1 : 1
-    return b.updatedAt - a.updatedAt
+    return compareChats(a, b, sort)
   })
 }
 
-export function groupChatsByDate(chats: Chat[]): ChatDateGroup[] {
-  const sorted = [...chats].sort((a, b) => b.updatedAt - a.updatedAt)
+export function groupChatsByDate(
+  chats: Chat[],
+  sort: SidebarChatSort = 'updated-desc'
+): ChatDateGroup[] {
+  const sorted = [...chats].sort((a, b) => compareChats(a, b, sort))
   const groups = new Map<string, ChatDateGroup>()
 
   for (const chat of sorted) {
@@ -54,11 +111,18 @@ export function groupChatsByDate(chats: Chat[]): ChatDateGroup[] {
 }
 
 /** Flat order as rendered in the sidebar (pinned → date groups or sorted unpinned). */
-export function flattenSidebarChats(chats: Chat[], showDateGroups: boolean): Chat[] {
-  const pinned = chats.filter((c) => c.pinned)
+export function flattenSidebarChats(
+  chats: Chat[],
+  showDateGroups: boolean,
+  sort: SidebarChatSort = 'updated-desc'
+): Chat[] {
+  const pinned = sortChatsForSidebar(
+    chats.filter((c) => c.pinned),
+    'updated-desc'
+  )
   const unpinned = chats.filter((c) => !c.pinned)
   if (showDateGroups) {
-    return [...pinned, ...groupChatsByDate(unpinned).flatMap((g) => g.chats)]
+    return [...pinned, ...groupChatsByDate(unpinned, sort).flatMap((g) => g.chats)]
   }
-  return sortChatsForSidebar(chats)
+  return sortChatsForSidebar(chats, sort)
 }

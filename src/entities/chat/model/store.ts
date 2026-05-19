@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Message } from '@/entities/message/model/types'
 import { notifyActiveChatChange } from '@/entities/chat/model/active-chat-effects'
 import { sortChatsForSidebar } from '@/shared/lib/chat-sidebar'
+import { useSettingsStore } from '@/entities/settings/model/store'
 import type { Chat } from './types'
 
 interface ChatsState {
@@ -12,12 +13,14 @@ interface ChatsState {
   chatHistoryPast: string[]
   chatHistoryFuture: string[]
   createChat: () => string
+  forkChat: (sourceChatId: string) => string
   selectChat: (id: string) => void
   goBackInChatHistory: () => void
   goForwardInChatHistory: () => void
   deleteChat: (id: string) => void
   renameChat: (id: string, title: string) => void
   togglePinChat: (id: string) => void
+  setChatHasError: (id: string, hasError: boolean) => void
   addMessage: (message: Omit<Message, 'id' | 'createdAt'>, targetChatId?: string) => string
   removeMessagesFrom: (messageId: string) => void
   updateUserMessageContent: (messageId: string, content: string) => void
@@ -32,6 +35,7 @@ interface ChatsState {
   setChatMessages: (chatId: string, messages: Message[]) => void
   getActiveChat: () => Chat | null
   ensureActiveChat: () => string
+  resortChats: () => void
 }
 
 type PersistedChatsState = Pick<
@@ -67,7 +71,8 @@ function chatNeedsTitleFromFirstUser(title: string): boolean {
 }
 
 function withSortedChats(chats: Chat[]): Chat[] {
-  return sortChatsForSidebar(chats)
+  const sort = useSettingsStore.getState().sidebarChatSort
+  return sortChatsForSidebar(chats, sort)
 }
 
 function normalizePersistedState(state: PersistedChatsState): PersistedChatsState {
@@ -104,6 +109,41 @@ export const useChatsStore = create<ChatsState>()(
         })
         notifyActiveChatChange()
         return chat.id
+      },
+
+      forkChat: (sourceChatId) => {
+        const source = get().chats.find((c) => c.id === sourceChatId)
+        if (!source) return get().createChat()
+
+        const now = Date.now()
+        const forked: Chat = {
+          id: `chat-${now}-${Math.random().toString(36).slice(2, 8)}`,
+          title:
+            source.title.trim() === '' || source.title === 'New chat'
+              ? 'New chat'
+              : `${source.title} (fork)`,
+          messages: source.messages.map((message) => ({
+            ...message,
+            id: newMessageId(),
+            createdAt: now
+          })),
+          createdAt: now,
+          updatedAt: now
+        }
+
+        set((state) => {
+          const chatHistoryPast = state.activeChatId
+            ? [...(state.chatHistoryPast ?? []), state.activeChatId]
+            : (state.chatHistoryPast ?? [])
+          return {
+            chats: withSortedChats([forked, ...state.chats]),
+            activeChatId: forked.id,
+            chatHistoryPast,
+            chatHistoryFuture: []
+          }
+        })
+        notifyActiveChatChange()
+        return forked.id
       },
 
       selectChat: (id) => {
@@ -202,6 +242,12 @@ export const useChatsStore = create<ChatsState>()(
         if (get().activeChatId !== prevActive) {
           notifyActiveChatChange()
         }
+      },
+
+      setChatHasError: (id, hasError) => {
+        set((state) => ({
+          chats: state.chats.map((c) => (c.id === id ? { ...c, hasError } : c))
+        }))
       },
 
       togglePinChat: (id) => {
@@ -357,6 +403,12 @@ export const useChatsStore = create<ChatsState>()(
           return id
         }
         return get().createChat()
+      },
+
+      resortChats: () => {
+        set((state) => ({
+          chats: withSortedChats(state.chats)
+        }))
       }
     }),
     {

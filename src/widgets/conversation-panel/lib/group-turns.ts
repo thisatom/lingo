@@ -6,6 +6,10 @@ export type ConversationTurn = {
   assistantMessages: Message[]
 }
 
+export function messageHasVisibleContent(message: Message): boolean {
+  return message.content.trim().length > 0
+}
+
 export function groupMessagesIntoTurns(messages: Message[]): ConversationTurn[] {
   const turns: ConversationTurn[] = []
   let user: Message | null = null
@@ -13,7 +17,15 @@ export function groupMessagesIntoTurns(messages: Message[]): ConversationTurn[] 
 
   const flush = () => {
     if (!user) return
-    turns.push({ id: user.id, user, assistantMessages })
+
+    const visibleAssistants = assistantMessages.filter(messageHasVisibleContent)
+    if (!messageHasVisibleContent(user) && visibleAssistants.length === 0) {
+      user = null
+      assistantMessages = []
+      return
+    }
+
+    turns.push({ id: user.id, user, assistantMessages: visibleAssistants })
     user = null
     assistantMessages = []
   }

@@ -8,16 +8,16 @@ export const typographyProseClass =
   'max-w-full min-w-0 text-foreground break-words [overflow-wrap:anywhere] [&>*:first-child]:mt-0 [&>*:last-child]:mb-0'
 
 export const typography = {
-  h1: 'scroll-m-20 border-b border-border pb-2 text-xl font-semibold tracking-tight text-balance first:mt-0',
-  h2: 'scroll-m-20 mt-6 border-b border-border pb-2 text-lg font-semibold tracking-tight first:mt-0',
-  h3: 'scroll-m-20 mt-5 text-base font-semibold tracking-tight first:mt-0',
-  h4: 'scroll-m-20 mt-4 text-sm font-semibold tracking-tight first:mt-0',
-  p: 'leading-7 text-foreground [&:not(:first-child)]:mt-3',
+  h1: 'scroll-m-20 border-b border-border pb-2 text-xl font-semibold text-balance first:mt-0',
+  h2: 'scroll-m-20 mt-6 border-b border-border pb-2 text-lg font-semibold first:mt-0',
+  h3: 'scroll-m-20 mt-5 text-base font-semibold first:mt-0',
+  h4: 'scroll-m-20 mt-4 text-[13px] font-semibold first:mt-0',
+  p: 'text-[13px] leading-[1.5] text-foreground [&:not(:first-child)]:mt-3',
   lead: 'text-base text-muted-foreground',
   blockquote: 'mt-3 border-l-2 border-border pl-6 italic text-muted-foreground',
   ul: 'my-3 ml-6 list-disc text-foreground [&>li]:mt-1.5',
   ol: 'my-3 ml-6 list-decimal text-foreground [&>li]:mt-1.5',
-  li: 'leading-7',
+  li: 'text-[13px] leading-[1.5]',
   a: 'font-medium text-primary underline underline-offset-4',
   strong: 'font-semibold text-foreground',
   em: 'italic',

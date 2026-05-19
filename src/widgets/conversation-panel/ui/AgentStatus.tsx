@@ -29,7 +29,7 @@ export function AgentStatus({ stage }: AgentStatusProps) {
         aria-live="polite"
         aria-label={`Searching web via ${provider.label}`}
       >
-        <span className="inline-flex flex-wrap items-baseline gap-x-1 text-sm font-medium">
+        <span className="inline-flex flex-wrap items-baseline gap-x-1 text-[13px] leading-[1.5] font-normal">
           <ShinyText
             text="Searching web"
             className="inline"
@@ -65,7 +65,7 @@ export function AgentStatus({ stage }: AgentStatusProps) {
       >
         <ShinyText
           text={label}
-          className="shrink-0 text-sm font-medium"
+          className="shrink-0 text-[13px] leading-[1.5] font-normal"
           color="#6b6b6b"
           shineColor="#d4d4d4"
           speed={2.2}
@@ -80,7 +80,7 @@ export function AgentStatus({ stage }: AgentStatusProps) {
     <div className={agentMessageClass} role="status" aria-live="polite" aria-label={label}>
       <ShinyText
         text={label}
-        className="text-sm font-medium"
+        className="text-[13px] leading-[1.5] font-normal"
         color="#6b6b6b"
         shineColor="#d4d4d4"
         speed={2.2}

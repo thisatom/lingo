@@ -52,10 +52,44 @@ export function getChatContextUsagePercent(
   modelId: string,
   reservedOutputTokens = openRouterConfig.maxTokens
 ): number {
-  const limit = getModelContextLimit(modelId)
-  const used = estimateChatContextTokens(messages) + reservedOutputTokens
-  if (limit <= 0) return 0
-  return Math.min(100, Math.max(0, Math.round((used / limit) * 100)))
+  return getChatContextUsageDetails(messages, modelId, reservedOutputTokens).percent
+}
+
+export type ChatContextUsageDetails = {
+  percent: number
+  limitTokens: number
+  usedTokens: number
+  messageTokens: number
+  systemReserveTokens: number
+  outputReserveTokens: number
+  messageCount: number
+}
+
+export function getChatContextUsageDetails(
+  messages: Pick<Message, 'role' | 'content'>[],
+  modelId: string,
+  reservedOutputTokens = openRouterConfig.maxTokens
+): ChatContextUsageDetails {
+  const limitTokens = getModelContextLimit(modelId)
+  const messageTokens = messages.reduce(
+    (sum, message) => sum + MESSAGE_OVERHEAD_TOKENS + estimateTextTokens(message.content),
+    0
+  )
+  const systemReserveTokens = SYSTEM_PROMPT_RESERVE
+  const outputReserveTokens = reservedOutputTokens
+  const usedTokens = systemReserveTokens + messageTokens + outputReserveTokens
+  const percent =
+    limitTokens <= 0 ? 0 : Math.min(100, Math.max(0, Math.round((usedTokens / limitTokens) * 100)))
+
+  return {
+    percent,
+    limitTokens,
+    usedTokens,
+    messageTokens,
+    systemReserveTokens,
+    outputReserveTokens,
+    messageCount: messages.length
+  }
 }
 
 export function trimMessagesForContext(

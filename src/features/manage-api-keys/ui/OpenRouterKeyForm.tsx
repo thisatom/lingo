@@ -65,10 +65,10 @@ export function OpenRouterKeyForm() {
         </p>
       )}
 
-      <Collapsible defaultOpen className="rounded-lg border border-border">
+      <Collapsible defaultOpen className="rounded-[8px] border border-border">
         <CollapsibleTrigger
           className={cn(
-            'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left outline-none',
+            'flex w-full items-center justify-between gap-2 rounded-[8px] px-3 py-2.5 text-left outline-none',
             'hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring [&[data-state=open]>svg]:rotate-180'
           )}
         >
@@ -125,10 +125,10 @@ export function OpenRouterKeyForm() {
         </CollapsibleContent>
       </Collapsible>
 
-      <Collapsible defaultOpen className="rounded-lg border border-border">
+      <Collapsible defaultOpen className="rounded-[8px] border border-border">
         <CollapsibleTrigger
           className={cn(
-            'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left outline-none',
+            'flex w-full items-center justify-between gap-2 rounded-[8px] px-3 py-2.5 text-left outline-none',
             'hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring [&[data-state=open]>svg]:rotate-180'
           )}
         >

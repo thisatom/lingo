@@ -35,8 +35,18 @@ export function useAiChat() {
   const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const stage = useConversationStore((s) => s.stage)
   const setStage = useConversationStore((s) => s.setStage)
-  const setError = useConversationStore((s) => s.setError)
+  const setConversationError = useConversationStore((s) => s.setError)
+  const setChatHasError = useChatsStore((s) => s.setChatHasError)
   const setBlurAnimateMessageId = useConversationStore((s) => s.setBlurAnimateMessageId)
+
+  const setError = useCallback(
+    (error: string | null) => {
+      setConversationError(error)
+      const chatId = useChatsStore.getState().activeChatId
+      if (chatId) setChatHasError(chatId, Boolean(error))
+    },
+    [setConversationError, setChatHasError]
+  )
   const streamControllerRef = useRef<ChatStreamController | null>(null)
   const streamingTtsRef = useRef<StreamingSentenceTts | null>(null)
 

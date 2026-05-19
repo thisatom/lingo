@@ -1,11 +1,13 @@
 import { ChevronLeft } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { SETTINGS_SECTIONS } from '@/entities/settings/config/sections'
+import { APP_RADIUS_8_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from '@/shared/ui/item'
 
 const navItemClass = cn(
   'w-full border-0 text-sidebar-foreground shadow-none',
+  APP_RADIUS_8_CLASS,
   'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
   'focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-sidebar-ring'
 )

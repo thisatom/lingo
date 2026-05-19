@@ -3,26 +3,14 @@ import { ArrowUp, Globe, Mic, Square } from 'lucide-react'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { VoiceRecordButton, type VoiceInteractionMode } from '@/features/voice-capture/ui/VoiceRecordButton'
-import {
-  CHAT_MODE_LABELS,
-  composerSelectContentClass,
-  composerSelectItemClass,
-  composerModelSelectTriggerClass,
-  composerSelectTriggerClass,
-  composerToolbarIconClass
-} from '@/widgets/chat-composer/lib/composer-toolbar'
+import { composerInputHoverClass } from '@/shared/lib/sidebar-filter-menu-styles'
+import { CHAT_MODE_LABELS, composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
+import { ComposerAgentMenuSelect } from '@/widgets/chat-composer/ui/ComposerAgentMenuSelect'
 import { ContextUsageButton } from '@/widgets/chat-composer/ui/ContextUsageButton'
-import { shortOpenRouterModelLabel } from '@/widgets/chat-composer/lib/model-label'
+import type { ChatContextUsageDetails } from '@/shared/lib/chat-context-usage'
 import { openRouterSuggestedModels } from '@/shared/config/openrouter'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
-import { Kbd, KbdGroup } from '@/shared/ui/kbd'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger
-} from '@/shared/ui/select'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
 const INPUT_MIN_HEIGHT_PX = 24
@@ -52,7 +40,7 @@ interface ChatComposerProps {
   liveConversationActive?: boolean
   placeholder?: string
   overlay?: boolean
-  contextUsagePercent?: number
+  contextUsage?: ChatContextUsageDetails | null
   onResetContext?: () => void
 }
 
@@ -95,7 +83,7 @@ export function ChatComposer({
   liveConversationActive = false,
   placeholder = 'Send follow-up',
   overlay = false,
-  contextUsagePercent,
+  contextUsage,
   onResetContext
 }: ChatComposerProps) {
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
@@ -105,14 +93,29 @@ export function ChatComposer({
   const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const setWebSearchEnabled = useSettingsStore((s) => s.setWebSearchEnabled)
 
-  const modelOptions = useMemo(() => {
+  const modelOptionIds = useMemo(() => {
     const ids = new Set<string>(openRouterSuggestedModels)
     if (modelId.trim()) ids.add(modelId.trim())
     return [...ids]
   }, [modelId])
 
+  const modeSelectOptions = useMemo(
+    () =>
+      [
+        { value: 'text' as const, label: CHAT_MODE_LABELS.text },
+        { value: 'conversation' as const, label: CHAT_MODE_LABELS.conversation }
+      ] as const,
+    []
+  )
+
   const canSend = !disabled && value.trim().length > 0
-  const showStop = Boolean(agentBusy && onStop && !canSend)
+  const showStop = Boolean(
+    onStop &&
+      !canSend &&
+      (agentBusy ||
+        voiceBusy ||
+        (liveConversationActive && chatComposerMode === 'conversation'))
+  )
   const micLabel = voiceMicLabel(chatComposerMode, liveConversationActive, Boolean(isListening))
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -121,10 +124,10 @@ export function ChatComposer({
     if (el) resizeTextarea(el)
   }, [value])
 
-  const showContext = contextUsagePercent != null && onResetContext
+  const showContext = contextUsage != null && onResetContext
 
   return (
-    <div className={cn('flex w-full shrink-0 flex-col gap-1.5', !overlay && 'px-4 pb-4 pt-2')}>
+    <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')}>
       <div className={cn(composerShellClass, disabled && 'opacity-60')}>
         <textarea
           ref={textareaRef}
@@ -201,7 +204,7 @@ export function ChatComposer({
             size="icon"
             className={cn(
               composerToolbarIconClass,
-              webSearchEnabled && 'bg-[#303030] text-foreground'
+              webSearchEnabled && cn(composerInputHoverClass, 'bg-[#303030] text-foreground')
             )}
             disabled={disabled}
             tooltip={webSearchEnabled ? 'Web search on' : 'Web search off'}
@@ -212,43 +215,25 @@ export function ChatComposer({
             <Globe className="size-4" />
           </TooltipIconButton>
 
-          <Select
-            value={chatComposerMode}
-            onValueChange={(v) => setChatComposerMode(v as 'text' | 'conversation')}
+          <ComposerAgentMenuSelect
+            mode={chatComposerMode}
+            modelId={modelId}
+            modeOptions={modeSelectOptions}
+            modelIds={modelOptionIds}
+            onModeChange={setChatComposerMode}
+            onModelChange={setModelId}
             disabled={disabled}
-          >
-            <SelectTrigger size="sm" aria-label="Chat mode" className={composerSelectTriggerClass}>
-              <span className="truncate leading-none">{CHAT_MODE_LABELS[chatComposerMode]}</span>
-            </SelectTrigger>
-            <SelectContent position="popper" align="start" className={composerSelectContentClass}>
-              <SelectItem
-                value="text"
-                className={composerSelectItemClass}
-                suffix={
-                  <KbdGroup className="ml-auto mr-1 opacity-70" aria-hidden>
-                    <Kbd>Ctrl</Kbd>
-                    <Kbd>Shift</Kbd>
-                    <Kbd>T</Kbd>
-                  </KbdGroup>
-                }
-              >
-                {CHAT_MODE_LABELS.text}
-              </SelectItem>
-              <SelectItem
-                value="conversation"
-                className={composerSelectItemClass}
-                suffix={
-                  <KbdGroup className="ml-auto mr-1 opacity-70" aria-hidden>
-                    <Kbd>Ctrl</Kbd>
-                    <Kbd>Shift</Kbd>
-                    <Kbd>V</Kbd>
-                  </KbdGroup>
-                }
-              >
-                {CHAT_MODE_LABELS.conversation}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          />
+
+          {showContext ? (
+            <ContextUsageButton
+              percent={contextUsage.percent}
+              usage={contextUsage}
+              modelId={modelId}
+              disabled={disabled}
+              onReset={onResetContext}
+            />
+          ) : null}
 
           <div className="min-w-0 flex-1" />
 
@@ -278,39 +263,6 @@ export function ChatComposer({
             </TooltipIconButton>
           )}
         </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-2 px-0.5">
-        <Select value={modelId} onValueChange={setModelId} disabled={disabled}>
-          <SelectTrigger
-            size="sm"
-            aria-label="AI model"
-            className={composerModelSelectTriggerClass}
-          >
-            <span className="truncate leading-none">
-              {shortOpenRouterModelLabel(modelId)}
-            </span>
-          </SelectTrigger>
-          <SelectContent
-            position="popper"
-            align="start"
-            className={cn(composerSelectContentClass, 'max-h-64 min-w-[14rem]')}
-          >
-            {modelOptions.map((id) => (
-              <SelectItem key={id} value={id} className={composerSelectItemClass}>
-                {id}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {showContext ? (
-          <ContextUsageButton
-            percent={contextUsagePercent}
-            disabled={disabled}
-            onReset={onResetContext}
-          />
-        ) : null}
       </div>
     </div>
   )
