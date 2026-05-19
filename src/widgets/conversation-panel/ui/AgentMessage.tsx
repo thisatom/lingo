@@ -12,8 +12,12 @@ interface AgentMessageProps {
 
 export function AgentMessage({ content, disabled, onRegenerate }: AgentMessageProps) {
   return (
-    <div className="group/message min-w-0 max-w-full space-y-1 overflow-hidden">
-      <MarkdownContent content={content} variant="typography" className={agentMessageClass} />
+    <div className="group/message w-full min-w-0 max-w-full space-y-1 overflow-hidden">
+      <MarkdownContent
+        content={content}
+        variant="typography"
+        className={agentMessageClass}
+      />
       <AgentMessageActions
         className="pl-3"
         content={content}

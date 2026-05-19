@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, X } from 'lucide-react'
 import { UserMessageActions } from './MessageActions'
-import { messageTextClass, userMessageBubbleClass } from './agent-layout'
+import { userMessageBubbleClass, userMessageTextClass } from './agent-layout'
 import { cn } from '@/shared/lib/utils'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
@@ -64,10 +64,10 @@ export function UserMessage({
 
   if (isEditing) {
     return (
-      <div className="group/message space-y-1" data-user-message-edit>
+      <div className="group/message w-full min-w-0 max-w-full" data-user-message-edit>
         <div
           className={cn(
-            'grid min-h-[42px] w-full grid-cols-[24px_1fr_24px] items-center gap-1',
+            'grid min-h-[42px] w-full max-w-full grid-cols-[24px_1fr_24px] items-center gap-1',
             userMessageBubbleClass,
             'px-2',
             'transition-colors focus-within:border-muted-foreground/40',
@@ -134,15 +134,17 @@ export function UserMessage({
   }
 
   return (
-    <div className="group/message space-y-1">
-      <div className={userMessageBubbleClass}>
-        <p className={cn(messageTextClass, 'whitespace-pre-wrap')}>{content}</p>
+    <div className="w-full min-w-0 max-w-full">
+      <div className={cn(userMessageBubbleClass, 'group/message relative')}>
+        <p className={cn(userMessageTextClass, 'whitespace-pre-wrap pr-12')}>{content}</p>
+        <UserMessageActions
+          compact
+          className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
+          content={content}
+          disabled={disabled}
+          onEdit={onEnterEdit}
+        />
       </div>
-      <UserMessageActions
-        content={content}
-        disabled={disabled}
-        onEdit={onEnterEdit}
-      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAiChat } from '@/features/ai-chat/model/useAiChat'
+import { useChatContextUsage } from '@/features/chat-context/model/useChatContextUsage'
 import { useChatComposerModeHotkey } from '@/features/chat-composer/model/useChatComposerModeHotkey'
 import { useOpenRouterKey } from '@/features/manage-api-keys/model/useOpenRouterKey'
 import { useLiveConversationLoop } from '@/features/voice-input/model/useLiveConversationLoop'
@@ -44,8 +45,11 @@ export function MainPage() {
   const speechError = useConversationStore((s) => s.speechError)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
+  const modelId = useSettingsStore((s) => s.modelId)
   const microphoneDeviceId = useSettingsStore((s) => s.microphoneDeviceId)
   const microphoneLabel = useSettingsStore((s) => s.microphoneLabel)
+  const { percent: contextUsagePercent, resetContext, showIndicator } =
+    useChatContextUsage(messages, modelId)
 
   useChatComposerModeHotkey()
 
@@ -304,6 +308,8 @@ export function MainPage() {
               voiceInteractionMode="toggle"
               liveConversationActive={liveConversation.isLiveConversationActive}
               placeholder={status?.isSet ? 'Send follow-up' : 'Add API key in Settings…'}
+              contextUsagePercent={showIndicator ? contextUsagePercent : undefined}
+              onResetContext={showIndicator ? resetContext : undefined}
               overlay
             />
           </div>

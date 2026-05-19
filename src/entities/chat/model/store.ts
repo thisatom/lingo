@@ -29,6 +29,7 @@ interface ChatsState {
   ) => void
   getComposerDraft: (chatId: string) => string
   setComposerDraft: (chatId: string, draft: string) => void
+  setChatMessages: (chatId: string, messages: Message[]) => void
   getActiveChat: () => Chat | null
   ensureActiveChat: () => string
 }
@@ -325,6 +326,18 @@ export const useChatsStore = create<ChatsState>()(
             ...(state.composerDraftByChatId ?? {}),
             [chatId]: draft
           }
+        }))
+      },
+
+      setChatMessages: (chatId, messages) => {
+        if (!get().chats.some((c) => c.id === chatId)) return
+
+        set((state) => ({
+          chats: withSortedChats(
+            state.chats.map((c) =>
+              c.id === chatId ? { ...c, messages, updatedAt: Date.now() } : c
+            )
+          )
         }))
       },
 

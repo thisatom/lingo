@@ -1,0 +1,84 @@
+import { normalizeOpenRouterModelId, openRouterConfig } from '@/shared/config/openrouter'
+import type { Message } from '@/entities/message/model/types'
+
+const MESSAGE_OVERHEAD_TOKENS = 4
+const SYSTEM_PROMPT_RESERVE = 256
+const DEFAULT_CONTEXT_LIMIT = 32_000
+
+/** Approximate context window sizes (tokens) for common OpenRouter models. */
+const MODEL_CONTEXT_LIMITS: Record<string, number> = {
+  'openai/gpt-4o-mini': 128_000,
+  'openai/gpt-4o': 128_000,
+  'openai/gpt-4.1-mini': 128_000,
+  'openai/gpt-4.1': 128_000,
+  'anthropic/claude-3.5-sonnet': 200_000,
+  'anthropic/claude-3.7-sonnet': 200_000,
+  'anthropic/claude-sonnet-4': 200_000,
+  'google/gemini-2.0-flash-001': 1_000_000,
+  'google/gemini-2.5-flash-preview': 1_000_000,
+  'meta-llama/llama-3.3-70b-instruct': 128_000,
+  'mistralai/mistral-small-3.1-24b-instruct': 128_000,
+  'deepseek/deepseek-chat': 64_000,
+  'qwen/qwen-2.5-72b-instruct': 128_000,
+  'perplexity/sonar': 127_000,
+  'openrouter/auto': 128_000
+}
+
+export function getModelContextLimit(modelId: string): number {
+  const key = normalizeOpenRouterModelId(modelId).toLowerCase()
+  return MODEL_CONTEXT_LIMITS[key] ?? DEFAULT_CONTEXT_LIMIT
+}
+
+export function estimateTextTokens(text: string): number {
+  if (!text.trim()) return 0
+  return Math.ceil(text.length / 3.5)
+}
+
+export function estimateChatContextTokens(
+  messages: Pick<Message, 'role' | 'content'>[]
+): number {
+  return (
+    SYSTEM_PROMPT_RESERVE +
+    messages.reduce(
+      (sum, message) =>
+        sum + MESSAGE_OVERHEAD_TOKENS + estimateTextTokens(message.content),
+      0
+    )
+  )
+}
+
+export function getChatContextUsagePercent(
+  messages: Pick<Message, 'role' | 'content'>[],
+  modelId: string,
+  reservedOutputTokens = openRouterConfig.maxTokens
+): number {
+  const limit = getModelContextLimit(modelId)
+  const used = estimateChatContextTokens(messages) + reservedOutputTokens
+  if (limit <= 0) return 0
+  return Math.min(100, Math.max(0, Math.round((used / limit) * 100)))
+}
+
+export function trimMessagesForContext(
+  messages: Message[],
+  modelId: string,
+  targetPercent = 50
+): Message[] {
+  if (messages.length <= 2) return messages
+
+  const limit = getModelContextLimit(modelId)
+  const targetTokens = Math.floor((limit * targetPercent) / 100)
+  const reservedOutput = openRouterConfig.maxTokens
+
+  let trimmed = [...messages]
+  while (
+    trimmed.length > 2 &&
+    estimateChatContextTokens(trimmed) + reservedOutput > targetTokens
+  ) {
+    trimmed = trimmed.slice(1)
+    while (trimmed.length > 0 && trimmed[0]?.role === 'assistant') {
+      trimmed = trimmed.slice(1)
+    }
+  }
+
+  return trimmed
+}

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AgentChatScrollArea } from './AgentChatScrollArea'
 import type { Message } from '@/entities/message/model/types'
 import type { PipelineStage } from '@/entities/conversation/model/store'
-import { AgentMessage } from './AgentMessage'
+import { groupMessagesIntoTurns } from '@/widgets/conversation-panel/lib/group-turns'
 import { AgentStatus } from './AgentStatus'
-import { UserMessage } from './UserMessage'
+import { ConversationTurn } from './ConversationTurn'
 
 const ACTIVE_STAGES: PipelineStage[] = [
   'listening',
@@ -56,6 +56,8 @@ export function ConversationPanel({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [editingUserMessageId])
 
+  const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages])
+
   const lastAssistantMessageId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'assistant') return messages[i].id
@@ -80,30 +82,22 @@ export function ConversationPanel({
             </p>
           )}
 
-          {messages.map((m) => (
-            <article key={m.id} className="min-w-0 max-w-full">
-              {m.role === 'user' ? (
-                <UserMessage
-                  messageId={m.id}
-                  content={m.content}
-                  disabled={actionsDisabled}
-                  isEditing={editingUserMessageId === m.id}
-                  onEnterEdit={() => setEditingUserMessageId(m.id)}
-                  onExitEdit={() => setEditingUserMessageId(null)}
-                  onSubmitEdit={(text) => {
-                    void onSubmitEditedUserMessage(m.id, text)
-                  }}
-                />
-              ) : (
-                <AgentMessage
-                  content={m.content}
-                  messageId={m.id}
-                  isLatestAssistant={m.id === lastAssistantMessageId}
-                  disabled={actionsDisabled}
-                  onRegenerate={() => onRegenerateAssistantMessage(m.id)}
-                />
-              )}
-            </article>
+          {turns.map((turn) => (
+            <ConversationTurn
+              key={turn.id}
+              turn={turn}
+              lastAssistantMessageId={lastAssistantMessageId}
+              editingUserMessageId={editingUserMessageId}
+              actionsDisabled={actionsDisabled}
+              onEnterEdit={setEditingUserMessageId}
+              onExitEdit={() => setEditingUserMessageId(null)}
+              onSubmitEdit={(messageId, text) => {
+                void onSubmitEditedUserMessage(messageId, text)
+              }}
+              onRegenerateAssistant={(messageId) => {
+                onRegenerateAssistantMessage(messageId)
+              }}
+            />
           ))}
 
           {showStatus && <AgentStatus stage={stage} />}

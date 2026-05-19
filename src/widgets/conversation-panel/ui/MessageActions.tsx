@@ -12,6 +12,7 @@ interface ActionButtonProps {
   disabled?: boolean
   activeLabel?: string
   active?: boolean
+  compact?: boolean
 }
 
 function ActionButton({
@@ -20,7 +21,8 @@ function ActionButton({
   onClick,
   disabled,
   activeLabel,
-  active
+  active,
+  compact
 }: ActionButtonProps) {
   const tooltip = active && activeLabel ? activeLabel : label
 
@@ -28,7 +30,10 @@ function ActionButton({
     <TooltipIconButton
       variant="ghost"
       size="icon"
-      className="size-7 text-muted-foreground hover:text-foreground"
+      className={cn(
+        'text-muted-foreground hover:text-foreground',
+        compact ? 'size-6' : 'size-7'
+      )}
       disabled={disabled}
       tooltip={tooltip}
       onClick={onClick}
@@ -40,10 +45,12 @@ function ActionButton({
 
 function CopyActionButton({
   text,
-  disabled
+  disabled,
+  compact
 }: {
   text: string
   disabled?: boolean
+  compact?: boolean
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -62,6 +69,7 @@ function CopyActionButton({
       icon={copied ? Check : Copy}
       onClick={() => void handleCopy()}
       disabled={disabled}
+      compact={compact}
     />
   )
 }
@@ -76,7 +84,8 @@ export function MessageActions({ className, disabled, children }: MessageActions
   return (
     <div
       className={cn(
-        'flex items-center gap-0.5 opacity-0 transition-opacity group-hover/message:opacity-100',
+        'flex items-center justify-center gap-0.5 opacity-0 transition-opacity',
+        'pointer-events-none group-hover/message:pointer-events-auto group-hover/message:opacity-100',
         disabled && 'pointer-events-none !opacity-0',
         className
       )}
@@ -89,14 +98,28 @@ export function MessageActions({ className, disabled, children }: MessageActions
 interface UserMessageActionsProps {
   content: string
   disabled?: boolean
+  className?: string
+  compact?: boolean
   onEdit: () => void
 }
 
-export function UserMessageActions({ content, disabled, onEdit }: UserMessageActionsProps) {
+export function UserMessageActions({
+  content,
+  disabled,
+  className,
+  compact,
+  onEdit
+}: UserMessageActionsProps) {
   return (
-    <MessageActions disabled={disabled}>
-      <CopyActionButton text={content} disabled={disabled} />
-      <ActionButton label="Edit" icon={Pencil} onClick={onEdit} disabled={disabled} />
+    <MessageActions className={className} disabled={disabled}>
+      <CopyActionButton text={content} disabled={disabled} compact={compact} />
+      <ActionButton
+        label="Edit"
+        icon={Pencil}
+        onClick={onEdit}
+        disabled={disabled}
+        compact={compact}
+      />
     </MessageActions>
   )
 }
@@ -105,6 +128,7 @@ interface AgentMessageActionsProps {
   content: string
   disabled?: boolean
   className?: string
+  compact?: boolean
   onRegenerate: () => void
 }
 
@@ -112,16 +136,18 @@ export function AgentMessageActions({
   content,
   disabled,
   className,
+  compact,
   onRegenerate
 }: AgentMessageActionsProps) {
   return (
     <MessageActions className={className} disabled={disabled}>
-      <CopyActionButton text={content} disabled={disabled} />
+      <CopyActionButton text={content} disabled={disabled} compact={compact} />
       <ActionButton
         label="Regenerate"
         icon={RotateCw}
         onClick={onRegenerate}
         disabled={disabled}
+        compact={compact}
       />
     </MessageActions>
   )
