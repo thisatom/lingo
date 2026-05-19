@@ -80,6 +80,9 @@ const lingo: LingoApi = {
   tts: {
     synthesize: (request: TtsSynthesizeRequest) =>
       ipcRenderer.invoke('lingo:tts:synthesize', request)
+  },
+  link: {
+    preview: (url: string) => ipcRenderer.invoke('lingo:link:preview', url)
   }
 }
 

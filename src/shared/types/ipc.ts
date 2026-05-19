@@ -69,6 +69,14 @@ export interface TtsSynthesizeResponse {
   mimeType: string
 }
 
+export interface LinkPreviewResponse {
+  url: string
+  title?: string
+  description?: string
+  image?: string
+  siteName?: string
+}
+
 export interface LingoApi {
   secrets: {
     getStatus: (provider: SecretProviderId) => Promise<SecretStatus>
@@ -88,6 +96,9 @@ export interface LingoApi {
   }
   tts: {
     synthesize: (request: TtsSynthesizeRequest) => Promise<TtsSynthesizeResponse>
+  }
+  link: {
+    preview: (url: string) => Promise<LinkPreviewResponse>
   }
 }
 

@@ -169,6 +169,14 @@ body > [data-radix-popper-content-wrapper]:has([data-slot='tooltip-content']) {
 }
 
 /* Titlebar: library uses backgroundColor + update-window-controls IPC on Windows */
+.cet-titlebar:not(.light) {
+  background-color: #121212;
+}
+
+.cet-titlebar:not(.light) .cet-window-controls {
+  background-color: #121212;
+}
+
 .cet-container {
   border-top: 1px solid #242424;
 }

@@ -9,6 +9,7 @@ import {
   attachTitlebarToWindow,
   setupTitlebar
 } from '@incanta/custom-electron-titlebar/main'
+import { titlebarTheme } from '../../src/shared/config/titlebar'
 import { registerIpcHandlers } from './ipc'
 import { resolveAppIconPath } from './icon'
 import { resolvePreloadScript } from './paths'
@@ -29,8 +30,14 @@ function createWindow(): BrowserWindow {
     title: 'Lingo',
     ...(iconPath ? { icon: iconPath } : {}),
     titleBarStyle: 'hidden',
-    // Lets custom-electron-titlebar sync native Win11 controls via update-window-controls IPC.
-    titleBarOverlay: process.platform === 'win32',
+    titleBarOverlay:
+      process.platform === 'win32'
+        ? {
+            color: titlebarTheme.background,
+            symbolColor: titlebarTheme.foreground,
+            height: titlebarTheme.overlayHeight
+          }
+        : false,
     webPreferences: {
       preload: resolvePreloadScript(),
       sandbox: false,
@@ -40,6 +47,14 @@ function createWindow(): BrowserWindow {
   })
 
   attachTitlebarToWindow(mainWindow)
+
+  if (process.platform === 'win32') {
+    mainWindow.setTitleBarOverlay({
+      color: titlebarTheme.background,
+      symbolColor: titlebarTheme.foreground,
+      height: titlebarTheme.overlayHeight
+    })
+  }
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()

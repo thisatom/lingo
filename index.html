@@ -8,6 +8,7 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#121212" />
+    <meta name="msapplication-TileColor" content="#121212" />
     <meta name="color-scheme" content="dark" />
     <link rel="icon" type="image/png" href="/icon.png" />
     <title>Lingo</title>
@@ -27,89 +28,21 @@
       #root {
         min-height: 100%;
       }
-      @keyframes app-splash-spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
       #app-splash {
         position: fixed;
         inset: 0;
         z-index: 2147483646;
-        display: flex;
-        flex-direction: row;
         background: #121212;
-        color: #d1d1d1;
-        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       }
       #app-splash.app-splash--hide {
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.22s ease-out;
       }
-      .app-splash-sidebar {
-        width: 22%;
-        min-width: 14rem;
-        max-width: 40%;
-        flex-shrink: 0;
-        border-right: 1px solid #2a2a2a;
-        padding: 0.5rem;
-        box-sizing: border-box;
-      }
-      .app-splash-main {
-        flex: 1;
-        min-width: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .app-splash-bar {
-        height: 2rem;
-        border-radius: 0.375rem;
-        background: #212121;
-        margin-bottom: 0.5rem;
-      }
-      .app-splash-row {
-        height: 2rem;
-        border-radius: 0.375rem;
-        background: #212121;
-        margin-bottom: 0.35rem;
-      }
-      .app-splash-spinner {
-        width: 2rem;
-        height: 2rem;
-        border-radius: 50%;
-        border: 2px solid #2a2a2a;
-        border-top-color: #888888;
-        animation: app-splash-spin 0.65s linear infinite;
-      }
     </style>
   </head>
   <body>
-    <div id="app-splash" aria-busy="true" aria-label="Loading">
-      <div class="app-splash-sidebar">
-        <div class="app-splash-bar" style="width: 100%"></div>
-        <div style="display: flex; gap: 0.25rem; margin-bottom: 0.5rem">
-          <div class="app-splash-bar" style="width: 1.75rem; height: 1.75rem; margin: 0"></div>
-          <div class="app-splash-bar" style="width: 1.75rem; height: 1.75rem; margin: 0"></div>
-          <div style="flex: 1"></div>
-          <div class="app-splash-bar" style="width: 1.75rem; height: 1.75rem; margin: 0"></div>
-          <div class="app-splash-bar" style="width: 1.75rem; height: 1.75rem; margin: 0"></div>
-        </div>
-        <div class="app-splash-bar" style="width: calc(100% - 0.5rem); margin-left: 0.25rem"></div>
-        <div style="height: 0.75rem"></div>
-        <div class="app-splash-bar" style="width: 3rem; height: 0.75rem; margin-bottom: 0.5rem"></div>
-        <div class="app-splash-row"></div>
-        <div class="app-splash-row"></div>
-        <div class="app-splash-row"></div>
-        <div class="app-splash-row"></div>
-        <div class="app-splash-row"></div>
-        <div class="app-splash-row"></div>
-      </div>
-      <div class="app-splash-main">
-        <div class="app-splash-spinner"></div>
-      </div>
-    </div>
+    <div id="app-splash" aria-busy="true" aria-label="Loading"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

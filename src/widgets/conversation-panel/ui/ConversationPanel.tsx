@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ScrollArea } from '@/shared/ui/scroll-area'
+import { AgentChatScrollArea } from './AgentChatScrollArea'
 import type { Message } from '@/entities/message/model/types'
 import type { PipelineStage } from '@/entities/conversation/model/store'
 import { AgentMessage } from './AgentMessage'
@@ -69,7 +69,7 @@ export function ConversationPanel({
 
   return (
     <div className="absolute inset-0 overflow-hidden">
-      <ScrollArea className="h-full min-h-0">
+      <AgentChatScrollArea className="h-full min-h-0">
         <div
           className="mx-auto max-w-3xl space-y-[18px] px-4 pt-[18px] sm:px-6"
           style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
@@ -81,7 +81,7 @@ export function ConversationPanel({
           )}
 
           {messages.map((m) => (
-            <article key={m.id}>
+            <article key={m.id} className="min-w-0 max-w-full">
               {m.role === 'user' ? (
                 <UserMessage
                   messageId={m.id}
@@ -110,7 +110,7 @@ export function ConversationPanel({
 
           <div ref={bottomRef} className="h-px shrink-0" />
         </div>
-      </ScrollArea>
+      </AgentChatScrollArea>
     </div>
   )
 }

@@ -21,7 +21,12 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin(), copyAppResources()],
     build: {
       rollupOptions: {
-        input: resolve(__dirname, 'electron/main/index.ts')
+        input: resolve(__dirname, 'electron/main/index.ts'),
+        external: [
+          '@huggingface/transformers',
+          'onnxruntime-node',
+          'onnxruntime-common'
+        ]
       }
     }
   },

@@ -12,6 +12,8 @@ interface VoiceRecordButtonProps {
   onRelease: () => void
   className?: string
   variant?: 'secondary' | 'ghost' | 'destructive'
+  label?: string
+  highlight?: boolean
   /** `toggle`: tap to start / tap to stop (conversation loop). `hold`: push-to-talk. */
   interactionMode?: VoiceInteractionMode
 }
@@ -23,23 +25,32 @@ export function VoiceRecordButton({
   onRelease,
   className,
   variant,
+  label: labelOverride,
+  highlight = false,
   interactionMode = 'hold'
 }: VoiceRecordButtonProps) {
   const isToggle = interactionMode === 'toggle'
-  const label = isListening
-    ? isToggle
-      ? 'Tap to send'
-      : 'Release to send'
-    : isToggle
-      ? 'Tap to speak'
-      : 'Hold to speak'
+  const label =
+    labelOverride ??
+    (isListening
+      ? isToggle
+        ? 'Tap to send'
+        : 'Release to send'
+      : isToggle
+        ? 'Tap to speak'
+        : 'Hold to speak')
 
   const button = (
     <Button
       type="button"
       variant={isListening ? 'destructive' : (variant ?? 'secondary')}
       size="icon"
-      className={cn('shrink-0', isListening && 'animate-pulse', className)}
+      className={cn(
+        'shrink-0',
+        isListening && 'animate-pulse',
+        highlight && !isListening && 'text-emerald-500/90',
+        className
+      )}
       disabled={disabled}
       aria-label={label}
       onPointerDown={(e) => {

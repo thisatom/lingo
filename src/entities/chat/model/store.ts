@@ -55,8 +55,14 @@ function newChat(): Chat {
 
 function titleFromMessage(content: string): string {
   const trimmed = content.trim()
+  if (!trimmed) return 'New chat'
   if (trimmed.length <= 40) return trimmed
   return `${trimmed.slice(0, 40)}…`
+}
+
+function chatNeedsTitleFromFirstUser(title: string): boolean {
+  const t = title.trim()
+  return t === '' || t === 'New chat'
 }
 
 function withSortedChats(chats: Chat[]): Chat[] {
@@ -234,11 +240,16 @@ export const useChatsStore = create<ChatsState>()(
             state.chats.map((c) => {
               if (c.id !== chatId) return c
               const isFirstUser =
-                message.role === 'user' && c.messages.length === 0 && c.title === 'New chat'
+                message.role === 'user' &&
+                c.messages.length === 0 &&
+                chatNeedsTitleFromFirstUser(c.title)
               return {
                 ...c,
                 messages: [...c.messages, fullMessage],
-                title: isFirstUser ? titleFromMessage(message.content) : c.title,
+                title:
+                  isFirstUser && message.content.trim()
+                    ? titleFromMessage(message.content)
+                    : c.title,
                 updatedAt: Date.now()
               }
             })
@@ -286,7 +297,10 @@ export const useChatsStore = create<ChatsState>()(
               const trimmed = message.role === 'user' ? content.trim() : content
               if (message.role === 'user' && !trimmed && !options?.allowEmptyUser) return c
               const nextContent = message.role === 'user' ? content : content
-              const isFirstUser = message.role === 'user' && index === 0 && c.title === 'New chat'
+              const isFirstUser =
+                message.role === 'user' &&
+                index === 0 &&
+                chatNeedsTitleFromFirstUser(c.title)
               return {
                 ...c,
                 messages: c.messages.map((m) =>

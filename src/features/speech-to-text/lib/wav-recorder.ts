@@ -1,6 +1,8 @@
 /** Mono 16-bit PCM WAV at 16 kHz — reliable input for Whisper. */
 
-const TARGET_SAMPLE_RATE = 16_000
+import { WHISPER_SAMPLE_RATE } from './speech-audio-constants'
+
+const TARGET_SAMPLE_RATE = WHISPER_SAMPLE_RATE
 
 
 

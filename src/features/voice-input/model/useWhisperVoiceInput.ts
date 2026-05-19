@@ -5,6 +5,7 @@ import {
   mapSpeechError,
   mapTranscriptionError
 } from '@/features/speech-to-text/lib/speech-errors'
+import { ensureWavForLocalStt } from '@/features/speech-to-text/lib/ensure-wav-for-stt'
 import {
   isAudioCaptureSupported,
   startAudioCapture,
@@ -13,7 +14,7 @@ import {
 import { getLingo } from '@/shared/lib/lingo'
 import { acquireMicrophoneStream, releaseMicrophoneStream } from '@/shared/lib/microphone'
 
-const STT_TIMEOUT_MS = 45_000
+const STT_TIMEOUT_MS = 120_000
 const MAX_RECORDING_MS = 120_000
 
 interface Options {
@@ -37,7 +38,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
   })
 }
 
-export function useWhisperVoiceInput({ enabled }: Options) {
+export function useRecordedVoiceInput({ enabled }: Options) {
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
   const setStage = useConversationStore((s) => s.setStage)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
@@ -51,6 +52,7 @@ export function useWhisperVoiceInput({ enabled }: Options) {
   const startTaskRef = useRef<Promise<boolean> | null>(null)
 
   const [phase, setPhase] = useState<Phase>('idle')
+  const [monitorStream, setMonitorStream] = useState<MediaStream | null>(null)
 
   const clearVoiceStage = useCallback(() => {
     const current = useConversationStore.getState().stage
@@ -79,6 +81,7 @@ export function useWhisperVoiceInput({ enabled }: Options) {
   const releaseMic = useCallback(() => {
     releaseMicrophoneStream(streamRef.current)
     streamRef.current = null
+    setMonitorStream(null)
   }, [])
 
   const hardReset = useCallback(() => {
@@ -133,10 +136,11 @@ export function useWhisperVoiceInput({ enabled }: Options) {
     }
 
     try {
+      const wavAudio = await ensureWavForLocalStt(audio.audioBase64, audio.format)
       const { text } = await withTimeout(
         getLingo().stt.transcribe({
-          audioBase64: audio.audioBase64,
-          format: audio.format,
+          audioBase64: wavAudio.audioBase64,
+          format: wavAudio.format,
           language: practiceLanguage
         }),
         STT_TIMEOUT_MS,
@@ -152,8 +156,7 @@ export function useWhisperVoiceInput({ enabled }: Options) {
     } catch (error) {
       hardReset()
       const msg = error instanceof Error ? error.message : 'STT_FAILED'
-      if (msg.includes('NO_OPENROUTER_KEY')) reportError('NO_OPENROUTER_KEY')
-      else if (msg.includes('RECORDING_TOO_SHORT')) reportError('RECORDING_TOO_SHORT')
+      if (msg.includes('RECORDING_TOO_SHORT')) reportError('RECORDING_TOO_SHORT')
       else if (msg.includes('NO_SPEECH')) reportError('no-speech')
       else if (msg.includes('STT_TIMEOUT')) reportError('network')
       else reportError(msg)
@@ -188,8 +191,9 @@ export function useWhisperVoiceInput({ enabled }: Options) {
         return false
       }
       streamRef.current = stream
+      setMonitorStream(stream)
 
-      const capture = await startAudioCapture(stream)
+      const capture = await startAudioCapture(stream, { preferWav: true })
       if (stopRequestedRef.current) {
         capture?.abort()
         hardReset()
@@ -270,6 +274,7 @@ export function useWhisperVoiceInput({ enabled }: Options) {
     isTranscribing,
     isBusy: phase !== 'idle',
     interimTranscript: '',
+    monitorStream,
     start,
     stop,
     cancel

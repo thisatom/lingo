@@ -1,7 +1,16 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { ArrowUp, Globe, Mic, Square } from 'lucide-react'
+import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { VoiceRecordButton, type VoiceInteractionMode } from '@/features/voice-capture/ui/VoiceRecordButton'
+import {
+  composerSelectContentClass,
+  composerSelectItemClass,
+  composerSelectTriggerClass,
+  composerToolbarIconClass
+} from '@/widgets/chat-composer/lib/composer-toolbar'
+import { shortOpenRouterModelLabel } from '@/widgets/chat-composer/lib/model-label'
+import { openRouterSuggestedModels } from '@/shared/config/openrouter'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { Kbd, KbdGroup } from '@/shared/ui/kbd'
@@ -35,12 +44,25 @@ interface ChatComposerProps {
   voiceSupported?: boolean
   isListening?: boolean
   onVoicePress?: () => void
-  /** Stop an active voice session (mic recording). */
   onVoiceStop?: () => void
   onVoiceRelease?: () => void
   voiceInteractionMode?: VoiceInteractionMode
+  liveConversationActive?: boolean
   placeholder?: string
   overlay?: boolean
+}
+
+function voiceMicLabel(
+  mode: ChatComposerMode,
+  live: boolean,
+  listening: boolean
+): string {
+  if (mode === 'conversation') {
+    if (listening) return 'Tap to send'
+    if (live) return 'Tap to end live chat'
+    return 'Tap to start live chat'
+  }
+  return listening ? 'Tap to finish' : 'Tap to speak'
 }
 
 function resizeTextarea(el: HTMLTextAreaElement) {
@@ -66,16 +88,26 @@ export function ChatComposer({
   onVoiceStop,
   onVoiceRelease,
   voiceInteractionMode = 'toggle',
+  liveConversationActive = false,
   placeholder = 'Send follow-up',
   overlay = false
 }: ChatComposerProps) {
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
   const setChatComposerMode = useSettingsStore((s) => s.setChatComposerMode)
+  const modelId = useSettingsStore((s) => s.modelId)
+  const setModelId = useSettingsStore((s) => s.setModelId)
   const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const setWebSearchEnabled = useSettingsStore((s) => s.setWebSearchEnabled)
 
+  const modelOptions = useMemo(() => {
+    const ids = new Set<string>(openRouterSuggestedModels)
+    if (modelId.trim()) ids.add(modelId.trim())
+    return [...ids]
+  }, [modelId])
+
   const canSend = !disabled && value.trim().length > 0
   const showStop = Boolean(agentBusy && onStop && !canSend)
+  const micLabel = voiceMicLabel(chatComposerMode, liveConversationActive, Boolean(isListening))
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -108,14 +140,14 @@ export function ChatComposer({
           }}
         />
 
-        <div className="flex shrink-0 items-center gap-1 px-2 pb-2 pt-0.5">
+        <div className="flex shrink-0 items-center gap-0.5 px-2 pb-2 pt-0.5">
           {voiceSupported && onVoicePress && (onVoiceStop || onVoiceRelease) ? (
             isListening && onVoiceStop ? (
               <TooltipIconButton
                 type="button"
                 variant="destructive"
                 size="icon"
-                className="size-8 shrink-0 animate-pulse rounded-full"
+                className={cn(composerToolbarIconClass, 'animate-pulse')}
                 disabled={disabled}
                 tooltip="Stop recording"
                 aria-label="Stop recording"
@@ -129,9 +161,17 @@ export function ChatComposer({
                 interactionMode={voiceInteractionMode}
                 isListening={!!isListening}
                 disabled={disabled || voiceBusy || agentBusy}
+                label={micLabel}
+                highlight={liveConversationActive && chatComposerMode === 'conversation'}
                 onPress={onVoicePress}
                 onRelease={onVoiceStop ?? onVoiceRelease ?? (() => undefined)}
-                className="size-8 shrink-0 rounded-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                className={cn(
+                  composerToolbarIconClass,
+                  liveConversationActive &&
+                    chatComposerMode === 'conversation' &&
+                    !isListening &&
+                    'ring-1 ring-emerald-500/50'
+                )}
               />
             )
           ) : (
@@ -139,7 +179,7 @@ export function ChatComposer({
               type="button"
               variant="ghost"
               size="icon"
-              className="size-8 shrink-0 rounded-full text-muted-foreground"
+              className={composerToolbarIconClass}
               disabled
               tabIndex={-1}
             >
@@ -152,10 +192,8 @@ export function ChatComposer({
             variant="ghost"
             size="icon"
             className={cn(
-              'size-8 shrink-0 rounded-full',
-              webSearchEnabled
-                ? 'bg-[#252525] text-foreground'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              composerToolbarIconClass,
+              webSearchEnabled && 'bg-muted/50 text-foreground'
             )}
             disabled={disabled}
             tooltip={webSearchEnabled ? 'Web search on' : 'Web search off'}
@@ -166,28 +204,18 @@ export function ChatComposer({
             <Globe className="size-4" />
           </TooltipIconButton>
 
-          <div className="min-w-0 flex-1" />
-
           <Select
             value={chatComposerMode}
             onValueChange={(v) => setChatComposerMode(v as 'text' | 'conversation')}
             disabled={disabled}
           >
-            <SelectTrigger
-              size="sm"
-              aria-label="Chat mode"
-              className="h-7 w-auto max-w-[6.75rem] shrink-0 cursor-pointer gap-1.5 border-0 bg-transparent px-1.5 text-[11px] leading-none shadow-none hover:bg-[#252525] focus-visible:ring-1 [&_svg]:ml-0.5 [&_svg]:size-3"
-            >
+            <SelectTrigger size="sm" aria-label="Chat mode" className={composerSelectTriggerClass}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent
-              position="popper"
-              align="end"
-              className="min-w-[11rem] border-border/60 bg-[#181818] p-0.5 text-popover-foreground"
-            >
+            <SelectContent position="popper" align="start" className={composerSelectContentClass}>
               <SelectItem
                 value="text"
-                className="h-7 cursor-pointer py-0 pr-8 pl-1.5 text-xs [&_[data-slot=select-item-indicator]]:right-2"
+                className={composerSelectItemClass}
                 suffix={
                   <KbdGroup className="ml-auto mr-1 opacity-70" aria-hidden>
                     <Kbd>Ctrl</Kbd>
@@ -200,7 +228,7 @@ export function ChatComposer({
               </SelectItem>
               <SelectItem
                 value="conversation"
-                className="h-7 cursor-pointer py-0 pr-8 pl-1.5 text-xs [&_[data-slot=select-item-indicator]]:right-2"
+                className={composerSelectItemClass}
                 suffix={
                   <KbdGroup className="ml-auto mr-1 opacity-70" aria-hidden>
                     <Kbd>Ctrl</Kbd>
@@ -209,10 +237,29 @@ export function ChatComposer({
                   </KbdGroup>
                 }
               >
-                Conversation
+                Speech
               </SelectItem>
             </SelectContent>
           </Select>
+
+          <Select value={modelId} onValueChange={setModelId} disabled={disabled}>
+            <SelectTrigger size="sm" aria-label="AI model" className={composerSelectTriggerClass}>
+              <span className="truncate">{shortOpenRouterModelLabel(modelId)}</span>
+            </SelectTrigger>
+            <SelectContent
+              position="popper"
+              align="start"
+              className={cn(composerSelectContentClass, 'max-h-64 min-w-[14rem]')}
+            >
+              {modelOptions.map((id) => (
+                <SelectItem key={id} value={id} className={composerSelectItemClass}>
+                  {id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="min-w-0 flex-1" />
 
           {showStop ? (
             <TooltipIconButton

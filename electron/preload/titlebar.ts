@@ -1,11 +1,10 @@
-export const TITLEBAR_BG = '#121212'
-export const TITLEBAR_FG = '#e4e4e4'
+import { titlebarTheme } from '../../src/shared/config/titlebar'
 
 export async function initCustomTitlebar(): Promise<void> {
   const { Titlebar, TitlebarColor } = await import('@incanta/custom-electron-titlebar')
 
-  const backgroundColor = TitlebarColor.fromHex(TITLEBAR_BG)
-  const foregroundColor = TitlebarColor.fromHex(TITLEBAR_FG)
+  const backgroundColor = TitlebarColor.fromHex(titlebarTheme.background)
+  const foregroundColor = TitlebarColor.fromHex(titlebarTheme.foreground)
 
   new Titlebar({
     minWidth: 400,

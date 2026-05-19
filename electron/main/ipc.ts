@@ -10,6 +10,7 @@ import { completeChat, validateOpenRouterKey } from './chat'
 import { streamChat } from './chat-stream'
 import { abortStream, clearStream, registerStreamAbort } from './chat-stream-registry'
 import { clearSecret, getSecretStatus, setSecret } from './secrets'
+import { fetchLinkPreview } from './link-preview'
 import { transcribeAudio } from './stt'
 import { synthesizeSpeech } from './tts'
 
@@ -49,9 +50,7 @@ export function registerIpcHandlers(): void {
         if (!isAbort && !event.sender.isDestroyed()) {
           const message = error instanceof Error ? error.message : 'Stream failed'
           event.sender.send(channel, { type: 'error', message })
-        }
-        if (!isAbort) {
-          throw error
+          console.warn('[lingo:chat:stream]', message)
         }
       } finally {
         clearStream(channel)
@@ -70,4 +69,6 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('lingo:tts:synthesize', (_e, request: TtsSynthesizeRequest) => {
     return synthesizeSpeech(request)
   })
+
+  ipcMain.handle('lingo:link:preview', (_e, url: string) => fetchLinkPreview(url))
 }

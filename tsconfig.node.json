@@ -5,7 +5,9 @@
     "src/shared/types/**/*",
     "src/shared/config/**/*",
     "src/shared/lib/web-search-intent.ts",
-    "src/shared/lib/strip-text-for-speech.ts"
+    "src/shared/lib/strip-text-for-speech.ts",
+    "src/features/speech-to-text/lib/speech-audio-constants.ts",
+    "src/features/speech-to-text/lib/wav-pcm.ts"
   ],
   "compilerOptions": {
     "composite": true,

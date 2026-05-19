@@ -5,7 +5,7 @@
 
 /** Wrapper for agent markdown — spacing between block elements */
 export const typographyProseClass =
-  'max-w-none text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0'
+  'max-w-full min-w-0 text-foreground break-words [overflow-wrap:anywhere] [&>*:first-child]:mt-0 [&>*:last-child]:mb-0'
 
 export const typography = {
   h1: 'scroll-m-20 border-b border-border pb-2 text-xl font-semibold tracking-tight text-balance first:mt-0',

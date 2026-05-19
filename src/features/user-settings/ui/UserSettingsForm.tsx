@@ -3,8 +3,6 @@ import { settingsInputClass } from '@/shared/lib/settings-control'
 import { Input } from '@/shared/ui/input'
 import { Item, ItemContent, ItemDescription, ItemGroup } from '@/shared/ui/item'
 import { Label } from '@/shared/ui/label'
-import { MicrophoneSettings } from './MicrophoneSettings'
-
 export function UserSettingsForm() {
   const displayName = useSettingsStore((s) => s.displayName)
   const setDisplayName = useSettingsStore((s) => s.setDisplayName)
@@ -30,7 +28,6 @@ export function UserSettingsForm() {
         </ItemContent>
       </Item>
 
-      <MicrophoneSettings />
     </ItemGroup>
   )
 }

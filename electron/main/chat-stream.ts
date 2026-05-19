@@ -7,6 +7,10 @@ import {
   shouldUseResearchMode
 } from '../../src/shared/lib/web-search-intent'
 import { openRouterConfig } from '../../src/shared/config/openrouter'
+import {
+  formatOpenRouterError,
+  isOpenRouterCreditError
+} from '../../src/shared/lib/openrouter-errors'
 import { getSecret } from './secrets'
 import {
   extractAssistantText,
@@ -108,7 +112,7 @@ async function fetchCompletion(
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '')
-    throw new Error(parseApiError(errText, response.status))
+    throw new Error(formatOpenRouterError(parseApiError(errText, response.status)))
   }
 
   const data = (await response.json()) as {
@@ -120,7 +124,7 @@ async function fetchCompletion(
   }
 
   if (data.error?.message) {
-    throw new Error(data.error.message)
+    throw new Error(formatOpenRouterError(data.error.message))
   }
 
   const choice = data.choices?.[0]
@@ -142,6 +146,31 @@ function parseApiError(errText: string, status: number): string {
   return errText || `OpenRouter request failed (${status})`
 }
 
+async function fetchCompletionResilient(
+  apiKey: string,
+  body: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<CompletionResult> {
+  try {
+    return await fetchCompletion(apiKey, body, signal)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const maxTokens = body.max_tokens
+    if (
+      !isOpenRouterCreditError(message) ||
+      typeof maxTokens !== 'number' ||
+      maxTokens <= openRouterConfig.maxTokensCreditFallback
+    ) {
+      throw error
+    }
+    return fetchCompletion(
+      apiKey,
+      { ...body, max_tokens: openRouterConfig.maxTokensCreditFallback },
+      signal
+    )
+  }
+}
+
 function attachWebCapabilities(
   body: Record<string, unknown>,
   modelId: string
@@ -161,7 +190,7 @@ async function completeWithWebSearch(
 ): Promise<void> {
   send({ type: 'searching' })
 
-  let result = await fetchCompletion(apiKey, body, signal)
+  let result = await fetchCompletionResilient(apiKey, body, signal)
   let text = result.text
 
   const needsRetry =
@@ -178,9 +207,9 @@ async function completeWithWebSearch(
         content: `Your answer was incomplete or too short. Answer this clearly in full sentences: "${lastUserMessage}"`
       }
     ]
-    result = await fetchCompletion(
+    result = await fetchCompletionResilient(
       apiKey,
-      { ...body, messages: retryMessages, max_tokens: 4096 },
+      { ...body, messages: retryMessages, max_tokens: openRouterConfig.maxTokensRetry },
       signal
     )
     text = result.text
@@ -228,7 +257,7 @@ export async function streamChat(
       request.practiceLanguage,
       researchMode ? 'research' : 'practice'
     ),
-    max_tokens: 4096,
+    max_tokens: openRouterConfig.maxTokens,
     temperature: researchMode ? 0.3 : 0.7
   }
 
@@ -238,7 +267,7 @@ export async function streamChat(
     return
   }
 
-  const { text } = await fetchCompletion(apiKey, body, signal)
+  const { text } = await fetchCompletionResilient(apiKey, body, signal)
   send({ type: 'text-delta', delta: text, text })
   send({ type: 'done', text })
 }

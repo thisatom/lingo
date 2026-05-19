@@ -1,18 +1,14 @@
 import { useCallback, useRef } from 'react'
-import SpeechRecognition from 'react-speech-recognition'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
+import { selectSttBackend } from '@/features/voice-input/lib/select-stt-backend'
 import { useBrowserSpeechVoiceInput } from '@/features/voice-input/model/useBrowserSpeechVoiceInput'
-import { useWhisperVoiceInput } from '@/features/voice-input/model/useWhisperVoiceInput'
-import { isAudioCaptureSupported } from '@/features/voice-input/lib/record-session'
-import { isLingoAvailable } from '@/shared/lib/lingo'
+import { useRecordedVoiceInput } from '@/features/voice-input/model/useRecordedVoiceInput'
 
 export type VoiceInputPhase = 'idle' | 'recording' | 'transcribing'
 
 export interface LiveVoiceHandlers {
   mode: ChatComposerMode
-  /** Text mode: live composer text (prefix + speech). */
   onTextDraft: (text: string) => void
-  /** Conversation: live user bubble content. */
   onConversationLive: (text: string) => void
   onConversationStart: () => string
   onConversationCommit: (messageId: string) => Promise<void>
@@ -23,11 +19,9 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
   const draftPrefixRef = useRef('')
   const conversationMessageIdRef = useRef('')
 
-  const browserSupported =
-    typeof window !== 'undefined' && SpeechRecognition.browserSupportsSpeechRecognition()
-
-  const useBrowser = browserSupported
-  const useWhisper = !useBrowser && isLingoAvailable() && isAudioCaptureSupported()
+  const backend = selectSttBackend()
+  const useLocal = backend === 'local'
+  const useBrowser = backend === 'browser'
 
   const onLiveTranscript = useCallback(
     (spoken: string) => {
@@ -53,21 +47,17 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
     onLiveTranscript
   })
 
-  const whisper = useWhisperVoiceInput({ enabled: useWhisper })
-
-  const backend = useBrowser ? 'browser' : useWhisper ? 'whisper' : ('none' as const)
+  const recorded = useRecordedVoiceInput({ enabled: useLocal })
 
   const start = useCallback(async () => {
-    if (handlers.mode === 'text') {
-      // draftPrefixRef set via setDraftPrefix() from MainPage
-    } else {
+    if (handlers.mode === 'conversation') {
       conversationMessageIdRef.current = handlers.onConversationStart()
     }
 
     if (useBrowser) return browser.start()
-    if (useWhisper) return whisper.start()
+    if (useLocal) return recorded.start()
     return false
-  }, [backend, browser, handlers, useBrowser, useWhisper, whisper])
+  }, [browser, handlers, recorded, useBrowser, useLocal])
 
   const stop = useCallback(async (): Promise<string | null> => {
     if (useBrowser) {
@@ -82,8 +72,8 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
       return text || null
     }
 
-    if (useWhisper) {
-      const text = (await whisper.stop())?.trim() ?? null
+    if (useLocal) {
+      const text = (await recorded.stop())?.trim() ?? null
       if (!text) return null
 
       if (handlers.mode === 'text') {
@@ -103,7 +93,7 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
     }
 
     return null
-  }, [browser, handlers, useBrowser, useWhisper, whisper])
+  }, [browser, handlers, recorded, useBrowser, useLocal])
 
   const cancel = useCallback(async () => {
     if (handlers.mode === 'text') {
@@ -116,10 +106,10 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
     }
 
     if (useBrowser) await browser.cancel()
-    else if (useWhisper) whisper.cancel()
-  }, [browser, handlers, useBrowser, useWhisper, whisper])
+    else if (useLocal) recorded.cancel()
+  }, [browser, handlers, recorded, useBrowser, useLocal])
 
-  const active = useBrowser ? browser : whisper
+  const active = useLocal ? recorded : browser
 
   return {
     supported: active.supported,
@@ -129,7 +119,8 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
     isRecording: active.isRecording,
     isTranscribing: active.isTranscribing,
     isBusy: active.isBusy,
-    interimTranscript: active.interimTranscript,
+    interimTranscript: useBrowser ? active.interimTranscript : '',
+    monitorStream: useLocal ? recorded.monitorStream : null,
     start,
     stop,
     cancel,

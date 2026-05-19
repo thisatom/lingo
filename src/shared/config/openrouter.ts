@@ -3,8 +3,14 @@ export const openRouterConfig = {
   defaultModel: 'openai/gpt-4o-mini',
   /** Reliable web-search model (also used when user picks `openrouter/auto`). */
   webSearchModel: 'perplexity/sonar',
-  /** Speech-to-text via OpenRouter (Whisper). */
-  sttModel: 'openai/whisper-large-v3'
+  /** Legacy; STT uses free local Whisper in the desktop app. */
+  sttModel: 'openai/whisper-large-v3',
+  /** Default completion budget (fits low-credit OpenRouter accounts). */
+  maxTokens: 1024,
+  /** Retry after a short/incomplete web-search answer. */
+  maxTokensRetry: 1536,
+  /** Last resort when OpenRouter rejects the requested max_tokens budget. */
+  maxTokensCreditFallback: 512
 } as const
 
 export function isOpenRouterAutoModel(modelId: string): boolean {

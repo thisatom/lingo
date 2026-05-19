@@ -2,10 +2,14 @@ import { useCallback, useRef } from 'react'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
-import { playTtsFromBase64, stopTtsPlayback } from '@/features/text-to-speech/model/playTts'
+import { stopTtsPlayback } from '@/features/text-to-speech/model/playTts'
+import {
+  createStreamingSentenceTts,
+  type StreamingSentenceTts
+} from '@/features/text-to-speech/model/streamingSentenceTts'
+import { formatOpenRouterError } from '@/shared/lib/openrouter-errors'
 import type { ChatStreamController } from '@/shared/types/ipc'
 import { getLingo } from '@/shared/lib/lingo'
-import { stripTextForSpeech } from '@/shared/lib/strip-text-for-speech'
 import { beginAgentRun, cancelAgentRun, isAgentRunActive } from './agent-run'
 
 type ChatHistoryMessage = { role: 'user' | 'assistant'; content: string }
@@ -34,12 +38,15 @@ export function useAiChat() {
   const setError = useConversationStore((s) => s.setError)
   const setBlurAnimateMessageId = useConversationStore((s) => s.setBlurAnimateMessageId)
   const streamControllerRef = useRef<ChatStreamController | null>(null)
+  const streamingTtsRef = useRef<StreamingSentenceTts | null>(null)
 
   const messages = activeChat?.messages ?? []
 
   const stopAgent = useCallback(() => {
     streamControllerRef.current?.abort()
     streamControllerRef.current = null
+    streamingTtsRef.current?.cancel()
+    streamingTtsRef.current = null
     cancelAgentRun()
     stopTtsPlayback()
     setBlurAnimateMessageId(null)
@@ -55,6 +62,22 @@ export function useAiChat() {
       const history = getHistoryForChat(targetChatId)
       let assistantMessageId: string | null = null
       let finalText = ''
+      const playTts = chatComposerMode === 'conversation'
+      let streamingTts: StreamingSentenceTts | null = null
+
+      if (playTts) {
+        streamingTts = createStreamingSentenceTts({
+          locale: practiceLanguage,
+          runId,
+          targetChatId,
+          onSpeaking: () => {
+            if (!isAgentRunActive(runId)) return
+            if (useChatsStore.getState().activeChatId !== targetChatId) return
+            setStage('speaking')
+          }
+        })
+        streamingTtsRef.current = streamingTts
+      }
 
       const syncAssistantText = (text: string) => {
         if (!text) return
@@ -85,7 +108,11 @@ export function useAiChat() {
               if (useChatsStore.getState().activeChatId !== targetChatId) return
               finalText = text
               syncAssistantText(text)
-              setStage('idle')
+              if (streamingTts) {
+                streamingTts.feed(text)
+              } else {
+                setStage('idle')
+              }
             },
             onDone: ({ text }) => {
               finalText = text
@@ -113,32 +140,20 @@ export function useAiChat() {
 
         setBlurAnimateMessageId(assistantMessageId)
 
-        const playTts = chatComposerMode === 'conversation'
-        if (playTts) {
-          setStage('speaking')
-
-          const speechText = stripTextForSpeech(finalText)
-          if (speechText) {
-            const { audioBase64, mimeType } = await getLingo().tts.synthesize({
-              text: speechText,
-              locale: practiceLanguage
-            })
-
+        if (streamingTts) {
+          try {
+            await streamingTts.finish()
+          } catch (playError) {
             if (!isAgentRunActive(runId)) return
             if (useChatsStore.getState().activeChatId !== targetChatId) return
-
-            try {
-              await playTtsFromBase64(audioBase64, mimeType)
-            } catch (playError) {
-              if (!isAgentRunActive(runId)) return
-              if (useChatsStore.getState().activeChatId !== targetChatId) return
-              const playMsg = playError instanceof Error ? playError.message : 'PLAYBACK_FAILED'
-              setError(
-                playMsg.includes('PLAYBACK_FAILED')
-                  ? 'Could not play audio. The assistant reply is shown in the chat.'
-                  : playMsg
-              )
-            }
+            const playMsg = playError instanceof Error ? playError.message : 'PLAYBACK_FAILED'
+            setError(
+              playMsg.includes('PLAYBACK_FAILED') || playMsg.includes('TTS_')
+                ? 'Could not play audio. The assistant reply is shown in the chat.'
+                : playMsg
+            )
+          } finally {
+            streamingTtsRef.current = null
           }
         }
 
@@ -152,6 +167,8 @@ export function useAiChat() {
         const msg = e instanceof Error ? e.message : 'Request failed'
         const aborted = msg.includes('aborted') || (e instanceof Error && e.name === 'AbortError')
         if (aborted) {
+          streamingTts?.cancel()
+          streamingTtsRef.current = null
           if (assistantMessageId) removeMessagesFrom(assistantMessageId)
           setStage('idle')
           return
@@ -165,11 +182,14 @@ export function useAiChat() {
           setError('Speech synthesis returned no audio. The text reply is still in the chat.')
           setStage('idle')
         } else {
-          setError(msg)
+          setError(formatOpenRouterError(msg))
           setStage('idle')
         }
       } finally {
         streamControllerRef.current = null
+        if (streamingTtsRef.current === streamingTts) {
+          streamingTtsRef.current = null
+        }
       }
     },
     [

@@ -22,17 +22,24 @@ export function isAudioCaptureSupported(): boolean {
 }
 
 export async function startAudioCapture(
-  stream: MediaStream
+  stream: MediaStream,
+  options?: { preferWav?: boolean }
 ): Promise<AudioCaptureSession | null> {
-  // MediaRecorder first — reliable in Electron (no AudioWorklet / CSP / file:// issues).
+  if (options?.preferWav && isWavRecorderSupported()) {
+    const wav = await startWavRecorder(stream)
+    if (wav) return wav
+  }
+
   if (isMediaRecorderCaptureSupported()) {
     const recorder = startMediaRecorder(stream)
     if (recorder) return recorder
   }
+
   if (isWavRecorderSupported()) {
     const wav = await startWavRecorder(stream)
     if (wav) return wav
   }
+
   console.warn('[lingo voice] No audio capture backend available')
   return null
 }

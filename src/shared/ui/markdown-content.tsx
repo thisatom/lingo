@@ -5,6 +5,7 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { normalizeMarkdown } from '@/shared/lib/normalize-markdown'
 import { cn } from '@/shared/lib/utils'
+import { MarkdownLink } from '@/shared/ui/link-preview-hover'
 import { typography, typographyProseClass } from '@/shared/ui/typography'
 
 const remarkPlugins = [remarkGfm, remarkBreaks]
@@ -39,14 +40,12 @@ const defaultMarkdownComponents: Components = {
     <del className="text-muted-foreground line-through decoration-muted-foreground">{children}</del>
   ),
   a: ({ href, children }) => (
-    <a
+    <MarkdownLink
       href={href}
       className="text-foreground underline underline-offset-4 hover:text-foreground/80"
-      target="_blank"
-      rel="noopener noreferrer"
     >
       {children}
-    </a>
+    </MarkdownLink>
   ),
   ul: ({ children }) => (
     <ul className="mb-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-foreground last:mb-0">
@@ -139,9 +138,9 @@ const typographyMarkdownComponents: Components = {
     <del className="text-muted-foreground line-through decoration-muted-foreground">{children}</del>
   ),
   a: ({ href, children }) => (
-    <a href={href} className={typography.a} target="_blank" rel="noopener noreferrer">
+    <MarkdownLink href={href} className={typography.a}>
       {children}
-    </a>
+    </MarkdownLink>
   ),
   ul: ({ children }) => <ul className={typography.ul}>{children}</ul>,
   ol: ({ children }) => <ol className={typography.ol}>{children}</ol>,
@@ -158,7 +157,7 @@ const typographyMarkdownComponents: Components = {
     />
   ),
   table: ({ children }) => (
-    <div className={typography.tableWrap}>
+    <div className={cn(typography.tableWrap, 'max-w-full overflow-x-auto')}>
       <table className={typography.table}>{children}</table>
     </div>
   ),
@@ -167,7 +166,9 @@ const typographyMarkdownComponents: Components = {
   tr: ({ children }) => <tr className={typography.tbodyTr}>{children}</tr>,
   th: ({ children }) => <th className={typography.th}>{children}</th>,
   td: ({ children }) => <td className={typography.td}>{children}</td>,
-  pre: ({ children }) => <pre className={typography.pre}>{children}</pre>,
+  pre: ({ children }) => (
+    <pre className={cn(typography.pre, 'max-w-full overflow-x-auto')}>{children}</pre>
+  ),
   code: ({ className, children, ...props }) => {
     const isFenced = Boolean(className)
     if (isFenced) {
