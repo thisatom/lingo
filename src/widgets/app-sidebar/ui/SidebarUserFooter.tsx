@@ -1,16 +1,15 @@
 import { Link, useLocation } from 'react-router-dom'
-import { PanelLeft, Settings } from 'lucide-react'
+import { Settings } from 'lucide-react'
+import { SidebarFilterMenu } from '@/features/sidebar-customize/ui/SidebarFilterMenu'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { getInitials } from '@/shared/lib/user'
 import { cn } from '@/shared/lib/utils'
+import { Avatar, AvatarFallback } from '@/shared/ui/avatar'
 import { Button } from '@/shared/ui/button'
 import { SidebarFooter } from '@/shared/ui/sidebar'
+import { TooltipWrap } from '@/shared/ui/tooltip-wrap'
 
-interface SidebarUserFooterProps {
-  onCustomize: () => void
-}
-
-export function SidebarUserFooter({ onCustomize }: SidebarUserFooterProps) {
+export function SidebarUserFooter() {
   const location = useLocation()
   const displayName = useSettingsStore((s) => s.displayName)
   const initials = getInitials(displayName)
@@ -19,38 +18,27 @@ export function SidebarUserFooter({ onCustomize }: SidebarUserFooterProps) {
   return (
     <SidebarFooter className="p-2">
       <div className="flex items-center gap-2 rounded-lg p-1.5">
-        <div
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-foreground"
-          aria-hidden
-        >
-          {initials}
-        </div>
+        <Avatar className="size-8 shrink-0" aria-hidden>
+          <AvatarFallback className="bg-muted text-xs font-medium text-foreground">{initials}</AvatarFallback>
+        </Avatar>
         <p className="min-w-0 flex-1 truncate text-sm text-sidebar-foreground">{displayName}</p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-          title="Customize sidebar"
-          aria-label="Customize sidebar"
-          onClick={onCustomize}
-        >
-          <PanelLeft className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            'size-7 shrink-0 text-muted-foreground hover:text-foreground',
-            isSettings && 'bg-sidebar-accent text-sidebar-accent-foreground'
-          )}
-          asChild
-          title="Settings"
-        >
-          <Link to="/settings/user">
-            <Settings className="size-4" />
-          </Link>
-        </Button>
+        <SidebarFilterMenu />
+        <TooltipWrap label="Settings">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'size-7 shrink-0 text-muted-foreground hover:text-foreground',
+              isSettings && 'bg-sidebar-accent text-sidebar-accent-foreground'
+            )}
+            asChild
+            aria-label="Settings"
+          >
+            <Link to="/settings/user">
+              <Settings className="size-4" />
+            </Link>
+          </Button>
+        </TooltipWrap>
       </div>
     </SidebarFooter>
   )

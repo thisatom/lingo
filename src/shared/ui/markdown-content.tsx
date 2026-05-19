@@ -5,10 +5,11 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { normalizeMarkdown } from '@/shared/lib/normalize-markdown'
 import { cn } from '@/shared/lib/utils'
+import { typography, typographyProseClass } from '@/shared/ui/typography'
 
 const remarkPlugins = [remarkGfm, remarkBreaks]
 
-const markdownComponents: Components = {
+const defaultMarkdownComponents: Components = {
   h1: ({ children }) => (
     <h2 className="mb-2 mt-4 text-lg font-semibold tracking-tight text-foreground first:mt-0">
       {children}
@@ -124,23 +125,85 @@ const markdownComponents: Components = {
   )
 }
 
+const typographyMarkdownComponents: Components = {
+  h1: ({ children }) => <h2 className={typography.h1}>{children}</h2>,
+  h2: ({ children }) => <h3 className={typography.h2}>{children}</h3>,
+  h3: ({ children }) => <h4 className={typography.h3}>{children}</h4>,
+  h4: ({ children }) => <h5 className={typography.h4}>{children}</h5>,
+  h5: ({ children }) => <h6 className={typography.h4}>{children}</h6>,
+  h6: ({ children }) => <h6 className={typography.h4}>{children}</h6>,
+  p: ({ children }) => <p className={typography.p}>{children}</p>,
+  strong: ({ children }) => <strong className={typography.strong}>{children}</strong>,
+  em: ({ children }) => <em className={typography.em}>{children}</em>,
+  del: ({ children }) => (
+    <del className="text-muted-foreground line-through decoration-muted-foreground">{children}</del>
+  ),
+  a: ({ href, children }) => (
+    <a href={href} className={typography.a} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+  ul: ({ children }) => <ul className={typography.ul}>{children}</ul>,
+  ol: ({ children }) => <ol className={typography.ol}>{children}</ol>,
+  li: ({ children }) => <li className={typography.li}>{children}</li>,
+  blockquote: ({ children }) => <blockquote className={typography.blockquote}>{children}</blockquote>,
+  hr: () => <hr className={typography.hr} />,
+  img: ({ src, alt, title }) => (
+    <img
+      src={src}
+      alt={alt ?? ''}
+      title={title}
+      className="my-4 max-h-80 max-w-full rounded-md border border-border object-contain"
+      loading="lazy"
+    />
+  ),
+  table: ({ children }) => (
+    <div className={typography.tableWrap}>
+      <table className={typography.table}>{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead>{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => <tr className={typography.tbodyTr}>{children}</tr>,
+  th: ({ children }) => <th className={typography.th}>{children}</th>,
+  td: ({ children }) => <td className={typography.td}>{children}</td>,
+  pre: ({ children }) => <pre className={typography.pre}>{children}</pre>,
+  code: ({ className, children, ...props }) => {
+    const isFenced = Boolean(className)
+    if (isFenced) {
+      return (
+        <code className={cn(typography.preCode, className)} {...props}>
+          {children}
+        </code>
+      )
+    }
+    return (
+      <code className={typography.inlineCode} {...props}>
+        {children}
+      </code>
+    )
+  },
+  input: defaultMarkdownComponents.input
+}
+
 interface MarkdownContentProps {
   content: string
   className?: string
+  variant?: 'default' | 'typography'
 }
 
-function MarkdownContentInner({ content, className }: MarkdownContentProps) {
+function MarkdownContentInner({ content, className, variant = 'default' }: MarkdownContentProps) {
   const normalized = useMemo(() => normalizeMarkdown(content), [content])
+  const components = variant === 'typography' ? typographyMarkdownComponents : defaultMarkdownComponents
 
   return (
     <div
       className={cn(
-        'prose-chat max-w-none text-sm leading-relaxed text-foreground',
-        '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
+        variant === 'typography' ? typographyProseClass : 'prose-chat max-w-none text-sm leading-relaxed text-foreground',
         className
       )}
     >
-      <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+      <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
         {normalized}
       </ReactMarkdown>
     </div>

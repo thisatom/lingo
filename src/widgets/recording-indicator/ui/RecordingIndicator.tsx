@@ -5,6 +5,8 @@ interface RecordingIndicatorProps {
   isListening: boolean
   interimTranscript?: string
   isTranscribing?: boolean
+  /** Shown after "release to …" while recording */
+  releaseHint?: string
   className?: string
 }
 
@@ -12,14 +14,15 @@ export function RecordingIndicator({
   isListening,
   interimTranscript,
   isTranscribing,
+  releaseHint = 'send',
   className
 }: RecordingIndicatorProps) {
   if (!isListening && !interimTranscript && !isTranscribing) return null
 
   const statusText = isListening
-    ? 'Listening… release to send'
+    ? `Recording… release to ${releaseHint}`
     : isTranscribing
-      ? 'Processing speech…'
+      ? 'Transcribing…'
       : 'Heard:'
 
   return (

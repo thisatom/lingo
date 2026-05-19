@@ -3,7 +3,9 @@
     "electron.vite.config.ts",
     "electron/**/*",
     "src/shared/types/**/*",
-    "src/shared/config/**/*"
+    "src/shared/config/**/*",
+    "src/shared/lib/web-search-intent.ts",
+    "src/shared/lib/strip-text-for-speech.ts"
   ],
   "compilerOptions": {
     "composite": true,

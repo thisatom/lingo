@@ -5,18 +5,21 @@ export type PipelineStage =
   | 'listening'
   | 'transcribing'
   | 'thinking'
+  | 'searching'
   | 'speaking'
   | 'error'
 
 interface ConversationState {
   stage: PipelineStage
   error: string | null
+  speechError: string | null
   /** Latest assistant message id pending BlurText (once) */
   blurAnimateMessageId: string | null
   /** Ids that already played blur animation */
   blurAnimatedMessageIds: string[]
   setStage: (stage: PipelineStage) => void
   setError: (error: string | null) => void
+  setSpeechError: (speechError: string | null) => void
   setBlurAnimateMessageId: (id: string | null) => void
   markBlurAnimationDone: (id: string) => void
   resetPipeline: () => void
@@ -25,6 +28,7 @@ interface ConversationState {
 export const useConversationStore = create<ConversationState>((set) => ({
   stage: 'idle',
   error: null,
+  speechError: null,
   blurAnimateMessageId: null,
   blurAnimatedMessageIds: [],
   setStage: (stage) => set({ stage }),
@@ -33,6 +37,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
       error,
       stage: error ? 'error' : state.stage === 'error' ? 'idle' : state.stage
     })),
+  setSpeechError: (speechError) => set({ speechError }),
   setBlurAnimateMessageId: (blurAnimateMessageId) => set({ blurAnimateMessageId }),
   markBlurAnimationDone: (id) =>
     set((state) => ({
@@ -43,5 +48,11 @@ export const useConversationStore = create<ConversationState>((set) => ({
         : [...state.blurAnimatedMessageIds, id]
     })),
   resetPipeline: () =>
-    set({ stage: 'idle', error: null, blurAnimateMessageId: null, blurAnimatedMessageIds: [] })
+    set({
+      stage: 'idle',
+      error: null,
+      speechError: null,
+      blurAnimateMessageId: null,
+      blurAnimatedMessageIds: []
+    })
 }))

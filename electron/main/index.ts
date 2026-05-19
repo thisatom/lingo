@@ -10,19 +10,24 @@ import {
   setupTitlebar
 } from '@incanta/custom-electron-titlebar/main'
 import { registerIpcHandlers } from './ipc'
+import { resolveAppIconPath } from './icon'
 import { resolvePreloadScript } from './paths'
 import { loadEnvBootstrap } from './secrets'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function createWindow(): BrowserWindow {
+  const iconPath = resolveAppIconPath()
+
   const mainWindow = new BrowserWindow({
     width: 1100,
     height: 720,
     minWidth: 800,
     minHeight: 560,
     show: false,
+    backgroundColor: '#121212',
     title: 'Lingo',
+    ...(iconPath ? { icon: iconPath } : {}),
     titleBarStyle: 'hidden',
     // Lets custom-electron-titlebar sync native Win11 controls via update-window-controls IPC.
     titleBarOverlay: process.platform === 'win32',
@@ -55,6 +60,10 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin') {
+    const iconPath = resolveAppIconPath()
+    if (iconPath) app.dock?.setIcon(iconPath)
+  }
   const allowMedia = (permission: string) =>
     permission === 'media' || permission === 'microphone' || permission === 'audioCapture'
 

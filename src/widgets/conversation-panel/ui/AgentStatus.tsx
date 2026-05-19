@@ -6,6 +6,7 @@ const STAGE_LABEL: Partial<Record<PipelineStage, string>> = {
   listening: 'Listening…',
   transcribing: 'Transcribing…',
   thinking: 'Thinking…',
+  searching: 'Web searching…',
   speaking: 'Speaking…'
 }
 

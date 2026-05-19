@@ -24,25 +24,50 @@ export async function ensureMicrophonePermission(): Promise<boolean> {
 export async function listAudioInputDevices(): Promise<MediaDeviceInfo[]> {
   if (!navigator.mediaDevices?.enumerateDevices) return []
   const devices = await navigator.mediaDevices.enumerateDevices()
-  return devices.filter((device) => device.kind === 'audioinput')
+  return devices.filter((device) => device.kind === 'audioinput' && device.deviceId)
 }
 
-export async function acquireMicrophoneStream(deviceId: string): Promise<MediaStream | null> {
-  if (!navigator.mediaDevices?.getUserMedia) return null
-
-  const constraints: MediaStreamConstraints = isSystemDefaultMicrophone(deviceId)
-    ? { audio: true }
-    : { audio: { deviceId: { exact: deviceId } } }
-
+async function openAudioStream(deviceId: string): Promise<MediaStream | null> {
   try {
-    return await navigator.mediaDevices.getUserMedia(constraints)
+    return await navigator.mediaDevices.getUserMedia({
+      audio: { deviceId: { exact: deviceId } }
+    })
   } catch {
-    if (isSystemDefaultMicrophone(deviceId)) return null
     try {
-      return await navigator.mediaDevices.getUserMedia({ audio: true })
+      return await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { ideal: deviceId } }
+      })
     } catch {
       return null
     }
+  }
+}
+
+/** Open mic stream using saved device id, with label fallback when ids change between sessions. */
+export async function acquireMicrophoneStream(
+  deviceId: string,
+  preferredLabel?: string
+): Promise<MediaStream | null> {
+  if (!navigator.mediaDevices?.getUserMedia) return null
+
+  if (!isSystemDefaultMicrophone(deviceId)) {
+    const byId = await openAudioStream(deviceId)
+    if (byId) return byId
+
+    if (preferredLabel?.trim()) {
+      const devices = await listAudioInputDevices()
+      const match = devices.find((d) => d.label === preferredLabel)
+      if (match?.deviceId) {
+        const byLabel = await openAudioStream(match.deviceId)
+        if (byLabel) return byLabel
+      }
+    }
+  }
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: true })
+  } catch {
+    return null
   }
 }
 

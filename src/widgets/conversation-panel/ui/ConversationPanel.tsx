@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import GradualBlur from '@/shared/ui/gradual-blur'
 import { ScrollArea } from '@/shared/ui/scroll-area'
 import type { Message } from '@/entities/message/model/types'
 import type { PipelineStage } from '@/entities/conversation/model/store'
@@ -11,11 +10,12 @@ const ACTIVE_STAGES: PipelineStage[] = [
   'listening',
   'transcribing',
   'thinking',
+  'searching',
   'speaking'
 ]
 
-/** Space for floating composer + blur at the bottom */
-const CHAT_BOTTOM_INSET = '5.5rem'
+/** Space for floating composer, optional error banner, and bottom shadow */
+const CHAT_BOTTOM_INSET = '7rem'
 
 interface ConversationPanelProps {
   messages: Message[]
@@ -63,31 +63,25 @@ export function ConversationPanel({
     return null
   }, [messages])
 
-  const userMessageCount = useMemo(
-    () => messages.filter((m) => m.role === 'user').length,
-    [messages]
-  )
-  const showTopBlur = userMessageCount > 1
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, stage])
+  }, [messages, stage, showStatus])
 
   return (
     <div className="absolute inset-0 overflow-hidden">
       <ScrollArea className="h-full min-h-0">
         <div
-          className="mx-auto max-w-3xl space-y-4 px-4 py-4 sm:px-6"
-          style={{ paddingBottom: CHAT_BOTTOM_INSET }}
+          className="mx-auto max-w-3xl space-y-[18px] px-4 pt-[18px] sm:px-6"
+          style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
         >
           {messages.length === 0 && !showStatus && (
-            <p className="text-sm text-muted-foreground">
+            <p className="pb-1 text-sm text-muted-foreground">
               Hold the mic and speak, or type a message below to start practicing.
             </p>
           )}
 
           {messages.map((m) => (
-            <article key={m.id} className="space-y-1">
+            <article key={m.id}>
               {m.role === 'user' ? (
                 <UserMessage
                   messageId={m.id}
@@ -117,10 +111,6 @@ export function ConversationPanel({
           <div ref={bottomRef} className="h-px shrink-0" />
         </div>
       </ScrollArea>
-
-      {showTopBlur && (
-        <GradualBlur position="top" height="2.5rem" strength={1.5} divCount={4} className="z-10" />
-      )}
     </div>
   )
 }

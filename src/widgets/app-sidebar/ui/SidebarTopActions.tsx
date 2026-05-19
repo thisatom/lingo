@@ -1,7 +1,8 @@
 import { ChevronLeft, ChevronRight, PanelLeft, Search } from 'lucide-react'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 import { useChatsStore } from '@/entities/chat/model/store'
-import { Button } from '@/shared/ui/button'
+import { Kbd, KbdGroup } from '@/shared/ui/kbd'
+import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
 interface SidebarTopActionsProps {
   onOpenSearch: () => void
@@ -21,56 +22,57 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
 
   return (
     <div className="flex items-center gap-0.5 px-1">
-      <Button
-        type="button"
+      <TooltipIconButton
         variant="ghost"
         size="icon"
         className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-        title="Hide sidebar"
-        aria-label="Hide sidebar"
+        tooltip="Hide sidebar"
         onClick={toggleSidebarPanel}
       >
         <PanelLeft className="size-4" />
-      </Button>
+      </TooltipIconButton>
 
-      <Button
-        type="button"
+      <TooltipIconButton
         variant="ghost"
         size="icon"
         className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-        title="Search chats (Ctrl+K)"
         aria-label="Search chats"
+        tooltip={
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <span>Search chats</span>
+            <KbdGroup className="opacity-90" aria-hidden>
+              <Kbd>Ctrl</Kbd>
+              <Kbd>K</Kbd>
+            </KbdGroup>
+          </span>
+        }
         onClick={onOpenSearch}
       >
         <Search className="size-4" />
-      </Button>
+      </TooltipIconButton>
 
       <div className="min-w-0 flex-1" />
 
-      <Button
-        type="button"
+      <TooltipIconButton
         variant="ghost"
         size="icon"
         className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
         disabled={!canGoBack}
-        title="Previous chat"
-        aria-label="Previous chat"
+        tooltip="Previous chat"
         onClick={goBackInChatHistory}
       >
         <ChevronLeft className="size-4" />
-      </Button>
-      <Button
-        type="button"
+      </TooltipIconButton>
+      <TooltipIconButton
         variant="ghost"
         size="icon"
         className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
         disabled={!canGoForward}
-        title="Next chat"
-        aria-label="Next chat"
+        tooltip="Next chat"
         onClick={goForwardInChatHistory}
       >
         <ChevronRight className="size-4" />
-      </Button>
+      </TooltipIconButton>
     </div>
   )
 }

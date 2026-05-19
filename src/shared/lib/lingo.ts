@@ -5,7 +5,7 @@ const DESKTOP_ONLY =
 
 export function getLingo(): LingoApi {
   const api = window.lingo
-  if (!api?.secrets || !api?.chat || !api?.tts) {
+  if (!api?.secrets || !api?.chat || !api?.stt || !api?.tts) {
     throw new Error(DESKTOP_ONLY)
   }
   return api

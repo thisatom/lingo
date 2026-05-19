@@ -1,11 +1,15 @@
+import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { settingsButtonSize, settingsInputClass } from '@/shared/lib/settings-control'
+import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui/collapsible'
 import { Input } from '@/shared/ui/input'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup } from '@/shared/ui/item'
 import { Label } from '@/shared/ui/label'
 import { useOpenRouterKey } from '../model/useOpenRouterKey'
+import { OpenRouterModelCombobox } from './OpenRouterModelCombobox'
 
 export function OpenRouterKeyForm() {
   const { status, loading, apiError, save, clear, validate } = useOpenRouterKey()
@@ -61,66 +65,90 @@ export function OpenRouterKeyForm() {
         </p>
       )}
 
-      <Item size="sm" className="flex-col items-stretch rounded-lg border border-border p-3">
-        <ItemContent className="gap-1.5">
-          <Label htmlFor="openrouter-key" className="text-xs font-medium">
-            OpenRouter API key
-          </Label>
-          <Input
-            id="openrouter-key"
-            type="password"
-            className={settingsInputClass}
-            placeholder="sk-or-…"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            autoComplete="off"
-          />
-          {status?.isSet && (
-            <ItemDescription className="text-xs">
-              Current: {status.masked ?? 'configured'}
-            </ItemDescription>
+      <Collapsible defaultOpen className="rounded-lg border border-border">
+        <CollapsibleTrigger
+          className={cn(
+            'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left outline-none',
+            'hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring [&[data-state=open]>svg]:rotate-180'
           )}
-        </ItemContent>
-        <ItemActions className="mt-3 w-full flex-wrap">
-          <Button size={settingsButtonSize} onClick={() => void onSave()} disabled={busy || !value.trim()}>
-            Save
-          </Button>
-          <Button
-            size={settingsButtonSize}
-            variant="outline"
-            onClick={() => void onValidate()}
-            disabled={busy || loading}
-          >
-            Test
-          </Button>
-          <Button
-            size={settingsButtonSize}
-            variant="destructive"
-            onClick={() => void onClear()}
-            disabled={busy || !status?.isSet}
-          >
-            Clear
-          </Button>
-        </ItemActions>
-      </Item>
+        >
+          <span className="text-xs font-medium text-foreground">OpenRouter API key</span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <Item size="sm" className="flex-col items-stretch border-t border-border p-3">
+            <ItemContent className="gap-1.5">
+              <Label htmlFor="openrouter-key" className="text-xs font-medium">
+                API key
+              </Label>
+              <Input
+                id="openrouter-key"
+                type="password"
+                className={settingsInputClass}
+                placeholder="sk-or-…"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                autoComplete="off"
+              />
+              {status?.isSet && (
+                <ItemDescription className="text-xs">
+                  Current: {status.masked ?? 'configured'}
+                </ItemDescription>
+              )}
+            </ItemContent>
+            <ItemActions className="mt-3 w-full flex-wrap">
+              <Button
+                size={settingsButtonSize}
+                onClick={() => void onSave()}
+                disabled={busy || !value.trim()}
+              >
+                Save
+              </Button>
+              <Button
+                size={settingsButtonSize}
+                variant="outline"
+                onClick={() => void onValidate()}
+                disabled={busy || loading}
+              >
+                Test
+              </Button>
+              <Button
+                size={settingsButtonSize}
+                variant="destructive"
+                onClick={() => void onClear()}
+                disabled={busy || !status?.isSet}
+              >
+                Clear
+              </Button>
+            </ItemActions>
+          </Item>
+        </CollapsibleContent>
+      </Collapsible>
 
-      <Item size="sm" className="flex-col items-stretch rounded-lg border border-border p-3">
-        <ItemContent className="gap-1.5">
-          <Label htmlFor="model" className="text-xs font-medium">
-            OpenRouter model
-          </Label>
-          <Input
-            id="model"
-            className={settingsInputClass}
-            value={modelId}
-            onChange={(e) => setModelId(e.target.value)}
-            placeholder="openai/gpt-4o-mini"
-          />
-          <ItemDescription className="text-xs">
-            Model id from OpenRouter, e.g. openai/gpt-4o-mini
-          </ItemDescription>
-        </ItemContent>
-      </Item>
+      <Collapsible defaultOpen className="rounded-lg border border-border">
+        <CollapsibleTrigger
+          className={cn(
+            'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left outline-none',
+            'hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring [&[data-state=open]>svg]:rotate-180'
+          )}
+        >
+          <span className="text-xs font-medium text-foreground">Model</span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <Item size="sm" className="flex-col items-stretch border-t border-border p-3">
+            <ItemContent className="gap-1.5">
+              <Label htmlFor="model" className="text-xs font-medium">
+                OpenRouter model
+              </Label>
+              <OpenRouterModelCombobox id="model" value={modelId} onChange={setModelId} />
+              <ItemDescription className="text-xs">
+                Pick a suggestion or type any OpenRouter model id (e.g. openai/gpt-4o-mini).
+              </ItemDescription>
+            </ItemContent>
+          </Item>
+        </CollapsibleContent>
+      </Collapsible>
 
       {message && <ItemDescription className="px-1 text-xs">{message}</ItemDescription>}
     </ItemGroup>

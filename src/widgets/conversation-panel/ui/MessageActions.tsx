@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Check, Copy, Pencil, RotateCw } from 'lucide-react'
 import { copyToClipboard } from '@/shared/lib/copy-to-clipboard'
 import { cn } from '@/shared/lib/utils'
-import { Button } from '@/shared/ui/button'
+import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
 interface ActionButtonProps {
   label: string
@@ -22,19 +22,19 @@ function ActionButton({
   activeLabel,
   active
 }: ActionButtonProps) {
+  const tooltip = active && activeLabel ? activeLabel : label
+
   return (
-    <Button
-      type="button"
+    <TooltipIconButton
       variant="ghost"
       size="icon"
       className="size-7 text-muted-foreground hover:text-foreground"
       disabled={disabled}
+      tooltip={tooltip}
       onClick={onClick}
-      title={active && activeLabel ? activeLabel : label}
-      aria-label={active && activeLabel ? activeLabel : label}
     >
       <Icon className="size-3.5" />
-    </Button>
+    </TooltipIconButton>
   )
 }
 
@@ -96,12 +96,7 @@ export function UserMessageActions({ content, disabled, onEdit }: UserMessageAct
   return (
     <MessageActions disabled={disabled}>
       <CopyActionButton text={content} disabled={disabled} />
-      <ActionButton
-        label="Edit"
-        icon={Pencil}
-        onClick={onEdit}
-        disabled={disabled}
-      />
+      <ActionButton label="Edit" icon={Pencil} onClick={onEdit} disabled={disabled} />
     </MessageActions>
   )
 }
@@ -109,16 +104,18 @@ export function UserMessageActions({ content, disabled, onEdit }: UserMessageAct
 interface AgentMessageActionsProps {
   content: string
   disabled?: boolean
+  className?: string
   onRegenerate: () => void
 }
 
 export function AgentMessageActions({
   content,
   disabled,
+  className,
   onRegenerate
 }: AgentMessageActionsProps) {
   return (
-    <MessageActions disabled={disabled}>
+    <MessageActions className={className} disabled={disabled}>
       <CopyActionButton text={content} disabled={disabled} />
       <ActionButton
         label="Regenerate"

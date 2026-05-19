@@ -21,6 +21,43 @@ export interface ChatCompleteResponse {
   text: string
 }
 
+export interface ChatStreamRequest {
+  messages: ChatMessagePayload[]
+  model?: string
+  practiceLanguage?: string
+  /** Defaults to true — enables OpenRouter `openrouter:web_search` server tool. */
+  webSearch?: boolean
+}
+
+export type ChatStreamEvent =
+  | { type: 'searching' }
+  | { type: 'text-delta'; delta: string; text: string }
+  | { type: 'done'; text: string }
+  | { type: 'error'; message: string }
+
+export interface ChatStreamHandlers {
+  onSearching?: () => void
+  onTextDelta?: (event: Extract<ChatStreamEvent, { type: 'text-delta' }>) => void
+  onDone?: (event: Extract<ChatStreamEvent, { type: 'done' }>) => void
+  onError?: (event: Extract<ChatStreamEvent, { type: 'error' }>) => void
+}
+
+export interface ChatStreamController {
+  abort: () => void
+  done: Promise<void>
+}
+
+export interface SttTranscribeRequest {
+  audioBase64: string
+  format: string
+  language?: string
+  model?: string
+}
+
+export interface SttTranscribeResponse {
+  text: string
+}
+
 export interface TtsSynthesizeRequest {
   text: string
   voice?: string
@@ -41,6 +78,13 @@ export interface LingoApi {
   }
   chat: {
     complete: (request: ChatCompleteRequest) => Promise<ChatCompleteResponse>
+    stream: (
+      request: ChatStreamRequest,
+      handlers: ChatStreamHandlers
+    ) => ChatStreamController
+  }
+  stt: {
+    transcribe: (request: SttTranscribeRequest) => Promise<SttTranscribeResponse>
   }
   tts: {
     synthesize: (request: TtsSynthesizeRequest) => Promise<TtsSynthesizeResponse>

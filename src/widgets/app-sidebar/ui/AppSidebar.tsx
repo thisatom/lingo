@@ -5,9 +5,9 @@ import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { useChatSearchHotkey } from '@/features/chat-search/model/useChatSearchHotkey'
 import { ChatSearchDialog } from '@/features/chat-search/ui/ChatSearchDialog'
-import { SidebarCustomizeSheet } from '@/features/sidebar-customize/ui/SidebarCustomizeSheet'
 import { groupChatsByDate } from '@/shared/lib/chat-sidebar'
 import { Button } from '@/shared/ui/button'
+import { TooltipWrap } from '@/shared/ui/tooltip-wrap'
 import {
   Sidebar,
   SidebarContent,
@@ -32,7 +32,6 @@ export function AppSidebar() {
   const togglePinChat = useChatsStore((s) => s.togglePinChat)
   const sidebarShowDateGroups = useSettingsStore((s) => s.sidebarShowDateGroups ?? true)
 
-  const [customizeOpen, setCustomizeOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const openSearch = useCallback(() => setSearchOpen(true), [])
   useChatSearchHotkey(openSearch)
@@ -77,15 +76,18 @@ export function AppSidebar() {
           <>
             <SidebarHeader className="gap-2 p-2">
               <SidebarTopActions onOpenSearch={openSearch} />
-              <Button
-                className="mx-1 w-[calc(100%-0.5rem)] justify-start gap-2 border-border/60 bg-muted/30 hover:bg-muted/50"
-                size="sm"
-                variant="outline"
-                onClick={() => createChat()}
-              >
-                <MessageSquarePlus className="size-4" />
-                New chat
-              </Button>
+              <TooltipWrap label="New chat">
+                <Button
+                  className="mx-1 w-[calc(100%-0.5rem)] justify-start gap-2 border-border/60 bg-muted/30 hover:bg-muted/50"
+                  size="sm"
+                  variant="outline"
+                  aria-label="New chat"
+                  onClick={() => createChat()}
+                >
+                  <MessageSquarePlus className="size-4" />
+                  New chat
+                </Button>
+              </TooltipWrap>
             </SidebarHeader>
 
             <SidebarContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
@@ -122,11 +124,10 @@ export function AppSidebar() {
           </>
         )}
 
-        <SidebarUserFooter onCustomize={() => setCustomizeOpen(true)} />
+        <SidebarUserFooter />
       </Sidebar>
 
       {!isSettings && <ChatSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />}
-      <SidebarCustomizeSheet open={customizeOpen} onOpenChange={setCustomizeOpen} />
     </>
   )
 }

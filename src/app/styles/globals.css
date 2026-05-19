@@ -41,6 +41,8 @@
   --color-chat-composer: var(--chat-composer);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-tooltip: var(--tooltip);
+  --color-tooltip-foreground: var(--tooltip-foreground);
 }
 
 /* Cursor-inspired dark theme (default) */
@@ -48,35 +50,39 @@
   --radius: 0.5rem;
   --lingo-titlebar-height: env(titlebar-area-height, 32px);
 
-  --background: #141414;
-  --foreground: #d1d1d1;
-  --card: #1a1a1a;
-  --card-foreground: #d1d1d1;
-  --primary: #d1d1d1;
-  --primary-foreground: #141414;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #d1d1d1;
-  --muted: #1a1a1a;
-  --muted-foreground: #888888;
-  --accent: #212121;
-  --accent-foreground: #d1d1d1;
+  --background: #121212;
+  --foreground: #e4e4e4;
+  --card: #1c1c1c;
+  --card-foreground: #e4e4e4;
+  --primary: #e8e8e8;
+  --primary-foreground: #121212;
+  --secondary: #1f1f1f;
+  --secondary-foreground: #e0e0e0;
+  --muted: #1f1f1f;
+  --muted-foreground: #9a9a9a;
+  --accent: #282828;
+  --accent-foreground: #e8e8e8;
   --destructive: #e06c75;
-  --border: #2a2a2a;
-  --input: #1a1a1a;
-  --ring: #555555;
-  --chat-user: #212121;
-  --chat-composer: #1a1a1a;
-  --popover: #1a1a1a;
-  --popover-foreground: #d1d1d1;
+  --border: #242424;
+  --input: #1f1f1f;
+  --ring: #5c5c5c;
+  --chat-user: #252525;
+  --chat-composer: #1c1c1c;
+  --popover: #242424;
+  --popover-foreground: #eaeaea;
+  /* Tooltips */
+  --tooltip: #181818;
+  --tooltip-foreground: #cccccc;
 
-  --sidebar: #141414;
-  --sidebar-foreground: #d1d1d1;
-  --sidebar-primary: #d1d1d1;
-  --sidebar-primary-foreground: #141414;
+  --sidebar: #121212;
+  --sidebar-foreground: #e0e0e0;
+  --sidebar-primary: #e8e8e8;
+  --sidebar-primary-foreground: #121212;
   --sidebar-accent: #212121;
-  --sidebar-accent-foreground: #d1d1d1;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #555555;
+  --menu-hover: #252525;
+  --sidebar-accent-foreground: #eaeaea;
+  --sidebar-border: #303030;
+  --sidebar-ring: #5c5c5c;
 }
 
 @layer base {
@@ -112,7 +118,7 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #333333 transparent;
+    scrollbar-color: #3a3a3a transparent;
   }
 
   *::-webkit-scrollbar {
@@ -121,13 +127,36 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background: #333333;
+    background: #3a3a3a;
     border-radius: 4px;
   }
 
   *::-webkit-scrollbar-track {
     background: transparent;
   }
+}
+
+/* Tooltip: стрелка + border (Radix — стрелка в отдельном span с transform) */
+[data-slot='tooltip-content'][data-side='bottom'] [data-slot='tooltip-arrow'] {
+  position: relative;
+  top: 1px;
+}
+[data-slot='tooltip-content'][data-side='top'] [data-slot='tooltip-arrow'] {
+  position: relative;
+  top: -1px;
+}
+[data-slot='tooltip-content'][data-side='left'] [data-slot='tooltip-arrow'] {
+  position: relative;
+  left: 1px;
+}
+[data-slot='tooltip-content'][data-side='right'] [data-slot='tooltip-arrow'] {
+  position: relative;
+  left: -1px;
+}
+
+/* Radix popper wrapper defaults to overflow:hidden and clips the tooltip arrow */
+body > [data-radix-popper-content-wrapper]:has([data-slot='tooltip-content']) {
+  overflow: visible !important;
 }
 
 /* App shell: fill area below custom titlebar (no page-level scrollbar) */
@@ -141,15 +170,23 @@
 
 /* Titlebar: library uses backgroundColor + update-window-controls IPC on Windows */
 .cet-container {
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid #242424;
+}
+
+/* Kbd dividers match the surface behind the key group */
+[data-slot='tooltip-content'] [data-slot='kbd-group'],
+[data-slot='select-content'] [data-slot='kbd-group'],
+[data-slot='dropdown-menu-content'] [data-slot='kbd-group'],
+[data-slot='dropdown-menu-sub-content'] [data-slot='kbd-group'] {
+  --kbd-divider: #181818;
 }
 
 .cet-titlebar:not(.light) .cet-control-icon svg {
-  fill: #d1d1d1;
+  fill: #e0e0e0;
 }
 
 .cet-titlebar:not(.light) .cet-control-icon:not(.inactive):hover {
-  background-color: #2a2a2a;
+  background-color: #333333;
 }
 
 .cet-titlebar .cet-control-close:not(.inactive):hover {

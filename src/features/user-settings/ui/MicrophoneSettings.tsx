@@ -1,22 +1,75 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { useAudioInputDevices } from '@/features/voice-capture/model/useAudioInputDevices'
 import { settingsInputClass } from '@/shared/lib/settings-control'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
-import { Item, ItemContent, ItemDescription, ItemGroup } from '@/shared/ui/item'
+import { Item, ItemContent, ItemDescription } from '@/shared/ui/item'
 import { Label } from '@/shared/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/shared/ui/select'
+
+const DEFAULT_MIC_VALUE = '__default__'
 
 export function MicrophoneSettings() {
   const microphoneDeviceId = useSettingsStore((s) => s.microphoneDeviceId)
-  const setMicrophoneDeviceId = useSettingsStore((s) => s.setMicrophoneDeviceId)
+  const microphoneLabel = useSettingsStore((s) => s.microphoneLabel)
+  const setMicrophoneDevice = useSettingsStore((s) => s.setMicrophoneDevice)
   const { devices, permissionDenied, loading, refresh } = useAudioInputDevices()
+  const validatedRef = useRef(false)
 
   useEffect(() => {
-    if (!microphoneDeviceId) return
-    if (devices.some((device) => device.deviceId === microphoneDeviceId)) return
-    setMicrophoneDeviceId('')
-  }, [devices, microphoneDeviceId, setMicrophoneDeviceId])
+    if (loading) return
+    if (permissionDenied) return
+    if (devices.length === 0) return
+
+    if (!microphoneDeviceId && !microphoneLabel) {
+      validatedRef.current = true
+      return
+    }
+
+    const byId = devices.find((d) => d.deviceId === microphoneDeviceId)
+    if (byId) {
+      if (byId.label !== microphoneLabel) {
+        setMicrophoneDevice(byId.deviceId, byId.label)
+      }
+      validatedRef.current = true
+      return
+    }
+
+    const byLabel = microphoneLabel
+      ? devices.find((d) => d.label === microphoneLabel)
+      : undefined
+    if (byLabel) {
+      setMicrophoneDevice(byLabel.deviceId, byLabel.label)
+      validatedRef.current = true
+      return
+    }
+
+    if (!validatedRef.current) {
+      validatedRef.current = true
+      return
+    }
+
+    setMicrophoneDevice('', '')
+  }, [
+    devices,
+    loading,
+    microphoneDeviceId,
+    microphoneLabel,
+    permissionDenied,
+    setMicrophoneDevice
+  ])
+
+  const selectValue =
+    microphoneDeviceId && devices.some((d) => d.deviceId === microphoneDeviceId)
+      ? microphoneDeviceId
+      : DEFAULT_MIC_VALUE
 
   return (
     <Item size="sm" className="flex-col items-stretch rounded-lg border border-border p-3">
@@ -37,23 +90,34 @@ export function MicrophoneSettings() {
           </Button>
         </div>
 
-        <select
-          id="microphone-device"
-          className={cn(
-            settingsInputClass,
-            'w-full rounded-md border border-input bg-background text-foreground'
-          )}
-          value={microphoneDeviceId}
+        <Select
+          value={selectValue}
+          onValueChange={(value) => {
+            if (value === DEFAULT_MIC_VALUE) {
+              setMicrophoneDevice('', '')
+              return
+            }
+            const device = devices.find((d) => d.deviceId === value)
+            setMicrophoneDevice(value, device?.label ?? '')
+          }}
           disabled={loading || permissionDenied}
-          onChange={(e) => setMicrophoneDeviceId(e.target.value)}
         >
-          <option value="">System default</option>
-          {devices.map((device) => (
-            <option key={device.deviceId} value={device.deviceId}>
-              {device.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            id="microphone-device"
+            size="sm"
+            className={cn(settingsInputClass, 'w-full min-w-0 border-input shadow-none')}
+          >
+            <SelectValue placeholder="System default" />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectItem value={DEFAULT_MIC_VALUE}>System default</SelectItem>
+            {devices.map((device) => (
+              <SelectItem key={device.deviceId} value={device.deviceId}>
+                {device.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {permissionDenied ? (
           <ItemDescription className="text-xs text-destructive">
@@ -67,7 +131,7 @@ export function MicrophoneSettings() {
           </ItemDescription>
         ) : (
           <ItemDescription className="text-xs">
-            Used for voice input in chat. Hold the mic button to speak.
+            Used to allow mic access. Speech recognition uses the system default input.
           </ItemDescription>
         )}
       </ItemContent>

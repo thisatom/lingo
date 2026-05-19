@@ -13,8 +13,9 @@ interface AgentMessageProps {
 export function AgentMessage({ content, disabled, onRegenerate }: AgentMessageProps) {
   return (
     <div className="group/message space-y-1">
-      <MarkdownContent content={content} className={agentMessageClass} />
+      <MarkdownContent content={content} variant="typography" className={agentMessageClass} />
       <AgentMessageActions
+        className="pl-3"
         content={content}
         disabled={disabled}
         onRegenerate={onRegenerate}

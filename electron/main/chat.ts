@@ -3,6 +3,7 @@ import { generateText } from 'ai'
 import type { ChatCompleteRequest, ChatCompleteResponse } from '../../src/shared/types/ipc'
 import { getSecret } from './secrets'
 import { openRouterConfig } from '../../src/shared/config/openrouter'
+import { normalizeOpenRouterModelId } from '../../src/shared/config/openrouter'
 
 function systemPrompt(practiceLanguage?: string): string {
   const lang = practiceLanguage ?? 'en'
@@ -15,7 +16,9 @@ export async function completeChat(request: ChatCompleteRequest): Promise<ChatCo
   const apiKey = await getSecret('openrouter')
   if (!apiKey) throw new Error('NO_OPENROUTER_KEY')
 
-  const modelId = request.model ?? process.env.LINGO_OPENROUTER_MODEL ?? openRouterConfig.defaultModel
+  const modelId = normalizeOpenRouterModelId(
+    request.model ?? process.env.LINGO_OPENROUTER_MODEL ?? openRouterConfig.defaultModel
+  )
 
   const openrouter = createOpenAI({
     baseURL: openRouterConfig.baseURL,

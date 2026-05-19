@@ -3,13 +3,24 @@ import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import {
   mapSpeechError,
-  NO_SPEECH_MESSAGE
+  mapTranscriptionError
 } from '@/features/speech-to-text/lib/speech-errors'
+import {
+  isMediaRecorderCaptureSupported,
+  startMediaRecorder,
+  type RecorderSession
+} from '@/features/speech-to-text/lib/media-recorder-capture'
 import {
   isSpeechRecognitionSupported,
   startListening,
   type SpeechSession
 } from '@/features/speech-to-text/lib/webSpeechRecognition'
+import {
+  isWavRecorderSupported,
+  startWavRecorder,
+  type WavRecorderSession
+} from '@/features/speech-to-text/lib/wav-recorder'
+import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
 import {
   acquireMicrophoneStream,
   releaseMicrophoneStream
@@ -17,24 +28,36 @@ import {
 
 export { NO_SPEECH_MESSAGE } from '@/features/speech-to-text/lib/speech-errors'
 
+type AudioRecorderSession = RecorderSession | WavRecorderSession
+
+function useOpenRouterStt(): boolean {
+  return isLingoAvailable() && (isWavRecorderSupported() || isMediaRecorderCaptureSupported())
+}
+
 export function useVoiceCapture() {
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
   const microphoneDeviceId = useSettingsStore((s) => s.microphoneDeviceId)
-  const stage = useConversationStore((s) => s.stage)
   const setStage = useConversationStore((s) => s.setStage)
-  const setError = useConversationStore((s) => s.setError)
+  const setSpeechError = useConversationStore((s) => s.setSpeechError)
 
-  const sessionRef = useRef<SpeechSession | null>(null)
+  const useWhisper = useOpenRouterStt()
+  const webSpeechSupported = isSpeechRecognitionSupported()
+  const supported = useWhisper || webSpeechSupported
+
   const streamRef = useRef<MediaStream | null>(null)
+  const recorderRef = useRef<AudioRecorderSession | null>(null)
+  const webSessionRef = useRef<SpeechSession | null>(null)
   const [interimTranscript, setInterimTranscript] = useState('')
   const [isListening, setIsListening] = useState(false)
   const finalizeRef = useRef<((text: string) => void) | null>(null)
-
-  const supported = isSpeechRecognitionSupported()
+  const stoppingRef = useRef(false)
 
   const cleanup = useCallback(() => {
-    sessionRef.current?.abort()
-    sessionRef.current = null
+    stoppingRef.current = false
+    recorderRef.current?.abort()
+    recorderRef.current = null
+    webSessionRef.current?.abort()
+    webSessionRef.current = null
     releaseMicrophoneStream(streamRef.current)
     streamRef.current = null
     setIsListening(false)
@@ -42,27 +65,108 @@ export function useVoiceCapture() {
     finalizeRef.current = null
   }, [])
 
-  useEffect(() => {
-    return () => {
-      cleanup()
-    }
-  }, [cleanup])
+  useEffect(() => cleanup, [cleanup])
 
   const reportSpeechError = useCallback(
     (code: string) => {
-      const message = mapSpeechError(code)
-      if (message) setError(message)
+      const message = mapSpeechError(code) ?? mapTranscriptionError(code)
+      if (message) setSpeechError(message)
     },
-    [setError]
+    [setSpeechError]
+  )
+
+  const finishTranscript = useCallback(
+    (text: string, onTranscript: (value: string) => void) => {
+      setInterimTranscript('')
+      setStage('idle')
+      cleanup()
+      onTranscript(text.trim())
+    },
+    [cleanup, setStage]
+  )
+
+  const transcribeRecording = useCallback(
+    async (onTranscript: (text: string) => void) => {
+      const recorder = recorderRef.current
+      recorderRef.current = null
+
+      if (!recorder) {
+        setStage('idle')
+        stoppingRef.current = false
+        cleanup()
+        reportSpeechError('RECORDING_EMPTY')
+        return
+      }
+
+      setStage('transcribing')
+
+      let audio: { audioBase64: string; format: string } | null = null
+      try {
+        audio = await recorder.stop()
+      } catch {
+        audio = null
+      }
+
+      releaseMicrophoneStream(streamRef.current)
+      streamRef.current = null
+      setIsListening(false)
+      stoppingRef.current = false
+
+      if (!audio) {
+        setStage('idle')
+        reportSpeechError('RECORDING_TOO_SHORT')
+        return
+      }
+
+      try {
+        const { text } = await getLingo().stt.transcribe({
+          audioBase64: audio.audioBase64,
+          format: audio.format,
+          language: practiceLanguage
+        })
+        if (!text.trim()) {
+          reportSpeechError('no-speech')
+          setStage('idle')
+          return
+        }
+        finishTranscript(text, onTranscript)
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'STT_FAILED'
+        if (msg.includes('NO_OPENROUTER_KEY')) {
+          reportSpeechError('NO_OPENROUTER_KEY')
+        } else if (msg.includes('RECORDING_TOO_SHORT')) {
+          reportSpeechError('RECORDING_TOO_SHORT')
+        } else if (msg.includes('NO_SPEECH')) {
+          reportSpeechError('no-speech')
+        } else {
+          reportSpeechError(msg)
+        }
+        setStage('idle')
+        cleanup()
+      }
+    },
+    [cleanup, finishTranscript, practiceLanguage, reportSpeechError, setStage]
   )
 
   const stopListening = useCallback(() => {
-    if (!sessionRef.current) return
-    setStage('transcribing')
-    sessionRef.current.stop()
-    sessionRef.current = null
-    setIsListening(false)
-  }, [setStage])
+    if (!isListening || stoppingRef.current) return
+    stoppingRef.current = true
+
+    const onTranscript = finalizeRef.current
+    if (useWhisper && recorderRef.current && onTranscript) {
+      void transcribeRecording(onTranscript)
+      return
+    }
+
+    stoppingRef.current = false
+
+    if (webSessionRef.current) {
+      setStage('transcribing')
+      webSessionRef.current.stop()
+      webSessionRef.current = null
+      setIsListening(false)
+    }
+  }, [isListening, transcribeRecording, setStage, useWhisper])
 
   const startListeningSession = useCallback(
     async (onTranscript: (text: string) => void): Promise<boolean> => {
@@ -71,9 +175,15 @@ export function useVoiceCapture() {
         return false
       }
 
-      setError(null)
+      if (useWhisper && !window.lingo?.stt) {
+        reportSpeechError('SPEECH_NOT_SUPPORTED')
+        return false
+      }
+
+      setSpeechError(null)
       setInterimTranscript('')
       finalizeRef.current = onTranscript
+      stoppingRef.current = false
 
       const stream = await acquireMicrophoneStream(microphoneDeviceId)
       if (!stream) {
@@ -82,19 +192,31 @@ export function useVoiceCapture() {
       }
       streamRef.current = stream
 
+      if (useWhisper) {
+        const recorder = (await startWavRecorder(stream)) ?? startMediaRecorder(stream)
+        if (!recorder) {
+          cleanup()
+          reportSpeechError('RECORDING_EMPTY')
+          return false
+        }
+        recorderRef.current = recorder
+        setIsListening(true)
+        setStage('listening')
+        return true
+      }
+
       const session = startListening({
         language: practiceLanguage,
         onInterim: (text) => setInterimTranscript(text),
         onFinal: (text) => {
-          setInterimTranscript('')
-          setStage('idle')
-          cleanup()
           const trimmed = text.trim()
           if (!trimmed) {
-            setError(NO_SPEECH_MESSAGE)
+            reportSpeechError('no-speech')
+            setStage('idle')
+            cleanup()
             return
           }
-          onTranscript(trimmed)
+          finishTranscript(text, onTranscript)
         },
         onError: (code) => {
           cleanup()
@@ -109,19 +231,21 @@ export function useVoiceCapture() {
         return false
       }
 
-      sessionRef.current = session
+      webSessionRef.current = session
       setIsListening(true)
       setStage('listening')
       return true
     },
     [
       cleanup,
+      finishTranscript,
       microphoneDeviceId,
       practiceLanguage,
       reportSpeechError,
-      setError,
+      setSpeechError,
       setStage,
-      supported
+      supported,
+      useWhisper
     ]
   )
 
@@ -140,9 +264,9 @@ export function useVoiceCapture() {
     supported,
     isListening,
     interimTranscript,
-    stage,
     startListeningSession,
     stopListening,
-    toggleListening
+    toggleListening,
+    usesWhisperStt: useWhisper
   }
 }

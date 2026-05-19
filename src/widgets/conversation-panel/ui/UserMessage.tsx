@@ -3,7 +3,7 @@ import { ArrowUp, X } from 'lucide-react'
 import { UserMessageActions } from './MessageActions'
 import { messageTextClass, userMessageBubbleClass } from './agent-layout'
 import { cn } from '@/shared/lib/utils'
-import { Button } from '@/shared/ui/button'
+import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
 const INPUT_MIN_HEIGHT_PX = 42
 
@@ -74,18 +74,16 @@ export function UserMessage({
             disabled && 'opacity-60'
           )}
         >
-          <Button
-            type="button"
+          <TooltipIconButton
             variant="ghost"
-            size="icon"
-            className="size-7 justify-self-center rounded-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            title="Cancel"
-            aria-label="Cancel edit"
+            size="iconSm"
+            className="justify-self-center rounded-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            tooltip="Cancel"
             disabled={disabled}
             onClick={handleCancel}
           >
             <X className="size-3.5" />
-          </Button>
+          </TooltipIconButton>
 
           <textarea
             ref={textareaRef}
@@ -116,8 +114,7 @@ export function UserMessage({
             }}
           />
 
-          <Button
-            type="button"
+          <TooltipIconButton
             size="iconSm"
             className={cn(
               'justify-self-center rounded-full transition-colors',
@@ -126,12 +123,11 @@ export function UserMessage({
                 : 'bg-muted text-muted-foreground'
             )}
             disabled={!canSend}
+            tooltip="Send"
             onClick={handleSubmit}
-            title="Send"
-            aria-label="Send edited message"
           >
             <ArrowUp className="size-3.5" />
-          </Button>
+          </TooltipIconButton>
         </div>
       </div>
     )

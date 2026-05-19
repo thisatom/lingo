@@ -21,6 +21,12 @@ interface ChatsState {
   addMessage: (message: Omit<Message, 'id' | 'createdAt'>, targetChatId?: string) => string
   removeMessagesFrom: (messageId: string) => void
   updateUserMessageContent: (messageId: string, content: string) => void
+  updateMessageContent: (
+    messageId: string,
+    content: string,
+    targetChatId?: string,
+    options?: { allowEmptyUser?: boolean }
+  ) => void
   getComposerDraft: (chatId: string) => string
   setComposerDraft: (chatId: string, draft: string) => void
   getActiveChat: () => Chat | null
@@ -263,25 +269,33 @@ export const useChatsStore = create<ChatsState>()(
       },
 
       updateUserMessageContent: (messageId, content) => {
-        const activeId = get().activeChatId
-        if (!activeId) return
+        get().updateMessageContent(messageId, content)
+      },
 
-        const trimmed = content.trim()
-        if (!trimmed) return
+      updateMessageContent: (messageId, content, targetChatId, options) => {
+        const chatId = targetChatId ?? get().activeChatId
+        if (!chatId) return
 
         set((state) => ({
           chats: withSortedChats(
             state.chats.map((c) => {
-              if (c.id !== activeId) return c
+              if (c.id !== chatId) return c
               const index = c.messages.findIndex((m) => m.id === messageId)
-              if (index === -1 || c.messages[index].role !== 'user') return c
-              const isFirstUser = index === 0 && c.title === 'New chat'
+              if (index === -1) return c
+              const message = c.messages[index]
+              const trimmed = message.role === 'user' ? content.trim() : content
+              if (message.role === 'user' && !trimmed && !options?.allowEmptyUser) return c
+              const nextContent = message.role === 'user' ? content : content
+              const isFirstUser = message.role === 'user' && index === 0 && c.title === 'New chat'
               return {
                 ...c,
-                messages: c.messages
-                  .slice(0, index + 1)
-                  .map((m) => (m.id === messageId ? { ...m, content: trimmed } : m)),
-                title: isFirstUser ? titleFromMessage(trimmed) : c.title,
+                messages: c.messages.map((m) =>
+                  m.id === messageId ? { ...m, content: nextContent } : m
+                ),
+                title:
+                  isFirstUser && trimmed
+                    ? titleFromMessage(trimmed)
+                    : c.title,
                 updatedAt: Date.now()
               }
             })

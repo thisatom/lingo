@@ -1,5 +1,6 @@
 import { UniversalEdgeTTS } from 'edge-tts-universal'
 import type { TtsSynthesizeRequest, TtsSynthesizeResponse } from '../../src/shared/types/ipc'
+import { stripTextForSpeech } from '../../src/shared/lib/strip-text-for-speech'
 
 const DEFAULT_VOICE = 'en-US-EmmaMultilingualNeural'
 
@@ -25,7 +26,11 @@ export async function synthesizeSpeech(
   request: TtsSynthesizeRequest
 ): Promise<TtsSynthesizeResponse> {
   const voice = resolveVoice(request)
-  const tts = new UniversalEdgeTTS(request.text, voice)
+  const text = stripTextForSpeech(request.text)
+  if (!text) {
+    throw new Error('TTS_EMPTY')
+  }
+  const tts = new UniversalEdgeTTS(text, voice)
   const result = await tts.synthesize()
   const buffer = Buffer.from(await result.audio.arrayBuffer())
   const mimeType = result.audio.type || 'audio/mpeg'

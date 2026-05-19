@@ -1,27 +1,28 @@
-"use client"
+import * as React from 'react'
+import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 
-import * as React from "react"
-import { Tooltip as TooltipPrimitive } from "radix-ui"
-
-import { cn } from "@/shared/lib/utils"
+import { cn } from '@/shared/lib/utils'
 
 function TooltipProvider({
-  delayDuration = 0,
+  delayDuration = 280,
+  skipDelayDuration = 200,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return (
     <TooltipPrimitive.Provider
       data-slot="tooltip-provider"
       delayDuration={delayDuration}
+      skipDelayDuration={skipDelayDuration}
       {...props}
     />
   )
 }
 
 function Tooltip({
+  delayDuration = 0,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+  return <TooltipPrimitive.Root data-slot="tooltip" delayDuration={delayDuration} {...props} />
 }
 
 function TooltipTrigger({
@@ -32,7 +33,8 @@ function TooltipTrigger({
 
 function TooltipContent({
   className,
-  sideOffset = 0,
+  sideOffset = 6,
+  collisionPadding = 12,
   children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
@@ -41,14 +43,24 @@ function TooltipContent({
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         className={cn(
-          "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) animate-in rounded-md bg-foreground px-3 py-1.5 text-xs text-balance text-background fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          'z-50 max-w-[min(20rem,calc(100vw-1.5rem))] origin-(--radix-tooltip-content-transform-origin) overflow-visible rounded-md border border-[#242424] bg-[#181818] px-2.5 py-1.5 text-xs leading-snug font-medium text-balance text-[#cccccc] shadow-lg shadow-black/35',
+          /* Extra bottom padding when arrow sits below (side=top) so the arrow is not clipped by overflow/border */
+          'data-[side=top]:pb-2',
+          'animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-1.5 data-[side=left]:slide-in-from-right-1.5 data-[side=right]:slide-in-from-left-1.5 data-[side=top]:slide-in-from-bottom-1.5',
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
           className
         )}
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground" />
+        <TooltipPrimitive.Arrow
+          data-slot="tooltip-arrow"
+          width={12}
+          height={6}
+          className="[&>polygon]:fill-[#181818] [&>polygon]:stroke-[#242424] [&>polygon]:[stroke-width:1px] [&>polygon]:[stroke-linejoin:round]"
+        />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )

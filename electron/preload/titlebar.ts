@@ -1,5 +1,5 @@
-export const TITLEBAR_BG = '#141414'
-export const TITLEBAR_FG = '#d1d1d1'
+export const TITLEBAR_BG = '#121212'
+export const TITLEBAR_FG = '#e4e4e4'
 
 export async function initCustomTitlebar(): Promise<void> {
   const { Titlebar, TitlebarColor } = await import('@incanta/custom-electron-titlebar')
@@ -12,7 +12,7 @@ export async function initCustomTitlebar(): Promise<void> {
     minHeight: 270,
     backgroundColor,
     menuBarBackgroundColor: backgroundColor,
-    itemBackgroundColor: TitlebarColor.fromHex('#2a2a2a'),
+    itemBackgroundColor: TitlebarColor.fromHex('#333333'),
     svgColor: foregroundColor,
     unfocusEffect: false,
     removeMenuBar: true
