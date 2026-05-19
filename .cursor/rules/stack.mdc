@@ -1,0 +1,23 @@
+---
+description: Зафиксированный стек AI-оркестрации и TTS
+alwaysApply: true
+---
+
+# Стек инструментов
+
+| Слой | Инструмент |
+|------|------------|
+| Диалог, streaming, история | Vercel AI SDK **или** OpenAI SDK + свой store |
+| Сложные сценарии позже | LangGraph |
+| TTS (dev) | edge-tts в **electron/main** |
+| TTS (prod) | Azure Speech (желательно тот же провайдер, что STT) |
+| AI API | **OpenRouter** |
+| Ключи | Settings UI + secure storage (main), смена без пересборки |
+
+## Правила
+
+- MVP: без LangChain/LangGraph для линейного чата
+- TTS: интерфейс `TtsProvider` в `shared/api/tts/`; dev/prod провайдеры взаимозаменяемы
+- edge-tts не вызывать из renderer
+- OpenRouter: `docs/OPENROUTER.md`, ключи: `docs/API_KEYS.md`
+- Подробности: `docs/STACK.md`

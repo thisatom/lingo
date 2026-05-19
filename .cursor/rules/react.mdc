@@ -1,0 +1,21 @@
+---
+description: React UI в renderer
+globs: src/**/*.tsx
+alwaysApply: false
+---
+
+# React (renderer)
+
+- Только функциональные компоненты и хуки
+- Логика записи/AI/TTS — в `features/*/model`, не в `pages`
+- Страницы (`pages`) собирают widgets и features, без тяжёлой бизнес-логики
+- UI kit: **shadcn/ui** (`@/shared/ui`), стили — **Tailwind** — см. `docs/UI.md`, `.cursor/rules/ui.mdc`
+
+## Состояние диалога
+
+- Сообщения пользователя и ассистента — `entities/message`, `entities/conversation`
+- Статусы пайплайна: `idle` | `listening` | `transcribing` | `thinking` | `speaking` | `error`
+
+## Доступ к Electron
+
+Только через preload: `window.lingo`, не прямой `electron` import.

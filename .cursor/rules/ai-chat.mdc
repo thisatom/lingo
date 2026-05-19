@@ -1,0 +1,33 @@
+---
+description: AI-диалог — SDK и store
+globs: "{src/features/ai-chat/**,src/entities/conversation/**}"
+alwaysApply: false
+---
+
+# AI chat (управление моделью)
+
+## Провайдер
+
+**OpenRouter** — `baseURL` `https://openrouter.ai/api/v1`, ключ из secure storage (не хардкод).
+
+## Инструменты
+
+| Задача | Инструмент |
+|--------|------------|
+| Диалог, streaming, история | Vercel AI SDK **или** OpenAI SDK + store |
+| Ключ и модель | `features/manage-api-keys`, `entities/api-credential` |
+| Сложные сценарии позже | LangGraph |
+
+## FSD
+
+- `features/ai-chat/model` — streamText к OpenRouter, abort при новой записи
+- `entities/conversation` — messages[], sessionId
+- `shared/api/openrouter` — createClient(baseURL, apiKey)
+- `shared/config` — system prompt, default modelId
+
+Ключ подставлять при каждом запросе из актуальных credentials. См. `docs/OPENROUTER.md`.
+
+На MVP не добавлять LangChain без запроса.
+
+Без валидного ключа OpenRouter — не стартовать чат; направить в settings.
+

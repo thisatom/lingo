@@ -1,0 +1,39 @@
+---
+description: Lingo — общие правила проекта
+alwaysApply: true
+---
+
+# Lingo
+
+Десктоп: **React + Electron + TypeScript**, архитектура UI — **FSD**.
+
+Продукт: микрофон → STT → AI (API key) → TTS. Тренировка разговорной речи на разных языках.
+
+## Сейчас
+
+Репозиторий может содержать только контекст (docs, rules, каркас папок). Не добавляй реализацию без явной просьбы пользователя.
+
+## Обязательно
+
+- Имя приложения: **Lingo**
+- Окно Electron: `@incanta/custom-electron-titlebar` (настройка в **main**, не в React-корне без согласования)
+- AI: **OpenRouter**; ключи в Settings, хранение в main (**keytar**)
+- `.env` только dev-fallback, не в git
+- UI: **shadcn/ui** в `shared/ui`, Tailwind — `docs/UI.md`
+- Импорты FSD: только вниз по слоям
+- Минимальный scope диффа
+
+## Документация
+
+Перед кодом: `AGENTS.md`, `docs/STACK.md`, `docs/UI.md`, `docs/OPENROUTER.md`, `docs/API_KEYS.md`, `docs/ARCHITECTURE.md`, `docs/FSD.md`.
+
+## Стек AI / TTS
+
+| Слой | Инструмент |
+|------|------------|
+| Диалог, streaming, история | Vercel AI SDK или OpenAI SDK + store |
+| Сложные сценарии | LangGraph (позже) |
+| TTS dev | edge-tts (main) |
+| TTS prod | Azure Speech |
+| AI API | OpenRouter |
+| Ключи | Settings + main secure storage (смена в runtime) |

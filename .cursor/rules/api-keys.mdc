@@ -1,0 +1,28 @@
+---
+description: OpenRouter и управление API-ключами
+globs: "{src/pages/settings/**,src/features/manage-api-keys/**,src/entities/api-credential/**,electron/**}"
+alwaysApply: false
+---
+
+# API keys
+
+## OpenRouter
+
+- `baseURL`: `https://openrouter.ai/api/v1`
+- Ключ: OpenRouter API key
+- SDK: Vercel AI SDK / OpenAI SDK с совместимым `baseURL`
+
+## Смена ключей
+
+- UI: `pages/settings` + `features/manage-api-keys`
+- Сохранение: **main only**, **keytar** (`lingo:secrets:*` IPC) — не safeStorage/файлы
+- После save renderer получает только `isSet` / masked, не полный секрет
+- Приоритет: пользовательский ключ > `.env` bootstrap
+
+## Запрещено
+
+- Хардкод ключа в `src/`
+- `localStorage` для секретов
+- Логирование ключей
+
+См. `docs/API_KEYS.md`, `docs/OPENROUTER.md`.

@@ -1,0 +1,28 @@
+---
+description: OpenRouter и смена API-ключей
+globs: "{src/features/ai-chat/**,src/features/manage-api-keys/**,src/entities/api-credentials/**,src/pages/settings/**,electron/main/**}"
+alwaysApply: false
+---
+
+# OpenRouter + ключи
+
+## Провайдер AI
+
+- Base URL: `https://openrouter.ai/api/v1`
+- Ключ: OpenRouter API key (не OpenAI напрямую)
+- SDK: `@ai-sdk/openai` / `openai` с кастомным `baseURL`
+- Заголовки: `HTTP-Referer`, `X-Title: Lingo`
+
+## Смена ключей (обязательно)
+
+- UI: `pages/settings` + `features/manage-api-keys`
+- Хранение: main + `safeStorage`, IPC `setApiKey` / `clearApiKey` / `getApiKeyStatus`
+- После сохранения — следующий чат с новым ключом
+- UI: password input, masked display, не логировать ключ
+
+## Приоритет
+
+1. Ключ из secure storage (UI)
+2. Fallback `.env` `LINGO_OPENROUTER_API_KEY` (dev)
+
+См. `docs/OPENROUTER.md`, `docs/API_KEYS.md`.

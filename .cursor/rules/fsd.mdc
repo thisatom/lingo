@@ -1,0 +1,42 @@
+---
+description: Feature-Sliced Design для src/
+globs: src/**/*
+alwaysApply: false
+---
+
+# FSD в Lingo
+
+Слои (сверху вниз): `app` → `pages` → `widgets` → `features` → `entities` → `shared`.
+
+## Правила
+
+- Слайс = папка с `ui/`, `model/`, `api/`, `lib/` по необходимости
+- Публичный API слайса: `index.ts` (re-export)
+- **Запрещено**: импорт из верхнего слоя в нижний (features → pages)
+- **Запрещено**: cross-import между слайсами одного слоя без `shared` или явного контракта
+
+## Маппинг фич
+
+| Слайс (план) | Слой |
+|--------------|------|
+| `voice-capture`, `speech-to-text`, `ai-chat`, `text-to-speech` | features |
+| `message`, `conversation`, `language` | entities |
+| `conversation-panel`, `recording-indicator` | widgets |
+| `main`, `settings` | pages |
+
+## Пример импорта
+
+```typescript
+// ✅ features/ai-chat/ui/AiChatButton.tsx
+import { Message } from '@/entities/message';
+import { Button } from '@/shared/ui/button';
+
+// ❌ entities/message/model/useMessage.ts
+import { useAiChat } from '@/features/ai-chat';
+```
+
+Алиас `@/` → `src/` (настроить при инициализации сборки).
+
+## UI
+
+- Примитивы shadcn — только `shared/ui/` (см. `docs/UI.md`)

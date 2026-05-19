@@ -1,0 +1,16 @@
+let generation = 0
+
+/** Start a new agent run; invalidates in-flight requests from older runs. */
+export function beginAgentRun(): number {
+  generation += 1
+  return generation
+}
+
+/** Cancel the current agent run (chat + TTS). */
+export function cancelAgentRun(): number {
+  return beginAgentRun()
+}
+
+export function isAgentRunActive(runId: number): boolean {
+  return runId === generation
+}

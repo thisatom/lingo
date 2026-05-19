@@ -1,0 +1,36 @@
+---
+description: Electron main/preload и titlebar
+globs: electron/**/*
+alwaysApply: false
+---
+
+# Electron
+
+## Разделение
+
+| Процесс | Путь | Ответственность |
+|---------|------|-----------------|
+| Main | `electron/main/` | Window, titlebar, IPC handlers, env |
+| Preload | `electron/preload/` | `contextBridge`, типизированный API |
+| Renderer | `src/` | React, FSD, без `require('electron')` |
+
+## Titlebar
+
+Использовать **`@incanta/custom-electron-titlebar`** в main при создании `BrowserWindow`:
+
+- `frame: false` (или по доке пакета)
+- Titlebar привязать к окну до загрузки renderer
+- Меню/кнопки окна — в main/titlebar, не дублировать кастомный хром в React без нужды
+
+## IPC
+
+- Каналы с префиксом `lingo:`
+- Типы запросов/ответов в `shared/types/ipc.ts` (план)
+- Preload экспортирует узкий API: `window.lingo.*`
+
+## Безопасность
+
+- `contextIsolation: true`, `nodeIntegration: false` в renderer
+- **OpenRouter** и прочие ключи — **keytar** в main, запросы к AI из main или proxy
+- IPC `lingo:secrets:*` — см. `docs/API_KEYS.md`
+- Renderer: только маска ключа и `configured`, не полное значение

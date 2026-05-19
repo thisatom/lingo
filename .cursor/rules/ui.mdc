@@ -1,0 +1,18 @@
+---
+description: UI/UX — shadcn/ui и Tailwind
+globs: "{src/**/*.tsx,src/**/*.css,components.json}"
+alwaysApply: false
+---
+
+# UI — shadcn/ui
+
+- Компоненты: **shadcn/ui** в `src/shared/ui/`
+- Стили: **Tailwind CSS**; `cn()` из `@/shared/lib/utils`
+- Добавление: `npx shadcn@latest add <name>` → `shared/ui`, не в features
+
+## Правила
+
+- Импорт: `@/shared/ui/button`, не дублировать примитивы в слайсах
+- Страницы/widgets/features собирают UI из shared + локальная композиция в `*/ui`
+- Тема: CSS variables в `app/styles/globals.css`
+- Подробности: `docs/UI.md`
