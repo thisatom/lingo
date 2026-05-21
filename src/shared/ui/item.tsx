@@ -43,7 +43,7 @@ const itemVariants = cva(
         default: 'gap-4 p-4',
         sm: 'gap-2.5 px-4 py-3',
         xs: 'h-6 min-h-6 flex-nowrap gap-1.5 px-2 py-0 text-[13px] leading-normal',
-        nav: 'h-8 min-h-8 flex-nowrap gap-2 border-0 px-2 py-0 text-[13px] leading-normal shadow-none focus-visible:border-transparent focus-visible:ring-1'
+        nav: 'h-[30px] min-h-[30px] flex-nowrap gap-2 border-0 px-2 py-0 text-[13px] leading-normal shadow-none focus-visible:border-transparent focus-visible:ring-1'
       }
     },
     defaultVariants: {

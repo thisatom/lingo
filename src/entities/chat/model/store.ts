@@ -34,7 +34,7 @@ interface ChatsState {
   /** Mark unread when the user is not viewing this chat on the main screen. */
   notifyChatReplyReady: (chatId: string) => void
   addMessage: (message: Omit<Message, 'id' | 'createdAt'>, targetChatId?: string) => string
-  removeMessagesFrom: (messageId: string) => void
+  removeMessagesFrom: (messageId: string, targetChatId?: string) => void
   /** Keeps the message with `messageId` and removes everything after it. */
   removeMessagesAfter: (messageId: string, targetChatId?: string) => void
   updateUserMessageContent: (
@@ -54,6 +54,11 @@ interface ChatsState {
   addComposerAttachments: (chatId: string, items: MessageAttachment[]) => void
   removeComposerAttachment: (chatId: string, attachmentId: string) => void
   clearComposerAttachments: (chatId: string) => void
+  setChatScrollAnchor: (
+    chatId: string,
+    userMessageId: string | null,
+    scrollTop?: number | null
+  ) => void
   setChatMessages: (chatId: string, messages: Message[]) => void
   getActiveChat: () => Chat | null
   ensureActiveChat: () => string
@@ -66,30 +71,14 @@ type PersistedChatsState = Pick<
   | 'chats'
   | 'activeChatId'
   | 'composerDraftByChatId'
+  | 'composerAttachmentsByChatId'
   | 'chatHistoryPast'
   | 'chatHistoryFuture'
 >
 
-/** Drop heavy base64 from persisted messages (images); keep text payloads short. */
+/** Persist chats as-is; attachment blobs live in IndexedDB (`lingo-att:` refs). */
 function chatsForPersist(chats: Chat[]): Chat[] {
-  return chats.map((chat) => ({
-    ...chat,
-    messages: chat.messages.map((message) => {
-      if (!message.attachments?.length) return message
-      return {
-        ...message,
-        attachments: message.attachments.map((att) => ({
-          ...att,
-          payload:
-            att.kind === 'image'
-              ? ''
-              : att.payload.length > 4_000
-                ? `${att.payload.slice(0, 4_000)}…`
-                : att.payload
-        }))
-      }
-    })
-  }))
+  return chats
 }
 
 function newMessageId(): string {
@@ -131,6 +120,8 @@ function normalizePersistedState(
     chats: state.chats ?? [],
     activeChatId: state.activeChatId ?? null,
     composerDraftByChatId: state.composerDraftByChatId ?? {},
+    composerAttachmentsByChatId:
+      (state.composerAttachmentsByChatId as Record<string, MessageAttachment[]>) ?? {},
     chatHistoryPast: state.chatHistoryPast ?? [],
     chatHistoryFuture: state.chatHistoryFuture ?? []
   }
@@ -390,14 +381,14 @@ export const useChatsStore = create<ChatsState>()(
         return fullMessage.id
       },
 
-      removeMessagesFrom: (messageId) => {
-        const activeId = get().activeChatId
-        if (!activeId) return
+      removeMessagesFrom: (messageId, targetChatId) => {
+        const chatId = targetChatId ?? get().activeChatId
+        if (!chatId) return
 
         set((state) => ({
           chats: withSortedChats(
             state.chats.map((c) => {
-              if (c.id !== activeId) return c
+              if (c.id !== chatId) return c
               const index = c.messages.findIndex((m) => m.id === messageId)
               if (index === -1) return c
               return {
@@ -519,6 +510,48 @@ export const useChatsStore = create<ChatsState>()(
         })
       },
 
+      setChatScrollAnchor: (chatId, userMessageId, scrollTop) => {
+        set((state) => {
+          const chat = state.chats.find((c) => c.id === chatId)
+          if (!chat) return state
+
+          const nextScrollTop =
+            scrollTop != null && scrollTop > 0 ? Math.round(scrollTop) : undefined
+
+          if (userMessageId == null) {
+            if (
+              chat.scrollAnchorUserMessageId == null &&
+              chat.scrollAnchorScrollTop == null
+            ) {
+              return state
+            }
+          } else if (
+            chat.scrollAnchorUserMessageId === userMessageId &&
+            chat.scrollAnchorScrollTop === nextScrollTop
+          ) {
+            return state
+          }
+
+          return {
+            chats: state.chats.map((c) => {
+              if (c.id !== chatId) return c
+              if (userMessageId == null) {
+                return {
+                  ...c,
+                  scrollAnchorUserMessageId: undefined,
+                  scrollAnchorScrollTop: undefined
+                }
+              }
+              return {
+                ...c,
+                scrollAnchorUserMessageId: userMessageId,
+                scrollAnchorScrollTop: nextScrollTop
+              }
+            })
+          }
+        })
+      },
+
       clearComposerAttachments: (chatId) => {
         set((state) => {
           if (!state.composerAttachmentsByChatId[chatId]) return state
@@ -579,11 +612,12 @@ export const useChatsStore = create<ChatsState>()(
     {
       name: 'lingo-chats-v3',
       storage: createJSONStorage(() => chatPersistStorage),
-      version: 2,
+      version: 3,
       partialize: (state): PersistedChatsState => ({
         chats: chatsForPersist(state.chats),
         activeChatId: state.activeChatId,
         composerDraftByChatId: state.composerDraftByChatId,
+        composerAttachmentsByChatId: state.composerAttachmentsByChatId,
         chatHistoryPast: state.chatHistoryPast,
         chatHistoryFuture: state.chatHistoryFuture
       }),
@@ -591,7 +625,7 @@ export const useChatsStore = create<ChatsState>()(
         const state = normalizePersistedState(
           persisted as Partial<PersistedChatsState> & { composerAttachmentsByChatId?: unknown }
         )
-        if (version < 2) return state
+        if (version >= 3) return state
         return state
       },
       merge: (persisted, current) => ({

@@ -19,18 +19,16 @@ export const userMessageEditButtonClass = cn(
   'text-muted-foreground/55 hover:bg-accent hover:text-muted-foreground'
 )
 
-/** Slight indent so agent replies sit right of the user bubble column. */
-export const agentContentIndentClass = 'pl-3 sm:pl-4'
-
 export const agentMessageWrapClass = 'w-full min-w-0 max-w-full'
 
 export const agentMessageBubbleClass = cn(
   'relative w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-chat-assistant px-3 py-2'
 )
 
+/** Horizontal padding matches `userMessageBubbleClass` (px-3) so Q&A text shares one column. */
 export const agentMessageClass = cn(
   messageTextClass,
-  'w-full min-w-0 max-w-full break-words px-0.5 pb-0.5 [overflow-wrap:anywhere] [word-break:break-word]'
+  'w-full min-w-0 max-w-full break-words px-3 pb-0.5 [overflow-wrap:anywhere] [word-break:break-word]'
 )
 
 export const messageActionButtonClass = cn(

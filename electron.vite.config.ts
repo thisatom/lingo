@@ -19,6 +19,11 @@ function copyAppResources(): Plugin {
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin(), copyAppResources()],
+    resolve: {
+      alias: {
+        '@': resolve(__dirname, 'src')
+      }
+    },
     build: {
       rollupOptions: {
         input: resolve(__dirname, 'electron/main/index.ts'),

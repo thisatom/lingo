@@ -32,6 +32,11 @@ export const typography = {
     'flex items-center justify-between gap-2 border-b border-border/80 bg-muted/30 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground',
   codeBlockCopyButton:
     'inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+  /** KaTeX display — larger than body (13px), distinct card layout */
+  mathDisplayWrap:
+    'katex-display-wrap my-3 w-full max-w-full overflow-x-auto rounded-xl border border-border/70 bg-muted/25 px-4 py-3 text-center',
+  /** KaTeX inline — between body and code */
+  mathInlineWrap: 'katex-inline-wrap inline align-middle leading-none',
   hr: 'my-5 border-border',
   tableWrap:
     'my-2.5 w-full max-w-full overflow-x-auto rounded-lg border border-border bg-muted/15 shadow-sm',

@@ -1,6 +1,10 @@
 import { normalizeOpenRouterModelId, openRouterSuggestedModels } from '@/shared/config/openrouter'
+import {
+  filterOpenRouterFreeModels,
+  isOpenRouterFreeModel
+} from '@/shared/config/openrouter-free-models'
 
-/** Merge suggested, saved, and active model ids (deduped, stable order). */
+/** Merge suggested, saved, and active free model ids (deduped, stable order). */
 export function mergeOpenRouterModelIds(
   customModels: readonly string[],
   activeModelId?: string
@@ -10,7 +14,7 @@ export function mergeOpenRouterModelIds(
 
   const add = (raw: string) => {
     const id = normalizeOpenRouterModelId(raw)
-    if (!id) return
+    if (!id || !isOpenRouterFreeModel(id)) return
     const key = id.toLowerCase()
     if (seen.has(key)) return
     seen.add(key)
@@ -21,7 +25,7 @@ export function mergeOpenRouterModelIds(
   if (activeModelId) add(activeModelId)
   for (const id of openRouterSuggestedModels) add(id)
 
-  return result
+  return filterOpenRouterFreeModels(result)
 }
 
 export function isModelInOpenRouterLists(

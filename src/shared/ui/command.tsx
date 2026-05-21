@@ -2,7 +2,9 @@ import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { SearchIcon } from 'lucide-react'
 
+import { sidebarMenuSurfaceClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from '@/shared/lib/utils'
+import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +21,8 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        'flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground',
+        'flex h-full w-full flex-col overflow-hidden rounded-md',
+        sidebarMenuSurfaceClass,
         className
       )}
       {...props}
@@ -44,7 +47,10 @@ function CommandDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
-      <DialogContent className={cn('overflow-hidden p-0', className)} showCloseButton={false}>
+      <DialogContent
+        className={cn('overflow-hidden border p-0 shadow-lg', sidebarMenuSurfaceClass, className)}
+        showCloseButton={false}
+      >
         <Command>{children}</Command>
       </DialogContent>
     </Dialog>
@@ -62,7 +68,7 @@ function CommandInput({
     <div
       data-slot="command-input-wrapper"
       className={cn(
-        'flex h-8 items-center gap-2 border-b border-border px-2.5',
+        'flex h-8 items-center gap-2 border-b border-border/60 px-2.5',
         wrapperClassName
       )}
     >
@@ -84,11 +90,13 @@ function CommandList({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.List>) {
   return (
-    <CommandPrimitive.List
-      data-slot="command-list"
-      className={cn('max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto', className)}
-      {...props}
-    />
+    <CustomScrollArea variant="menu" className={cn('max-h-[300px] min-h-0', className)}>
+      <CommandPrimitive.List
+        data-slot="command-list"
+        className="scroll-py-1 overflow-x-hidden overflow-y-visible"
+        {...props}
+      />
+    </CustomScrollArea>
   )
 }
 
@@ -128,7 +136,7 @@ function CommandSeparator({
   return (
     <CommandPrimitive.Separator
       data-slot="command-separator"
-      className={cn('-mx-1 h-px bg-border', className)}
+      className={cn('-mx-1 h-px bg-border/60', className)}
       {...props}
     />
   )
@@ -142,7 +150,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        'relative flex h-8 min-h-8 cursor-pointer items-center gap-2 rounded-sm px-2 py-0 text-sm text-foreground outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 data-[selected=true]:bg-menu-hover data-[selected=true]:text-foreground dark:data-[selected=true]:bg-accent dark:data-[selected=true]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4 [&_svg:not([class*="text-"])]:text-muted-foreground',
+        'relative flex h-8 min-h-8 cursor-pointer items-center gap-2 rounded-sm px-2 py-0 text-sm text-foreground outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 data-[selected=true]:bg-menu-hover data-[selected=true]:text-popover-foreground dark:data-[selected=true]:bg-[#252525] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4 [&_svg:not([class*="text-"])]:text-muted-foreground',
         className
       )}
       {...props}

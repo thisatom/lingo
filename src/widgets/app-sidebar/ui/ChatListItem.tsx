@@ -18,7 +18,8 @@ import {
   sidebarChatActiveTextClass,
   sidebarChatHoverTextClass,
   sidebarChatRowRadiusClass,
-  sidebarChatTextClass
+  sidebarChatTextClass,
+  sidebarRowHeightClass
 } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { ChatSidebarIndicator } from './ChatSidebarIndicator'
 
@@ -58,7 +59,8 @@ export function ChatListItem({
         <SidebarMenuButton
           isActive={isActive}
           className={cn(
-            'h-8 items-center pl-8 pr-8',
+            sidebarRowHeightClass,
+            'items-center pl-8 pr-8',
             sidebarChatRowRadiusClass,
             sidebarChatTextClass,
             sidebarChatHoverTextClass,

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import {
   sidebarMenuItemClass,
+  sidebarMenuPickerChevronClass,
   sidebarMenuPickerTriggerClass,
   sidebarMenuSurfaceClass
 } from '@/shared/lib/sidebar-filter-menu-styles'
@@ -52,17 +53,14 @@ export function ComposerMenuSelect({
           <span className="block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap leading-normal">
             {selected?.triggerLabel ?? selected?.label ?? value}
           </span>
-          <ChevronDown
-            className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-muted-foreground opacity-70"
-            aria-hidden
-          />
+          <ChevronDown className={sidebarMenuPickerChevronClass} aria-hidden />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         side="top"
         align="start"
         sideOffset={6}
-        className={cn('w-52 p-1', sidebarMenuSurfaceClass, contentClassName)}
+        className={cn('w-52', sidebarMenuSurfaceClass, contentClassName)}
       >
         {options.map((option) => {
           const isSelected = option.value === value

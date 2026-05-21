@@ -20,6 +20,9 @@ export const sidebarAgentDotSizePx = 2
 
 export const sidebarChatRowRadiusClass = APP_RADIUS_8_CLASS
 
+/** List row height for chats, settings nav, and primary sidebar actions. */
+export const sidebarRowHeightClass = 'h-[30px] min-h-[30px]'
+
 export const sidebarChatDotClass = 'bg-muted-foreground/70'
 
 export const sidebarChatDotErrorClass = 'bg-destructive'

@@ -36,7 +36,7 @@ export const chatPersistStorage: StateStorage = {
   getItem: (name) => readRaw(name),
   setItem: (name, value) => {
     try {
-      localStorage.setItem(name, stripHeavyPayloads(value))
+      localStorage.setItem(name, value)
     } catch (e) {
       console.warn('[lingo] Could not persist chats:', e)
     }

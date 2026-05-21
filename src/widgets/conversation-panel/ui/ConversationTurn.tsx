@@ -12,6 +12,7 @@ interface ConversationTurnProps {
   onEnterEdit: (messageId: string) => void
   onExitEdit: () => void
   onSubmitEdit: (messageId: string, text: string, attachments?: MessageAttachment[]) => void
+  onAttachmentError?: (message: string) => void
 }
 
 export function ConversationTurn({
@@ -21,12 +22,17 @@ export function ConversationTurn({
   actionsDisabled,
   onEnterEdit,
   onExitEdit,
-  onSubmitEdit
+  onSubmitEdit,
+  onAttachmentError
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
 
   return (
-    <section className="w-full min-w-0 max-w-full space-y-3.5" data-conversation-turn>
+    <section
+      className="w-full min-w-0 max-w-full space-y-3.5"
+      data-conversation-turn
+      data-turn-id={turn.user.id}
+    >
       <div
         className={cn(
           'z-20 w-full min-w-0 max-w-full bg-background',
@@ -43,11 +49,12 @@ export function ConversationTurn({
           onEnterEdit={() => onEnterEdit(turn.user.id)}
           onExitEdit={onExitEdit}
           onSubmitEdit={(text, attachments) => onSubmitEdit(turn.user.id, text, attachments)}
+          onAttachmentError={onAttachmentError}
         />
       </div>
 
       {turn.assistantMessages.map((message) => (
-        <article key={message.id} className="mt-1.5 min-w-0 max-w-full pl-3 sm:pl-4">
+        <article key={message.id} className="mt-1.5 min-w-0 max-w-full">
           <AgentMessage content={message.content} messageId={message.id} />
         </article>
       ))}

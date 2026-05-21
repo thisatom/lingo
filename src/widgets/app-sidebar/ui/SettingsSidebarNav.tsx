@@ -7,7 +7,8 @@ import { cn } from '@/shared/lib/utils'
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from '@/shared/ui/item'
 import {
   sidebarChatHoverTextClass,
-  sidebarChatTextClass
+  sidebarChatTextClass,
+  sidebarRowHeightClass
 } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 
 const navItemClass = cn(
@@ -15,6 +16,7 @@ const navItemClass = cn(
   APP_RADIUS_8_CLASS,
   sidebarChatTextClass,
   sidebarChatHoverTextClass,
+  sidebarRowHeightClass,
   'focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-sidebar-ring'
 )
 

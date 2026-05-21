@@ -8,14 +8,13 @@ import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { ComposerAttachments } from '@/features/chat-attachments/ui/ComposerAttachments'
 import { ComposerTextareaContextMenu } from '@/features/chat-composer/ui/ComposerTextareaContextMenu'
 import { ComposerFileInput } from '@/features/chat-attachments/ui/ComposerFileInput'
+import { useComposerPaste } from '@/features/chat-attachments/model/useComposerPaste'
 import { useNativeComposerDrop } from '@/features/chat-attachments/model/useNativeComposerDrop'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { VoiceRecordButton, type VoiceInteractionMode } from '@/features/voice-capture/ui/VoiceRecordButton'
 import { composerInputHoverClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { CHAT_MODE_LABELS, composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
 import { ComposerAgentMenuSelect } from '@/widgets/chat-composer/ui/ComposerAgentMenuSelect'
-import { ContextUsageButton } from '@/widgets/chat-composer/ui/ContextUsageButton'
-import type { ChatContextUsageDetails } from '@/shared/lib/chat-context-usage'
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
@@ -52,8 +51,6 @@ interface ChatComposerProps {
   liveConversationActive?: boolean
   placeholder?: string
   overlay?: boolean
-  contextUsage?: ChatContextUsageDetails | null
-  onResetContext?: () => void
   /** When this id changes, focus the composer textarea. */
   focusChatId?: string | null
 }
@@ -105,8 +102,6 @@ export function ChatComposer({
   liveConversationActive = false,
   placeholder = 'Send follow-up',
   overlay = false,
-  contextUsage,
-  onResetContext,
   focusChatId
 }: ChatComposerProps) {
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
@@ -114,6 +109,8 @@ export function ChatComposer({
   const modelId = useSettingsStore((s) => s.modelId)
   const customModels = useSettingsStore((s) => s.customModels ?? [])
   const setModelId = useSettingsStore((s) => s.setModelId)
+  const modelAutoFallback = useSettingsStore((s) => s.modelAutoFallback)
+  const setModelAutoFallback = useSettingsStore((s) => s.setModelAutoFallback)
   const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const setWebSearchEnabled = useSettingsStore((s) => s.setWebSearchEnabled)
 
@@ -149,6 +146,14 @@ export function ChatComposer({
   const micLabel = voiceMicLabel(chatComposerMode, liveConversationActive, Boolean(isListening))
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  useComposerPaste({
+    textareaRef,
+    enabled: !disabled && Boolean(onAddAttachments),
+    existingCount: attachments.length,
+    onAdd: onAddAttachments ?? noopAddAttachments,
+    onError: onAttachmentError
+  })
+
   useEffect(() => {
     const el = textareaRef.current
     if (el) resizeTextarea(el)
@@ -163,8 +168,6 @@ export function ChatComposer({
     })
     return () => cancelAnimationFrame(frame)
   }, [focusChatId])
-
-  const showContext = contextUsage != null && onResetContext
 
   return (
     <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')}>
@@ -285,20 +288,12 @@ export function ChatComposer({
             modelId={modelId}
             modeOptions={modeSelectOptions}
             modelIds={modelOptionIds}
+            modelAutoFallback={modelAutoFallback}
             onModeChange={setChatComposerMode}
             onModelChange={setModelId}
+            onModelAutoFallbackChange={setModelAutoFallback}
             disabled={disabled}
           />
-
-          {showContext ? (
-            <ContextUsageButton
-              percent={contextUsage.percent}
-              usage={contextUsage}
-              modelId={modelId}
-              disabled={disabled}
-              onReset={onResetContext}
-            />
-          ) : null}
 
           <div className="min-w-0 flex-1" />
 

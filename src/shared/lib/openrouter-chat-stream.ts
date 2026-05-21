@@ -12,18 +12,33 @@ import {
   isOpenRouterCreditError
 } from '@/shared/lib/openrouter-errors'
 import { openRouterHeaders } from '@/shared/lib/openrouter-headers'
-import { extractAssistantText, resolveWebSearchModel } from '@/shared/lib/openrouter-model'
+import { extractAssistantText } from '@/shared/lib/openrouter-model'
+import {
+  isLocalWebSearchRegistered
+} from '@/shared/lib/local-web-search-runtime'
+import {
+  isWebSearchApiError,
+  isWebSearchResultFailure,
+  substituteMessagesWithLocalWebSearch
+} from '@/shared/lib/web-search-messages'
+import {
+  isVisionApiError,
+  substituteMessagesWithOcr
+} from '@/shared/lib/image-ocr-messages'
+import { runWithModelFallback } from '@/shared/lib/openrouter-model-fallback'
+import { isVisionCapableModel, messagesHaveImages } from '@/shared/lib/vision-models'
 
 export { normalizeOpenRouterModelId } from '@/shared/config/openrouter'
 
 type SendEvent = (event: ChatStreamEvent) => void
-type PromptMode = 'research' | 'practice'
+type PromptMode = 'research' | 'practice' | 'vision'
 
 export type OpenRouterStreamRequest = {
   messages: ChatMessagePayload[]
   model?: string
   practiceLanguage?: string
   webSearch?: boolean
+  modelAutoFallback?: boolean
 }
 
 export type OpenRouterStreamOptions = {
@@ -44,6 +59,23 @@ function formatTodayLine(): string {
 function systemPrompt(practiceLanguage: string | undefined, mode: PromptMode): string {
   const lang = practiceLanguage ?? 'en'
   const today = formatTodayLine()
+  const ocrNote =
+    ' Image attachments may appear as **Text extracted from image (OCR)** blocks — treat that as the image content.'
+  const localSearchNote =
+    ' Messages may include **Web search results (local)** blocks — treat them as live web search results and cite linked sources.'
+
+  if (mode === 'vision') {
+    return `You are Lingo, a helpful AI assistant with vision.
+${today}
+The user can attach images to messages. You receive those images in the conversation and CAN see them.
+Rules:
+- Describe, analyze, compare, and answer questions about attached images (objects, scenes, diagrams, screenshots, handwriting).
+- Read visible text in images when asked (OCR-style).
+- Answer in the same language the user writes in (often ${lang}).
+- If the user sends only an image, describe what you see and offer relevant help.
+- For language practice with images, you may still correct mistakes and ask follow-ups, but prioritize visual questions first.
+- NEVER claim you cannot see images when they are attached in this thread.`
+  }
 
   if (mode === 'research') {
     return `You are Lingo, a helpful AI assistant with live web search.
@@ -54,12 +86,12 @@ Rules:
 - Use web search when you need current or factual information beyond today's date.
 - Include markdown links to sources when search results are used.
 - NEVER stop mid-sentence. NEVER reply with only a few words unless asked.
-- If the user asks the current year or date, state it clearly from today's date above.`
+- If the user asks the current year or date, state it clearly from today's date above.${ocrNote}${localSearchNote}`
   }
 
   return `You are Lingo, a friendly language practice partner. The user practices conversational ${lang}.
 ${today}
-Respond in ${lang}. Keep replies concise (2–4 sentences), gently correct mistakes, ask a follow-up when appropriate.`
+Respond in ${lang}. Keep replies concise (2–4 sentences), gently correct mistakes, ask a follow-up when appropriate.${ocrNote}`
 }
 
 function payloadHasContent(content: ChatMessagePayload['content']): boolean {
@@ -67,7 +99,7 @@ function payloadHasContent(content: ChatMessagePayload['content']): boolean {
   return content.some(
     (p) =>
       (p.type === 'text' && p.text.trim().length > 0) ||
-      (p.type === 'image_url' && Boolean(p.image_url.url))
+      (p.type === 'image_url' && Boolean(p.image_url.url?.startsWith('data:')))
   )
 }
 
@@ -202,8 +234,6 @@ async function completeWithWebSearch(
   lastUserMessage: string,
   signal?: AbortSignal
 ): Promise<void> {
-  send({ type: 'searching' })
-
   let result = await fetchCompletionResilient(apiKey, body, signal)
   let text = result.text
 
@@ -230,11 +260,128 @@ async function completeWithWebSearch(
   }
 
   if (!isSubstantiveReply(text, lastUserMessage) || looksTruncatedOrRefusal(text)) {
-    throw new Error(
-      'The model returned an incomplete answer. Create a new chat or set model to perplexity/sonar in Settings.'
-    )
+    throw new Error('The model returned an incomplete answer.')
   }
 
+  send({ type: 'text-delta', delta: text, text })
+  send({ type: 'done', text })
+}
+
+async function completeWithLocalWebSearch(
+  apiKey: string,
+  userModelId: string,
+  apiMessages: ChatMessagePayload[],
+  practiceLanguage: string | undefined,
+  lastUserMessage: string,
+  send: SendEvent,
+  signal?: AbortSignal
+): Promise<void> {
+  const augmented = await substituteMessagesWithLocalWebSearch(apiMessages, lastUserMessage)
+  const body: Record<string, unknown> = {
+    model: userModelId.trim(),
+    messages: buildMessages(augmented, practiceLanguage, 'research'),
+    max_tokens: openRouterConfig.maxTokens,
+    temperature: 0.3
+  }
+
+  const { text } = await fetchCompletionResilient(apiKey, body, signal)
+  send({ type: 'text-delta', delta: text, text })
+  send({ type: 'done', text })
+}
+
+async function tryNativeWebSearch(
+  apiKey: string,
+  userModelId: string,
+  apiMessages: ChatMessagePayload[],
+  practiceLanguage: string | undefined,
+  send: SendEvent,
+  signal?: AbortSignal
+): Promise<void> {
+  const lastUserMessage = getLastUserMessageContent(apiMessages)
+  const researchMode =
+    shouldForceWebSearch(lastUserMessage) || shouldUseResearchMode(lastUserMessage)
+
+  const body: Record<string, unknown> = {
+    model: userModelId.trim(),
+    messages: buildMessages(apiMessages, practiceLanguage, researchMode ? 'research' : 'practice'),
+    max_tokens: openRouterConfig.maxTokens,
+    temperature: researchMode ? 0.3 : 0.7
+  }
+
+  attachWebCapabilities(body, userModelId)
+  await completeWithWebSearch(apiKey, body, send, lastUserMessage, signal)
+}
+
+async function completeTextChat(
+  apiKey: string,
+  userModelId: string,
+  apiMessages: ChatMessagePayload[],
+  practiceLanguage: string | undefined,
+  webSearchRequested: boolean,
+  send: SendEvent,
+  signal?: AbortSignal
+): Promise<void> {
+  const lastUserMessage = getLastUserMessageContent(apiMessages)
+  const webSearchEnabled = webSearchRequested && !messagesHaveImages(apiMessages)
+
+  if (webSearchEnabled) {
+    send({ type: 'searching' })
+
+    if (isLocalWebSearchRegistered()) {
+      await completeWithLocalWebSearch(
+        apiKey,
+        userModelId,
+        apiMessages,
+        practiceLanguage,
+        lastUserMessage,
+        send,
+        signal
+      )
+      return
+    }
+
+    try {
+      await tryNativeWebSearch(
+        apiKey,
+        userModelId,
+        apiMessages,
+        practiceLanguage,
+        send,
+        signal
+      )
+      return
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const canFallback =
+        isWebSearchApiError(message) || isWebSearchResultFailure(message)
+
+      if (!canFallback) throw error
+
+      await completeWithLocalWebSearch(
+        apiKey,
+        userModelId,
+        apiMessages,
+        practiceLanguage,
+        lastUserMessage,
+        send,
+        signal
+      )
+      return
+    }
+  }
+
+  const researchMode =
+    shouldForceWebSearch(lastUserMessage) || shouldUseResearchMode(lastUserMessage)
+  const promptMode: PromptMode = researchMode ? 'research' : 'practice'
+
+  const body: Record<string, unknown> = {
+    model: userModelId.trim(),
+    messages: buildMessages(apiMessages, practiceLanguage, promptMode),
+    max_tokens: openRouterConfig.maxTokens,
+    temperature: researchMode ? 0.3 : 0.7
+  }
+
+  const { text } = await fetchCompletionResilient(apiKey, body, signal)
   send({ type: 'text-delta', delta: text, text })
   send({ type: 'done', text })
 }
@@ -249,35 +396,52 @@ export async function streamOpenRouterChat(
   const apiKey = await getApiKey()
   if (!apiKey) throw new Error('NO_OPENROUTER_KEY')
 
-  const userModelId = request.model ?? options?.defaultModel ?? openRouterConfig.defaultModel
-  const webSearchEnabled = request.webSearch !== false
-  const lastUserMessage = getLastUserMessageContent(request.messages)
-  const researchMode =
-    webSearchEnabled &&
-    (shouldForceWebSearch(lastUserMessage) || shouldUseResearchMode(lastUserMessage))
+  const primaryModelId = request.model ?? options?.defaultModel ?? openRouterConfig.defaultModel
+  const webSearchRequested = request.webSearch !== false
+  const modelAutoFallback = request.modelAutoFallback === true
 
-  const resolvedModel = webSearchEnabled
-    ? resolveWebSearchModel(userModelId)
-    : userModelId.trim()
+  await runWithModelFallback(primaryModelId, modelAutoFallback, async (tryModelId) => {
+    let apiMessages = request.messages
+    let hasImages = messagesHaveImages(apiMessages)
 
-  const body: Record<string, unknown> = {
-    model: resolvedModel,
-    messages: buildMessages(
-      request.messages,
+    if (hasImages && !isVisionCapableModel(tryModelId)) {
+      apiMessages = await substituteMessagesWithOcr(apiMessages)
+      hasImages = false
+    }
+
+    if (hasImages && isVisionCapableModel(tryModelId)) {
+      const body: Record<string, unknown> = {
+        model: tryModelId.trim(),
+        messages: buildMessages(apiMessages, request.practiceLanguage, 'vision'),
+        max_tokens: openRouterConfig.maxTokens,
+        temperature: 0.7
+      }
+
+      try {
+        const { text } = await fetchCompletionResilient(apiKey, body, signal)
+        send({ type: 'text-delta', delta: text, text })
+        send({ type: 'done', text })
+        return
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (!isVisionApiError(message)) throw error
+        apiMessages = await substituteMessagesWithOcr(apiMessages)
+        hasImages = false
+      }
+    }
+
+    if (hasImages) {
+      apiMessages = await substituteMessagesWithOcr(apiMessages)
+    }
+
+    await completeTextChat(
+      apiKey,
+      tryModelId,
+      apiMessages,
       request.practiceLanguage,
-      researchMode ? 'research' : 'practice'
-    ),
-    max_tokens: openRouterConfig.maxTokens,
-    temperature: researchMode ? 0.3 : 0.7
-  }
-
-  if (webSearchEnabled) {
-    attachWebCapabilities(body, resolvedModel)
-    await completeWithWebSearch(apiKey, body, send, lastUserMessage, signal)
-    return
-  }
-
-  const { text } = await fetchCompletionResilient(apiKey, body, signal)
-  send({ type: 'text-delta', delta: text, text })
-  send({ type: 'done', text })
+      webSearchRequested,
+      send,
+      signal
+    )
+  })
 }

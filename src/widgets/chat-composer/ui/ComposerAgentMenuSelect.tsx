@@ -1,8 +1,9 @@
-import { Check, ChevronDown } from 'lucide-react'
+import { Check } from 'lucide-react'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { shortOpenRouterModelLabel } from '@/widgets/chat-composer/lib/model-label'
 import {
   sidebarMenuItemClass,
+  sidebarMenuPickerDotClass,
   sidebarMenuPickerTriggerClass,
   sidebarMenuSubTriggerClass,
   sidebarMenuSurfaceClass
@@ -18,6 +19,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/shared/ui/dropdown-menu'
+import { Switch } from '@/shared/ui/switch'
 
 export type AgentModeOption = {
   value: ChatComposerMode
@@ -29,8 +31,10 @@ interface ComposerAgentMenuSelectProps {
   modelId: string
   modeOptions: readonly AgentModeOption[]
   modelIds: readonly string[]
+  modelAutoFallback: boolean
   onModeChange: (mode: ChatComposerMode) => void
   onModelChange: (modelId: string) => void
+  onModelAutoFallbackChange: (enabled: boolean) => void
   disabled?: boolean
 }
 
@@ -39,8 +43,10 @@ export function ComposerAgentMenuSelect({
   modelId,
   modeOptions,
   modelIds,
+  modelAutoFallback,
   onModeChange,
   onModelChange,
+  onModelAutoFallbackChange,
   disabled
 }: ComposerAgentMenuSelectProps) {
   const selectedMode = modeOptions.find((option) => option.value === mode)
@@ -50,23 +56,27 @@ export function ComposerAgentMenuSelect({
       <DropdownMenuTrigger asChild disabled={disabled}>
         <button
           type="button"
-          className={sidebarMenuPickerTriggerClass}
+          className={cn(sidebarMenuPickerTriggerClass, 'justify-center px-2.5')}
           aria-label="Agent mode and model"
         >
-          <span className="block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap leading-normal">
-            {selectedMode?.label ?? mode}
+          <span className="inline-flex min-w-0 items-center justify-center gap-1.5">
+            <span className="text-[13px] leading-[13px]">{selectedMode?.label ?? mode}</span>
+            {modelAutoFallback ? (
+              <>
+                <span className={sidebarMenuPickerDotClass} aria-hidden />
+                <span className="shrink-0 text-[13px] leading-[13px] text-muted-foreground/80">
+                  Auto
+                </span>
+              </>
+            ) : null}
           </span>
-          <ChevronDown
-            className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-muted-foreground opacity-70"
-            aria-hidden
-          />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         side="top"
         align="start"
         sideOffset={6}
-        className={cn('w-52 p-1', sidebarMenuSurfaceClass)}
+        className={cn('w-52', sidebarMenuSurfaceClass)}
       >
         {modeOptions.map((option) => {
           const isSelected = option.value === mode
@@ -94,11 +104,25 @@ export function ComposerAgentMenuSelect({
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
             sideOffset={4}
-            className={cn(
-              'max-h-64 min-w-[14rem] overflow-y-auto p-1',
-              sidebarMenuSurfaceClass
-            )}
+            className={cn('min-w-[14rem]', sidebarMenuSurfaceClass)}
           >
+            <div
+              className={cn(
+                sidebarMenuItemClass,
+                'pointer-events-auto flex cursor-default items-center justify-between gap-2'
+              )}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="text-[12px] text-foreground">Auto</span>
+              <Switch
+                checked={modelAutoFallback}
+                disabled={disabled}
+                aria-label="Auto: try other free models on error"
+                onCheckedChange={onModelAutoFallbackChange}
+              />
+            </div>
+            <DropdownMenuSeparator className="my-1 bg-border/60" />
             {modelIds.map((id) => {
               const isSelected = id === modelId
               return (

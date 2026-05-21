@@ -3,15 +3,16 @@ import {
   normalizeOpenRouterModelId,
   openRouterConfig
 } from '@/shared/config/openrouter'
+import { isOpenRouterFreeRouter } from '@/shared/config/openrouter-free-models'
 
 export function withOnlineVariant(modelId: string): string {
   const base = normalizeOpenRouterModelId(modelId)
   return base.endsWith(':online') ? base : `${base}:online`
 }
 
-/** Model that supports OpenRouter web search reliably. */
+/** Model that supports OpenRouter web search reliably (free tier). */
 export function resolveWebSearchModel(userModelId: string): string {
-  if (isOpenRouterAutoModel(userModelId)) {
+  if (isOpenRouterAutoModel(userModelId) || isOpenRouterFreeRouter(userModelId)) {
     return openRouterConfig.webSearchModel
   }
   const base = normalizeOpenRouterModelId(userModelId)

@@ -1,6 +1,6 @@
 import { ArrowDown } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
-import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
 interface ScrollToLatestButtonProps {
   show: boolean
@@ -12,10 +12,10 @@ export function ScrollToLatestButton({ show, onClick, className }: ScrollToLates
   if (!show) return null
 
   return (
-    <TooltipIconButton
+    <Button
+      type="button"
       variant="outline"
       size="icon"
-      tooltip="Scroll to latest"
       aria-label="Scroll to latest"
       onClick={onClick}
       className={cn(
@@ -24,6 +24,6 @@ export function ScrollToLatestButton({ show, onClick, className }: ScrollToLates
       )}
     >
       <ArrowDown className="size-4" />
-    </TooltipIconButton>
+    </Button>
   )
 }

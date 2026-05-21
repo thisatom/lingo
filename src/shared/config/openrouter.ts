@@ -1,8 +1,10 @@
+import { openRouterFreeModels } from '@/shared/config/openrouter-free-models'
+
 export const openRouterConfig = {
   baseURL: 'https://openrouter.ai/api/v1',
   defaultModel: 'nvidia/nemotron-3-super-120b-a12b:free',
-  /** Reliable web-search model (also used when user picks `openrouter/auto`). */
-  webSearchModel: 'perplexity/sonar',
+  /** Free router for web-search-style requests when user picks `openrouter/free`. */
+  webSearchModel: 'openrouter/free',
   /** Legacy; STT uses free local Whisper in the desktop app. */
   sttModel: 'openai/whisper-large-v3',
   /** Default completion budget (fits low-credit OpenRouter accounts). */
@@ -21,22 +23,8 @@ export function normalizeOpenRouterModelId(modelId: string): string {
   return modelId.trim().replace(/:online$/i, '')
 }
 
-/** Common OpenRouter model ids for the settings combobox (any id can still be applied). */
+/** Free OpenRouter models for settings and agent model picker. */
 export const openRouterSuggestedModels: readonly string[] = [
   openRouterConfig.defaultModel,
-  'openrouter/auto',
-  openRouterConfig.webSearchModel,
-  'openai/gpt-4o-mini',
-  'openai/gpt-4o',
-  'openai/gpt-4.1-mini',
-  'openai/gpt-4.1',
-  'anthropic/claude-3.5-sonnet',
-  'anthropic/claude-3.7-sonnet',
-  'anthropic/claude-sonnet-4',
-  'google/gemini-2.0-flash-001',
-  'google/gemini-2.5-flash-preview',
-  'meta-llama/llama-3.3-70b-instruct',
-  'mistralai/mistral-small-3.1-24b-instruct',
-  'deepseek/deepseek-chat',
-  'qwen/qwen-2.5-72b-instruct'
+  ...openRouterFreeModels.filter((id) => id !== openRouterConfig.defaultModel)
 ]

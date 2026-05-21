@@ -22,6 +22,10 @@ export const sidebarMenuSurfaceClass =
 
   'border-border/60 bg-popover text-popover-foreground shadow-lg dark:bg-[#181818]'
 
+/** Row highlight — dropdown, command palette, context menus. */
+export const menuItemHighlightClass =
+  'focus:bg-menu-hover focus:text-popover-foreground data-[highlighted]:bg-menu-hover data-[highlighted]:text-popover-foreground dark:focus:bg-[#252525] dark:data-[highlighted]:bg-[#252525]'
+
 
 
 export const sidebarMenuItemClass = cn(
@@ -30,7 +34,7 @@ export const sidebarMenuItemClass = cn(
 
   sidebarMenuRadiusClass,
 
-  'focus:bg-menu-hover data-[highlighted]:bg-menu-hover dark:focus:bg-[#252525] dark:data-[highlighted]:bg-[#252525]'
+  menuItemHighlightClass
 
 )
 
@@ -62,9 +66,9 @@ export const sidebarMenuIconButtonClass = cn(
 
 export const sidebarMenuPickerTriggerClass = cn(
 
-  'relative inline-flex h-7 min-h-7 w-fit max-w-[9rem] min-w-0 shrink-0 cursor-pointer items-center',
+  'inline-flex h-7 min-h-7 w-fit max-w-[9rem] min-w-0 shrink-0 cursor-pointer items-center gap-1',
 
-  'rounded-full py-0 pr-8 pl-2.5 text-[13px] leading-normal text-muted-foreground outline-none',
+  'rounded-full py-0 pl-2.5 pr-2 text-[13px] leading-none text-muted-foreground outline-none',
 
   composerInputHoverClass,
 
@@ -73,6 +77,12 @@ export const sidebarMenuPickerTriggerClass = cn(
   'disabled:pointer-events-none disabled:opacity-50'
 
 )
+
+export const sidebarMenuPickerDotClass =
+  'inline-block size-[3px] shrink-0 self-center rounded-full bg-muted-foreground/60'
+
+export const sidebarMenuPickerChevronClass =
+  'size-4 shrink-0 translate-y-px text-muted-foreground opacity-70'
 
 
 

@@ -1,31 +1,51 @@
-/* KaTeX — aligned with Lingo light/dark themes */
+/* KaTeX — agent chat math (body 13px, code 12px, math separate scale) */
 
-.markdown-prose .katex {
+.markdown-prose {
+  --md-math-inline-size: 14px;
+  --md-math-display-size: 16px;
+  --md-math-display-line: 1.45;
+}
+
+/* Display formulas — card block, centered, scroll on overflow */
+.markdown-prose .katex-display-wrap {
+  font-size: var(--md-math-display-size);
+  line-height: var(--md-math-display-line);
+}
+
+.markdown-prose .katex-display-wrap .katex {
   color: var(--foreground);
-  font-size: 1.02em;
+  font-size: 1em;
 }
 
-.markdown-prose .katex-display {
-  margin: 0.65em 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0.15rem 0;
-}
-
-.markdown-prose .katex-display > .katex {
+.markdown-prose .katex-display-wrap .katex-display {
+  margin: 0;
   text-align: center;
+}
+
+.markdown-prose .katex-display-wrap > .katex > .katex-html {
+  max-width: 100%;
+}
+
+/* Inline formulas — sit on the text line, slightly above body size */
+.markdown-prose .katex-inline-wrap {
+  font-size: var(--md-math-inline-size);
+  line-height: 1.2;
+  margin: 0 0.12em;
+  vertical-align: -0.12em;
+}
+
+.markdown-prose .katex-inline-wrap .katex {
+  color: var(--foreground);
+  font-size: 1em;
+}
+
+.markdown-prose p .katex-inline-wrap,
+.markdown-prose li .katex-inline-wrap {
+  vertical-align: -0.15em;
 }
 
 .markdown-prose .katex-error {
   color: var(--destructive);
   font-size: 12px;
-}
-
-/* Prevent long equations from breaking layout */
-.markdown-prose .katex-display > .katex > .katex-html {
-  max-width: 100%;
-}
-
-.markdown-prose p .katex {
-  vertical-align: baseline;
+  font-family: ui-monospace, monospace;
 }

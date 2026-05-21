@@ -5,6 +5,10 @@ import {
   type MicNoiseSuppression
 } from '@/features/speech-to-text/lib/mic-noise-suppression'
 import { normalizeOpenRouterModelId, openRouterConfig } from '@/shared/config/openrouter'
+import {
+  filterOpenRouterFreeModels,
+  isOpenRouterFreeModel
+} from '@/shared/config/openrouter-free-models'
 import { TTS_VOICE_AUTO, isKnownTtsVoiceId, normalizeTtsVoiceId } from '@/shared/config/tts-voices'
 import { isSidebarChatSort, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
 import { isTtsSpeechRate, type TtsSpeechRate } from '@/shared/lib/tts-rate'
@@ -38,6 +42,8 @@ interface SettingsState {
   ttsVoiceId: string
   chatComposerMode: ChatComposerMode
   webSearchEnabled: boolean
+  /** On API error, try other free OpenRouter models (each at most once). */
+  modelAutoFallback: boolean
   sidebarShowDateGroups: boolean
   sidebarChatSort: SidebarChatSort
   /** First-run setup wizard completed. */
@@ -57,6 +63,7 @@ interface SettingsState {
   setTtsVoiceId: (voiceId: string) => void
   setChatComposerMode: (mode: ChatComposerMode) => void
   setWebSearchEnabled: (enabled: boolean) => void
+  setModelAutoFallback: (enabled: boolean) => void
   setSidebarShowDateGroups: (show: boolean) => void
   setSidebarChatSort: (sort: SidebarChatSort) => void
   setOnboardingCompleted: (completed: boolean) => void
@@ -81,6 +88,7 @@ type PersistedSettings = Pick<
   | 'ttsVoiceId'
   | 'chatComposerMode'
   | 'webSearchEnabled'
+  | 'modelAutoFallback'
   | 'sidebarShowDateGroups'
   | 'sidebarChatSort'
   | 'onboardingCompleted'
@@ -103,6 +111,7 @@ const DEFAULT_SETTINGS: Omit<
   | 'setTtsVoiceId'
   | 'setChatComposerMode'
   | 'setWebSearchEnabled'
+  | 'setModelAutoFallback'
   | 'setSidebarShowDateGroups'
   | 'setSidebarChatSort'
   | 'setOnboardingCompleted'
@@ -124,6 +133,7 @@ const DEFAULT_SETTINGS: Omit<
   ttsVoiceId: TTS_VOICE_AUTO,
   chatComposerMode: 'text',
   webSearchEnabled: true,
+  modelAutoFallback: true,
   sidebarShowDateGroups: true,
   sidebarChatSort: 'updated-desc',
   onboardingCompleted: false
@@ -134,10 +144,14 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       ...DEFAULT_SETTINGS,
       setPracticeLanguage: (practiceLanguage) => set({ practiceLanguage }),
-      setModelId: (modelId) => set({ modelId: normalizeOpenRouterModelId(modelId) }),
+      setModelId: (modelId) => {
+        const id = normalizeOpenRouterModelId(modelId)
+        if (!id || !isOpenRouterFreeModel(id)) return
+        set({ modelId: id })
+      },
       addCustomModel: (modelId) => {
         const id = normalizeOpenRouterModelId(modelId)
-        if (!id) return
+        if (!id || !isOpenRouterFreeModel(id)) return
         const key = id.toLowerCase()
         set((state) => {
           const list = state.customModels ?? []
@@ -176,6 +190,7 @@ export const useSettingsStore = create<SettingsState>()(
         }),
       setChatComposerMode: (chatComposerMode) => set({ chatComposerMode }),
       setWebSearchEnabled: (webSearchEnabled) => set({ webSearchEnabled }),
+      setModelAutoFallback: (modelAutoFallback) => set({ modelAutoFallback }),
       setSidebarShowDateGroups: (sidebarShowDateGroups) => set({ sidebarShowDateGroups }),
       setSidebarChatSort: (sidebarChatSort) => set({ sidebarChatSort }),
       setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
@@ -183,7 +198,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'lingo-settings',
-      version: 13,
+      version: 14,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
         modelId: state.modelId,
@@ -201,6 +216,7 @@ export const useSettingsStore = create<SettingsState>()(
         ttsVoiceId: state.ttsVoiceId,
         chatComposerMode: state.chatComposerMode,
         webSearchEnabled: state.webSearchEnabled,
+        modelAutoFallback: state.modelAutoFallback,
         sidebarShowDateGroups: state.sidebarShowDateGroups,
         sidebarChatSort: state.sidebarChatSort,
         onboardingCompleted: state.onboardingCompleted
@@ -268,6 +284,20 @@ export const useSettingsStore = create<SettingsState>()(
             onboardingCompleted: true
           }
         }
+        if (version < 14) {
+          const modelId =
+            typeof state.modelId === 'string' && isOpenRouterFreeModel(state.modelId)
+              ? normalizeOpenRouterModelId(state.modelId)
+              : openRouterConfig.defaultModel
+          state = {
+            ...state,
+            modelId,
+            modelAutoFallback: true,
+            customModels: filterOpenRouterFreeModels(
+              Array.isArray(state.customModels) ? (state.customModels as string[]) : []
+            )
+          }
+        }
         return state
       },
       merge: (persisted, current) => {
@@ -285,7 +315,17 @@ export const useSettingsStore = create<SettingsState>()(
           sidebarChatSort: isSidebarChatSort(saved.sidebarChatSort)
             ? saved.sidebarChatSort
             : current.sidebarChatSort,
-          customModels: Array.isArray(saved.customModels) ? saved.customModels : current.customModels,
+          customModels: filterOpenRouterFreeModels(
+            Array.isArray(saved.customModels) ? saved.customModels : current.customModels
+          ),
+          modelId:
+            typeof saved.modelId === 'string' && isOpenRouterFreeModel(saved.modelId)
+              ? normalizeOpenRouterModelId(saved.modelId)
+              : current.modelId,
+          modelAutoFallback:
+            typeof saved.modelAutoFallback === 'boolean'
+              ? saved.modelAutoFallback
+              : current.modelAutoFallback,
           ttsSpeechRate: isTtsSpeechRate(saved.ttsSpeechRate)
             ? saved.ttsSpeechRate
             : current.ttsSpeechRate,

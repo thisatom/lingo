@@ -12,7 +12,10 @@ import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
 import { Kbd, KbdGroup } from '@/shared/ui/kbd'
 import { APP_RADIUS_8_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
-import { isSidebarAgentStage } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
+import {
+  isSidebarAgentStage,
+  sidebarRowHeightClass
+} from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import {
   Sidebar,
   SidebarContent,
@@ -95,7 +98,8 @@ export function AppSidebar() {
               <SidebarTopActions onOpenSearch={openSearch} />
               <Button
                 className={cn(
-                  'mx-1 h-8 w-[calc(100%-0.5rem)] justify-start gap-2 border-border/60 bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground',
+                  'mx-1 w-[calc(100%-0.5rem)] justify-start gap-2 border-border/60 bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground',
+                  sidebarRowHeightClass,
                   APP_RADIUS_8_CLASS
                 )}
                 size="sm"

@@ -1,0 +1,31 @@
+# WebSearch Crawler for lingo (used by websearch-mcp)
+# Start: docker compose -f docker-compose.websearch.yml up -d
+# Health: curl http://localhost:3001/health
+
+services:
+  crawler:
+    image: laituanmanh/websearch-crawler:latest
+    container_name: lingo-websearch-api
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - LOG_LEVEL=info
+      - FLARESOLVERR_URL=http://flaresolverr:8191/v1
+    depends_on:
+      - flaresolverr
+    volumes:
+      - crawler_storage:/app/storage
+
+  flaresolverr:
+    image: 21hsmw/flaresolverr:nodriver
+    container_name: lingo-flaresolverr
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+      - TZ=UTC
+
+volumes:
+  crawler_storage:

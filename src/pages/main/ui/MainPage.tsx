@@ -17,6 +17,7 @@ import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
 import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
 import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
 import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
+import { ChatHeaderTitle } from '@/widgets/chat-header/ui/ChatHeaderTitle'
 import { ConversationPanel } from '@/widgets/conversation-panel/ui/ConversationPanel'
 import { VoiceCaptureBar } from '@/features/audio-devices/ui/VoiceCaptureBar'
 import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
@@ -75,7 +76,7 @@ export function MainPage() {
   const modelId = useSettingsStore((s) => s.modelId)
   const microphoneDeviceId = useSettingsStore((s) => s.microphoneDeviceId)
   const microphoneLabel = useSettingsStore((s) => s.microphoneLabel)
-  const { usage: contextUsage, resetContext, showIndicator } = useChatContextUsage(
+  const { usage: contextUsage } = useChatContextUsage(
     messages,
     modelId
   )
@@ -325,9 +326,14 @@ export function MainPage() {
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <header className="relative z-10 flex shrink-0 items-center gap-2 bg-background p-2">
         <SidebarExpandButton />
-        <h1 className="min-w-0 flex-1 truncate text-[13px] font-normal leading-[1.5] text-foreground">
-          {activeChat?.title ?? 'New chat'}
-        </h1>
+        <ChatHeaderTitle
+          title={activeChat?.title ?? 'New chat'}
+          chat={activeChat}
+          messageCount={messages.length}
+          modelId={modelId}
+          contextUsage={contextUsage}
+          contextPercent={contextUsage?.percent ?? 0}
+        />
         <ChatHeaderMenu chatId={activeChatId} messages={messages} />
       </header>
 
@@ -338,6 +344,7 @@ export function MainPage() {
           activeChatId={activeChat?.id ?? null}
           actionsDisabled={actionsDisabled}
           onSubmitEditedUserMessage={submitEditedUserMessage}
+          onAttachmentError={handleAttachmentError}
           onAtBottomChange={setChatAtBottom}
           onShowScrollToLatestChange={setShowScrollToLatest}
           onScrollToLatestReady={(scrollToLatest) => {
@@ -363,7 +370,7 @@ export function MainPage() {
                 onClick={() => scrollToLatestRef.current?.()}
                 className="absolute bottom-full right-0 z-50 mb-2 shrink-0"
               />
-              <div className="space-y-2">
+              <div className="space-y-1">
             {showSpeechError && speechError && (
               <div
                 role="status"
@@ -431,12 +438,12 @@ export function MainPage() {
                 placeholder={
                   !status?.isSet
                     ? 'Add API key in Settings…'
-                    : agentBusy
-                      ? 'Queue follow-up…'
-                      : 'Send follow-up'
+                    : composerAttachments.length > 0
+                      ? 'Ask about the image…'
+                      : agentBusy
+                        ? 'Queue follow-up…'
+                        : 'Send follow-up'
                 }
-              contextUsage={showIndicator ? contextUsage : null}
-              onResetContext={showIndicator ? resetContext : undefined}
                 overlay
               />
               </div>

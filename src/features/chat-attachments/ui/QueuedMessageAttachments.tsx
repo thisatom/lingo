@@ -1,6 +1,20 @@
 import { FileText } from 'lucide-react'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import { useAttachmentDisplayUrl } from '@/features/chat-attachments/model/useAttachmentDisplayUrl'
 import { cn } from '@/shared/lib/utils'
+
+function QueueAttachmentThumb({ item }: { item: MessageAttachment }) {
+  const src = useAttachmentDisplayUrl(item)
+  if (item.kind !== 'image') {
+    return (
+      <span className="flex size-4 shrink-0 items-center justify-center rounded bg-accent">
+        <FileText className="size-2.5" />
+      </span>
+    )
+  }
+  if (!src) return <span className="size-4 shrink-0 rounded bg-muted" />
+  return <img src={src} alt="" className="size-4 shrink-0 rounded object-cover" />
+}
 
 type Props = {
   attachments: readonly MessageAttachment[]
@@ -19,17 +33,7 @@ export function QueuedMessageAttachments({ attachments, className }: Props) {
           className="inline-flex max-w-[120px] items-center gap-1 rounded border border-border bg-muted py-0.5 pl-0.5 pr-1.5 text-[10px] text-muted-foreground"
           title={item.name}
         >
-          {item.kind === 'image' ? (
-            <img
-              src={item.payload}
-              alt=""
-              className="size-4 shrink-0 rounded object-cover"
-            />
-          ) : (
-            <span className="flex size-4 shrink-0 items-center justify-center rounded bg-accent">
-              <FileText className="size-2.5" />
-            </span>
-          )}
+          <QueueAttachmentThumb item={item} />
           <span className="truncate">{item.name}</span>
         </span>
       ))}

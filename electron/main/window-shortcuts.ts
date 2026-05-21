@@ -1,16 +1,29 @@
 import type { BrowserWindow } from 'electron'
 
 /** Prevent Chromium from handling Ctrl/Cmd+N and forward to the renderer. */
-export function registerWindowShortcuts(win: BrowserWindow): void {
+export function registerWindowShortcuts(
+  win: BrowserWindow,
+  onNewWindow?: () => BrowserWindow
+): void {
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return
     const mod = input.control || input.meta
-    if (!mod || input.alt || input.shift) return
-    if (input.key.toLowerCase() !== 'n') return
+    if (!mod || input.alt) return
 
-    event.preventDefault()
-    if (!win.webContents.isDestroyed()) {
-      win.webContents.send('lingo:shortcut:new-chat')
+    const key = input.key.toLowerCase()
+
+    if (input.shift && key === 'n' && onNewWindow) {
+      event.preventDefault()
+      const next = onNewWindow()
+      if (!next.isDestroyed()) next.focus()
+      return
+    }
+
+    if (!input.shift && key === 'n') {
+      event.preventDefault()
+      if (!win.webContents.isDestroyed()) {
+        win.webContents.send('lingo:shortcut:new-chat')
+      }
     }
   })
 }

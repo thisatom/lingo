@@ -37,6 +37,8 @@ export interface ChatStreamRequest {
   practiceLanguage?: string
   /** Defaults to true — enables OpenRouter `openrouter:web_search` server tool. */
   webSearch?: boolean
+  /** Try other free models when the selected one errors (no repeat attempts). */
+  modelAutoFallback?: boolean
 }
 
 export type ChatStreamEvent =

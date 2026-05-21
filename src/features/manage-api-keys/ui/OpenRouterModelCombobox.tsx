@@ -2,6 +2,7 @@ import { Check, ChevronsUpDown, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { normalizeOpenRouterModelId, openRouterSuggestedModels } from '@/shared/config/openrouter'
+import { isOpenRouterFreeModel } from '@/shared/config/openrouter-free-models'
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import {
   settingsCommandClass,
@@ -59,7 +60,9 @@ export function OpenRouterModelCombobox({ id, value, onChange, className }: Open
   }, [customModels, value])
 
   const showSaveCustom =
-    normalizedSearch.length > 0 && !allKnownKeys.has(normalizedSearch.toLowerCase())
+    normalizedSearch.length > 0 &&
+    isOpenRouterFreeModel(normalizedSearch) &&
+    !allKnownKeys.has(normalizedSearch.toLowerCase())
 
   const selectModel = (modelId: string, saveToCustom: boolean) => {
     const id = normalizeOpenRouterModelId(modelId)

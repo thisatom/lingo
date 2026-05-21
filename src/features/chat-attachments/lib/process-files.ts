@@ -1,4 +1,5 @@
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import { persistAttachment } from '@/entities/message/lib/prepare-attachment'
 import {
   IMAGE_MIME_TYPES,
   MAX_COMPOSER_ATTACHMENTS,
@@ -64,10 +65,7 @@ async function fileToAttachment(file: File): Promise<MessageAttachment | null> {
     if (file.size > MAX_TEXT_FILE_BYTES) {
       throw new Error(`${file.name}: text file must be under 256 KB`)
     }
-    let text = await readFileAsText(file)
-    if (text.length > MAX_TEXT_CHARS_IN_API) {
-      text = `${text.slice(0, MAX_TEXT_CHARS_IN_API)}\n… (truncated)`
-    }
+    const text = await readFileAsText(file)
     return {
       id: newAttachmentId(),
       kind: 'text',
@@ -101,7 +99,7 @@ export async function processDroppedFiles(
   for (const file of batch) {
     try {
       const att = await fileToAttachment(file)
-      if (att) attachments.push(att)
+      if (att) attachments.push(await persistAttachment(att))
     } catch (e) {
       errors.push(e instanceof Error ? e.message : 'Could not attach file')
     }

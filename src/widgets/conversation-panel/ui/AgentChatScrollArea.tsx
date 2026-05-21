@@ -6,13 +6,17 @@ interface AgentChatScrollAreaProps {
   className?: string
   onAtBottomChange?: (atBottom: boolean) => void
   onShowScrollToLatestChange?: (show: boolean) => void
+  onViewportRef?: (viewport: HTMLDivElement | null) => void
+  onViewportScroll?: (viewport: HTMLDivElement) => void
 }
 
 export function AgentChatScrollArea({
   children,
   className,
   onAtBottomChange,
-  onShowScrollToLatestChange
+  onShowScrollToLatestChange,
+  onViewportRef,
+  onViewportScroll
 }: AgentChatScrollAreaProps) {
   return (
     <CustomScrollArea
@@ -20,6 +24,8 @@ export function AgentChatScrollArea({
       className={className}
       onAtBottomChange={onAtBottomChange}
       onShowScrollToLatestChange={onShowScrollToLatestChange}
+      onViewportRef={onViewportRef}
+      onViewportScroll={onViewportScroll}
     >
       {children}
     </CustomScrollArea>

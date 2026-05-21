@@ -14,7 +14,10 @@ import {
   createStreamingSentenceTts,
   type StreamingSentenceTts
 } from '@/features/text-to-speech/model/streamingSentenceTts'
-import { messageToApiPayload, messageHasVisibleContent } from '@/shared/lib/chat-message-api'
+import { messageHasVisibleContent } from '@/shared/lib/chat-message-api'
+import { resolveMessagesForApi } from '@/shared/lib/resolve-chat-api-messages'
+import { messagesHaveImages } from '@/shared/lib/vision-models'
+import { persistAttachments } from '@/entities/message/lib/prepare-attachment'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { EMPTY_MESSAGES } from '@/entities/message/model/types'
 import { formatOpenRouterError } from '@/shared/lib/openrouter-errors'
@@ -31,10 +34,11 @@ function isAgentPipelineBusy(stage: PipelineStage, streamActive: boolean): boole
   )
 }
 
-function getHistoryForChat(chatId: string): ChatMessagePayload[] {
+async function getHistoryForApi(chatId: string): Promise<ChatMessagePayload[]> {
   const chat = useChatsStore.getState().chats.find((c) => c.id === chatId)
-  const base =
-    chat?.messages.filter(messageHasVisibleContent).map((m) => messageToApiPayload(m)) ?? []
+  const base = await resolveMessagesForApi(
+    chat?.messages.filter(messageHasVisibleContent) ?? []
+  )
 
   const { addressUserByName, displayName } = useSettingsStore.getState()
   const name = displayName?.trim()
@@ -63,6 +67,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const updateMessageContent = useChatsStore((s) => s.updateMessageContent)
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
   const modelId = useSettingsStore((s) => s.modelId)
+  const modelAutoFallback = useSettingsStore((s) => s.modelAutoFallback)
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
   const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const stage = useConversationStore((s) => s.stage)
@@ -129,10 +134,12 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const runAssistantReply = useCallback(
     async (targetChatId: string) => {
       const runId = beginAgentRun()
-      setStage(webSearchEnabled ? 'searching' : 'thinking')
+      const history = await getHistoryForApi(targetChatId)
+      const hasImagesInThread = messagesHaveImages(history)
+
+      setStage(webSearchEnabled && !hasImagesInThread ? 'searching' : 'thinking')
       setError(null)
 
-      const history = getHistoryForChat(targetChatId)
       let assistantMessageId: string | null = null
       let finalText = ''
       const ttsEnabled = useSettingsStore.getState().ttsEnabled
@@ -169,19 +176,21 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             messages: history,
             model: modelId,
             practiceLanguage,
-            webSearch: webSearchEnabled
+            webSearch: webSearchEnabled && !hasImagesInThread,
+            modelAutoFallback
           },
           {
             onSearching: () => {
               if (!isAgentRunActive(runId)) return
-              if (useChatsStore.getState().activeChatId !== targetChatId) return
-              setStage('searching')
+              if (useChatsStore.getState().activeChatId === targetChatId) {
+                setStage('searching')
+              }
             },
             onTextDelta: ({ text }) => {
               if (!isAgentRunActive(runId)) return
-              if (useChatsStore.getState().activeChatId !== targetChatId) return
               finalText = text
               syncAssistantText(text)
+              if (useChatsStore.getState().activeChatId !== targetChatId) return
               if (streamingTts) {
                 streamingTts.feed(text)
               } else {
@@ -189,6 +198,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
               }
             },
             onDone: ({ text }) => {
+              if (!isAgentRunActive(runId)) return
               finalText = text
               syncAssistantText(text)
             }
@@ -199,20 +209,26 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         await stream.done
 
         if (!isAgentRunActive(runId)) {
-          if (assistantMessageId) removeMessagesFrom(assistantMessageId)
-          return
-        }
-        if (useChatsStore.getState().activeChatId !== targetChatId) {
-          if (assistantMessageId) removeMessagesFrom(assistantMessageId)
+          if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
           return
         }
 
         if (!finalText.trim() || !assistantMessageId) {
-          if (assistantMessageId) removeMessagesFrom(assistantMessageId)
+          if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
           throw new Error('Model returned an empty response')
         }
 
         useChatsStore.getState().notifyChatReplyReady(targetChatId)
+
+        const isViewingTargetChat =
+          useChatsStore.getState().activeChatId === targetChatId &&
+          !window.location.hash.startsWith('#/settings')
+
+        if (!isViewingTargetChat) {
+          streamingTts?.cancel()
+          streamingTtsRef.current = null
+          return
+        }
 
         setBlurAnimateMessageId(assistantMessageId)
 
@@ -251,12 +267,12 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         if (aborted) {
           streamingTts?.cancel()
           streamingTtsRef.current = null
-          if (assistantMessageId) removeMessagesFrom(assistantMessageId)
+          if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
           setStage('idle')
           return
         }
 
-        if (assistantMessageId) removeMessagesFrom(assistantMessageId)
+        if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
         setBlurAnimateMessageId(null)
         if (msg.includes('NO_OPENROUTER_KEY')) {
           setError('Add your OpenRouter API key in Settings.')
@@ -277,6 +293,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     [
       addMessage,
       modelId,
+      modelAutoFallback,
       practiceLanguage,
       removeMessagesFrom,
       setBlurAnimateMessageId,
@@ -448,7 +465,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       const chatId = chat.id
 
       stopAgent()
-      updateUserMessageContent(messageId, trimmed, editAttachments)
+      const preparedAttachments =
+        editAttachments.length > 0 ? await persistAttachments(editAttachments) : editAttachments
+      updateUserMessageContent(messageId, trimmed, preparedAttachments)
       removeMessagesAfter(messageId, chatId)
       setBlurAnimateMessageId(null)
       setError(null)

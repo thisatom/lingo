@@ -1,6 +1,8 @@
 import type { MessageAttachment } from '../../entities/message/model/attachment'
+import { isAttachmentRef, isInlineAttachmentPayload } from '../../entities/message/lib/attachment-payload'
 import type { Message } from '../../entities/message/model/types'
 import type { ChatContentPart, ChatMessagePayload } from '../types/ipc'
+import { MAX_TEXT_CHARS_IN_API } from '@/features/chat-attachments/lib/constants'
 
 export function buildUserApiContent(
   text: string,
@@ -15,11 +17,34 @@ export function buildUserApiContent(
 
   for (const att of attachments ?? []) {
     if (att.kind === 'image') {
-      parts.push({ type: 'image_url', image_url: { url: att.payload } })
+      if (att.payload.startsWith('data:')) {
+        parts.push({ type: 'image_url', image_url: { url: att.payload } })
+      } else if (isAttachmentRef(att.payload)) {
+        parts.push({
+          type: 'text',
+          text: `[Attached image: ${att.name} — still loading or unavailable]`
+        })
+      } else {
+        parts.push({
+          type: 'text',
+          text: `[Attached image: ${att.name} — image is no longer available]`
+        })
+      }
     } else {
+      let text = att.payload
+      if (isAttachmentRef(text)) {
+        parts.push({
+          type: 'text',
+          text: `[Attached file: ${att.name} — still loading or unavailable]`
+        })
+        continue
+      }
+      if (text.length > MAX_TEXT_CHARS_IN_API) {
+        text = `${text.slice(0, MAX_TEXT_CHARS_IN_API)}\n… (truncated)`
+      }
       parts.push({
         type: 'text',
-        text: `**${att.name}**\n\`\`\`\n${att.payload}\n\`\`\``
+        text: `**${att.name}**\n\`\`\`\n${text}\n\`\`\``
       })
     }
   }
@@ -54,7 +79,8 @@ export function messageHasApiContent(payload: ChatMessagePayload): boolean {
   return payload.content.some(
     (p: ChatContentPart) =>
       (p.type === 'text' && p.text.trim().length > 0) ||
-      (p.type === 'image_url' && Boolean(p.image_url.url))
+      (p.type === 'image_url' &&
+        Boolean(p.image_url.url && isInlineAttachmentPayload(p.image_url.url) && p.image_url.url.startsWith('data:')))
   )
 }
 

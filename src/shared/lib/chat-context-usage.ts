@@ -20,8 +20,11 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   'mistralai/mistral-small-3.1-24b-instruct': 128_000,
   'deepseek/deepseek-chat': 64_000,
   'qwen/qwen-2.5-72b-instruct': 128_000,
-  'perplexity/sonar': 127_000,
-  'openrouter/auto': 128_000
+  'openrouter/free': 128_000,
+  'openrouter/auto': 128_000,
+  'nvidia/nemotron-3-super-120b-a12b:free': 256_000,
+  'meta-llama/llama-3.3-70b-instruct:free': 128_000,
+  'google/gemma-3-27b-it:free': 128_000
 }
 
 export function getModelContextLimit(modelId: string): number {

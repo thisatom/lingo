@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, X } from 'lucide-react'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import { useComposerPaste } from '@/features/chat-attachments/model/useComposerPaste'
 import { ComposerAttachments } from '@/features/chat-attachments/ui/ComposerAttachments'
+import { ComposerFileInput } from '@/features/chat-attachments/ui/ComposerFileInput'
 import { UserQuestionContextMenu } from './chat-context-menu/UserQuestionContextMenu'
 import { MessageBodyClamp } from './MessageBodyClamp'
 import { UserMessageAttachments } from '@/features/chat-attachments/ui/UserMessageAttachments'
 import { UserMessageEditButton } from './UserMessageEditButton'
-import { chatSelectableClass, userMessageBubbleClass, userMessageTextClass } from './agent-layout'
+import { MarkdownContent } from '@/shared/ui/markdown-content'
+import { chatSelectableClass, userMessageBubbleClass } from './agent-layout'
 import { cn } from '@/shared/lib/utils'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
@@ -28,6 +31,7 @@ interface UserMessageProps {
   onEnterEdit: () => void
   onExitEdit: () => void
   onSubmitEdit: (text: string, attachments?: MessageAttachment[]) => void
+  onAttachmentError?: (message: string) => void
 }
 
 export function UserMessage({
@@ -39,7 +43,8 @@ export function UserMessage({
   isEditing,
   onEnterEdit,
   onExitEdit,
-  onSubmitEdit
+  onSubmitEdit,
+  onAttachmentError
 }: UserMessageProps) {
   const [draft, setDraft] = useState(content)
   const [editAttachments, setEditAttachments] = useState<MessageAttachment[]>([])
@@ -61,8 +66,20 @@ export function UserMessage({
     }
   }, [isEditing, content, messageId, attachments])
 
+  useComposerPaste({
+    textareaRef,
+    enabled: isEditing && !disabled,
+    existingCount: editAttachments.length,
+    onAdd: (items) => setEditAttachments((prev) => [...prev, ...items]),
+    onError: onAttachmentError
+  })
+
   const hasAttachments = editAttachments.length > 0
   const canSend = (draft.trim().length > 0 || hasAttachments) && !disabled
+
+  const handleAddAttachments = (items: MessageAttachment[]) => {
+    setEditAttachments((prev) => [...prev, ...items])
+  }
 
   const handleSubmit = () => {
     if (!canSend) return
@@ -95,7 +112,7 @@ export function UserMessage({
             />
           ) : null}
 
-          <div className="grid min-h-8 w-full grid-cols-[24px_1fr_24px] items-center gap-1">
+          <div className="grid min-h-8 w-full grid-cols-[24px_24px_1fr_24px] items-center gap-1">
             <TooltipIconButton
               variant="ghost"
               size="iconSm"
@@ -106,6 +123,13 @@ export function UserMessage({
             >
               <X className="size-3.5" />
             </TooltipIconButton>
+
+            <ComposerFileInput
+              existingCount={editAttachments.length}
+              disabled={disabled}
+              onAdd={handleAddAttachments}
+              onError={onAttachmentError}
+            />
 
             <textarea
               ref={textareaRef}
@@ -164,9 +188,7 @@ export function UserMessage({
             <UserMessageAttachments attachments={attachments} />
           ) : null}
           {content.trim() ? (
-            <p className={cn(userMessageTextClass, chatSelectableClass, 'whitespace-pre-wrap')}>
-              {content}
-            </p>
+            <MarkdownContent content={content} variant="agent" className={chatSelectableClass} />
           ) : null}
         </MessageBodyClamp>
         <UserMessageEditButton disabled={disabled} onEdit={onEnterEdit} />

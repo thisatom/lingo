@@ -1,7 +1,23 @@
 import { FileText, X } from 'lucide-react'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import { useAttachmentDisplayUrl } from '@/features/chat-attachments/model/useAttachmentDisplayUrl'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
+
+function ComposerAttachmentThumb({ item }: { item: MessageAttachment }) {
+  const src = useAttachmentDisplayUrl(item)
+  if (item.kind !== 'image') {
+    return (
+      <div className="flex size-8 shrink-0 items-center justify-center rounded bg-accent text-muted-foreground">
+        <FileText className="size-3.5" />
+      </div>
+    )
+  }
+  if (!src) {
+    return <div className="size-8 shrink-0 rounded bg-muted" />
+  }
+  return <img src={src} alt={item.name} className="size-8 shrink-0 rounded object-cover" />
+}
 
 type Props = {
   items: readonly MessageAttachment[]
@@ -19,17 +35,7 @@ export function ComposerAttachments({ items, onRemove, className }: Props) {
           key={item.id}
           className="group relative flex max-w-[140px] items-center gap-1.5 rounded-lg border border-border bg-muted py-1 pl-1 pr-7"
         >
-          {item.kind === 'image' ? (
-            <img
-              src={item.payload}
-              alt={item.name}
-              className="size-8 shrink-0 rounded object-cover"
-            />
-          ) : (
-            <div className="flex size-8 shrink-0 items-center justify-center rounded bg-accent text-muted-foreground">
-              <FileText className="size-3.5" />
-            </div>
-          )}
+          <ComposerAttachmentThumb item={item} />
           <span className="min-w-0 truncate text-xs text-muted-foreground" title={item.name}>
             {item.name}
           </span>

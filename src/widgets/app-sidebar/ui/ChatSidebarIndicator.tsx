@@ -43,7 +43,8 @@ export function ChatSidebarIndicator({
       ) : (
         <span
           className={cn(
-            'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full transition-opacity group-hover/chat:opacity-0',
+            'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full transition-opacity',
+            !showUnreadDot && !hasError && 'group-hover/chat:opacity-0',
             sidebarChatDotSizeClass,
             hasError
               ? sidebarChatDotErrorClass
@@ -51,7 +52,8 @@ export function ChatSidebarIndicator({
                 ? sidebarChatUnreadDotClass
                 : sidebarChatDotClass
           )}
-          aria-hidden
+          aria-hidden={!showUnreadDot}
+          aria-label={showUnreadDot ? 'New reply' : undefined}
         />
       )}
 
