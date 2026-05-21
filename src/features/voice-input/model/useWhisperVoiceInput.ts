@@ -11,7 +11,7 @@ import {
   startAudioCapture,
   type AudioCaptureSession
 } from '@/features/voice-input/lib/record-session'
-import { getLingo } from '@/shared/lib/lingo'
+import { getLingo, isElectronApp } from '@/shared/lib/lingo'
 import { acquireMicrophoneStream, releaseMicrophoneStream } from '@/shared/lib/microphone'
 
 const STT_TIMEOUT_MS = 120_000
@@ -43,7 +43,8 @@ export function useRecordedVoiceInput({ enabled }: Options) {
   const setStage = useConversationStore((s) => s.setStage)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
 
-  const supported = enabled && isAudioCaptureSupported() && Boolean(window.lingo?.stt)
+  const supported =
+    enabled && isElectronApp() && isAudioCaptureSupported() && Boolean(window.lingo?.stt)
 
   const streamRef = useRef<MediaStream | null>(null)
   const captureRef = useRef<AudioCaptureSession | null>(null)

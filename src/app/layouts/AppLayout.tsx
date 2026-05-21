@@ -5,12 +5,18 @@ import { useChatsStore } from '@/entities/chat/model/store'
 import { ResizableSidebarContext } from '@/app/context/resizable-sidebar-context'
 import { AppStartupOverlay } from '@/app/ui/AppStartupOverlay'
 import { AppSidebar } from '@/widgets/app-sidebar/ui/AppSidebar'
+import { useThemeSync } from '@/app/hooks/use-theme-sync'
+import { useWindowTitle } from '@/app/hooks/use-window-title'
+import { useNewChatHotkey } from '@/features/chat/model/useNewChatHotkey'
 import { useAppReady } from '@/shared/lib/hooks/use-app-ready'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/shared/ui/resizable'
 import { SidebarInset, SidebarProvider } from '@/shared/ui/sidebar'
 import { TooltipProvider } from '@/shared/ui/tooltip'
 
 export function AppLayout() {
+  useThemeSync()
+  useWindowTitle()
+  useNewChatHotkey()
   const appReady = useAppReady()
   const ensureActiveChat = useChatsStore((s) => s.ensureActiveChat)
   const sidebarPanelRef = usePanelRef()

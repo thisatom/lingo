@@ -1,3 +1,4 @@
+import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { cn } from '@/shared/lib/utils'
 import type { ConversationTurn as Turn } from '@/widgets/conversation-panel/lib/group-turns'
 import { AgentMessage } from './AgentMessage'
@@ -10,7 +11,7 @@ interface ConversationTurnProps {
   actionsDisabled?: boolean
   onEnterEdit: (messageId: string) => void
   onExitEdit: () => void
-  onSubmitEdit: (messageId: string, text: string) => void
+  onSubmitEdit: (messageId: string, text: string, attachments?: MessageAttachment[]) => void
 }
 
 export function ConversationTurn({
@@ -35,17 +36,18 @@ export function ConversationTurn({
         <UserMessage
           messageId={turn.user.id}
           content={turn.user.content}
+          attachments={turn.user.attachments}
           chatId={activeChatId}
           disabled={actionsDisabled}
           isEditing={isEditing}
           onEnterEdit={() => onEnterEdit(turn.user.id)}
           onExitEdit={onExitEdit}
-          onSubmitEdit={(text) => onSubmitEdit(turn.user.id, text)}
+          onSubmitEdit={(text, attachments) => onSubmitEdit(turn.user.id, text, attachments)}
         />
       </div>
 
       {turn.assistantMessages.map((message) => (
-        <article key={message.id} className="min-w-0 max-w-full">
+        <article key={message.id} className="mt-1.5 min-w-0 max-w-full pl-3 sm:pl-4">
           <AgentMessage content={message.content} messageId={message.id} />
         </article>
       ))}

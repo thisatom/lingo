@@ -1,6 +1,6 @@
 import type { Message } from '@/entities/message/model/types'
 
-export function formatChatMessagesForCopy(messages: Message[]): string {
+export function formatChatMessagesForCopy(messages: readonly Message[]): string {
   return messages
     .filter((message) => message.content.trim().length > 0)
     .map((message) => {

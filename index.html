@@ -12,18 +12,21 @@
     <meta name="color-scheme" content="dark" />
     <link rel="icon" type="image/png" href="/icon.png" />
     <title>Lingo</title>
+    <script src="/init-theme.js"></script>
     <style>
       html,
       body,
       #root {
-        background-color: #121212;
-        color: #d1d1d1;
-      }
-      html,
-      body {
         margin: 0;
         height: 100%;
         overflow: hidden;
+        background-color: #121212;
+        color: #d1d1d1;
+      }
+      html:not(.dark) body,
+      html:not(.dark) #root {
+        background-color: #f5f5f5;
+        color: #171717;
       }
       #root {
         min-height: 100%;
@@ -33,6 +36,9 @@
         inset: 0;
         z-index: 2147483646;
         background: #121212;
+      }
+      html:not(.dark) #app-splash {
+        background: #f5f5f5;
       }
       #app-splash.app-splash--hide {
         opacity: 0;

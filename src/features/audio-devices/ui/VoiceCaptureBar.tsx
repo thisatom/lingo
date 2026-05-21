@@ -35,7 +35,7 @@ export function VoiceCaptureBar({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-full border border-border bg-[#1e1e1e] px-3 py-2',
+        'flex items-center gap-2 rounded-full border border-border bg-chat-composer px-3 py-2',
         className
       )}
       role="region"

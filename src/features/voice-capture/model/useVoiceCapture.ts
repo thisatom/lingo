@@ -30,8 +30,12 @@ export { NO_SPEECH_MESSAGE } from '@/features/speech-to-text/lib/speech-errors'
 
 type AudioRecorderSession = RecorderSession | WavRecorderSession
 
-function useOpenRouterStt(): boolean {
-  return isLingoAvailable() && (isWavRecorderSupported() || isMediaRecorderCaptureSupported())
+function useRecordedStt(): boolean {
+  return (
+    isLingoAvailable() &&
+    Boolean(window.lingo?.stt) &&
+    (isWavRecorderSupported() || isMediaRecorderCaptureSupported())
+  )
 }
 
 export function useVoiceCapture() {
@@ -40,7 +44,7 @@ export function useVoiceCapture() {
   const setStage = useConversationStore((s) => s.setStage)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
 
-  const useWhisper = useOpenRouterStt()
+  const useWhisper = useRecordedStt()
   const webSpeechSupported = isSpeechRecognitionSupported()
   const supported = useWhisper || webSpeechSupported
 

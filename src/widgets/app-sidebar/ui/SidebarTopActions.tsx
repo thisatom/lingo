@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, PanelLeft, Search } from 'lucide-react'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
-import { useChatsStore } from '@/entities/chat/model/store'
+import { EMPTY_CHAT_HISTORY, useChatsStore } from '@/entities/chat/model/store'
 import { Kbd, KbdGroup } from '@/shared/ui/kbd'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
@@ -10,8 +10,8 @@ interface SidebarTopActionsProps {
 
 export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
   const { toggleSidebarPanel, sidebarCollapsed } = useResizableSidebar()
-  const chatHistoryPast = useChatsStore((s) => s.chatHistoryPast ?? [])
-  const chatHistoryFuture = useChatsStore((s) => s.chatHistoryFuture ?? [])
+  const chatHistoryPast = useChatsStore((s) => s.chatHistoryPast ?? EMPTY_CHAT_HISTORY)
+  const chatHistoryFuture = useChatsStore((s) => s.chatHistoryFuture ?? EMPTY_CHAT_HISTORY)
   const goBackInChatHistory = useChatsStore((s) => s.goBackInChatHistory)
   const goForwardInChatHistory = useChatsStore((s) => s.goForwardInChatHistory)
 

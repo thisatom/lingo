@@ -5,7 +5,19 @@
     "src/shared/types/**/*",
     "src/shared/config/**/*",
     "src/shared/lib/web-search-intent.ts",
+    "src/shared/lib/chat-message-api.ts",
+    "src/entities/message/model/**/*",
+    "src/shared/lib/openrouter-errors.ts",
+    "src/shared/lib/openrouter-headers.ts",
+    "src/shared/lib/openrouter-model.ts",
+    "src/shared/lib/openrouter-chat-stream.ts",
     "src/shared/lib/strip-text-for-speech.ts",
+    "src/shared/lib/prepare-text-for-speech.ts",
+    "src/shared/lib/tts-rate.ts",
+    "src/shared/config/tts-voices.ts",
+    "src/shared/config/titlebar.ts",
+    "src/shared/types/app-theme.ts",
+    "src/shared/lib/theme.ts",
     "src/features/speech-to-text/lib/speech-audio-constants.ts",
     "src/features/speech-to-text/lib/wav-pcm.ts"
   ],
@@ -17,6 +29,10 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   }
 }

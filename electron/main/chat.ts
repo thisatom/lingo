@@ -1,6 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
 import type { ChatCompleteRequest, ChatCompleteResponse } from '../../src/shared/types/ipc'
+import { extractPlainTextFromPayload } from '../../src/shared/lib/chat-message-api'
 import { getSecret } from './secrets'
 import { openRouterConfig } from '../../src/shared/config/openrouter'
 import { normalizeOpenRouterModelId } from '../../src/shared/config/openrouter'
@@ -36,7 +37,8 @@ export async function completeChat(request: ChatCompleteRequest): Promise<ChatCo
       .filter((m) => m.role !== 'system')
       .map((m) => ({
         role: m.role as 'user' | 'assistant',
-        content: m.content
+        content:
+          typeof m.content === 'string' ? m.content : extractPlainTextFromPayload(m.content)
       }))
   })
 

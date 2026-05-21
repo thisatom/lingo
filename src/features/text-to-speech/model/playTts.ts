@@ -14,13 +14,37 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes
 }
 
+function bytesToObjectUrl(bytes: Uint8Array, mimeType: string): string {
+  const arrayBuffer = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength
+  ) as ArrayBuffer
+  const blob = new Blob([arrayBuffer], { type: mimeType || 'audio/mpeg' })
+  return URL.createObjectURL(blob)
+}
+
+type PreparedClip = {
+  audio: HTMLAudioElement
+  url: string
+}
+
 let activeAudio: HTMLAudioElement | null = null
+const preparedClips: PreparedClip[] = []
 let queueTail: Promise<void> = Promise.resolve()
 let queueGeneration = 0
+
+function clearPreparedClips(): void {
+  for (const clip of preparedClips) {
+    clip.audio.src = ''
+    URL.revokeObjectURL(clip.url)
+  }
+  preparedClips.length = 0
+}
 
 export function resetTtsPlaybackQueue(): void {
   queueGeneration++
   queueTail = Promise.resolve()
+  clearPreparedClips()
 }
 
 export function stopTtsPlayback(): void {
@@ -34,24 +58,47 @@ export function stopTtsPlayback(): void {
   activeAudio = null
 }
 
+/** Decode and warm a clip while earlier chunks play (FIFO). */
+export function prepareTtsFromBase64(audioBase64: string, mimeType: string): void {
+  if (!audioBase64?.trim()) return
+
+  const type = mimeType || 'audio/mpeg'
+  const url = bytesToObjectUrl(base64ToBytes(audioBase64), type)
+  const audio = new Audio()
+  audio.preload = 'auto'
+  audio.src = url
+  void audio.load()
+  preparedClips.push({ audio, url })
+}
+
+async function takeClipForPlayback(
+  audioBase64: string,
+  mimeType: string
+): Promise<HTMLAudioElement> {
+  const type = mimeType || 'audio/mpeg'
+  const prepared = preparedClips.shift()
+
+  if (prepared) {
+    const { speakerDeviceId } = useSettingsStore.getState()
+    await applyAudioOutputDevice(prepared.audio, speakerDeviceId)
+    return prepared.audio
+  }
+
+  const url = bytesToObjectUrl(base64ToBytes(audioBase64), type)
+  const audio = new Audio()
+  audio.preload = 'auto'
+  audio.src = url
+  return audio
+}
+
 async function playTtsClip(audioBase64: string, mimeType: string): Promise<void> {
   if (!audioBase64?.trim()) {
     throw new Error('TTS_EMPTY_AUDIO')
   }
 
-  const type = mimeType || 'audio/mpeg'
-  const bytes = base64ToBytes(audioBase64)
-  const arrayBuffer = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength
-  ) as ArrayBuffer
-  const blob = new Blob([arrayBuffer], { type })
-  const url = URL.createObjectURL(blob)
-
-  const audio = new Audio()
+  const audio = await takeClipForPlayback(audioBase64, mimeType)
+  const url = audio.src
   activeAudio = audio
-  audio.preload = 'auto'
-  audio.src = url
 
   const { speakerDeviceId } = useSettingsStore.getState()
   await applyAudioOutputDevice(audio, speakerDeviceId)
@@ -77,25 +124,37 @@ async function playTtsClip(audioBase64: string, mimeType: string): Promise<void>
         reject(new Error(`PLAYBACK_FAILED (${code}: ${message})`))
       }
 
-      void audio
-        .play()
-        .then(() => {
-          attachTtsPlaybackMeter(audio)
-        })
-        .catch((playError: unknown) => {
-          cleanup()
-          detachTtsPlaybackMeter()
-          if (activeAudio === audio) activeAudio = null
-          const detail =
-            playError instanceof Error
-              ? playError.message
-              : 'Autoplay blocked or unsupported format'
-          reject(new Error(`PLAYBACK_FAILED: ${detail}`))
-        })
+      const start = () => {
+        void audio
+          .play()
+          .then(() => {
+            attachTtsPlaybackMeter(audio)
+          })
+          .catch((playError: unknown) => {
+            cleanup()
+            detachTtsPlaybackMeter()
+            if (activeAudio === audio) activeAudio = null
+            const detail =
+              playError instanceof Error
+                ? playError.message
+                : 'Autoplay blocked or unsupported format'
+            reject(new Error(`PLAYBACK_FAILED: ${detail}`))
+          })
+      }
+
+      if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        start()
+      } else {
+        audio.oncanplay = () => {
+          audio.oncanplay = null
+          start()
+        }
+        void audio.load()
+      }
     })
   } finally {
     detachTtsPlaybackMeter()
-    URL.revokeObjectURL(url)
+    if (url.startsWith('blob:')) URL.revokeObjectURL(url)
     if (activeAudio === audio) {
       audio.src = ''
       activeAudio = null
@@ -109,7 +168,7 @@ export async function playTtsFromBase64(audioBase64: string, mimeType: string): 
   await playTtsClip(audioBase64, mimeType)
 }
 
-/** Queue a clip after the current one (for sentence-by-sentence streaming). */
+/** Queue a clip after the current one (for chunked streaming TTS). */
 export function enqueueTtsFromBase64(audioBase64: string, mimeType: string): Promise<void> {
   const generation = queueGeneration
   const task = queueTail.then(async () => {

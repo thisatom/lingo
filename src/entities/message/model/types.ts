@@ -1,3 +1,5 @@
+import type { MessageAttachment } from './attachment'
+
 export type MessageRole = 'user' | 'assistant'
 
 export interface Message {
@@ -5,4 +7,8 @@ export interface Message {
   role: MessageRole
   content: string
   createdAt: number
+  attachments?: MessageAttachment[]
 }
+
+/** Stable empty reference for Zustand selectors. */
+export const EMPTY_MESSAGES: readonly Message[] = []

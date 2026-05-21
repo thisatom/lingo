@@ -1,156 +1,221 @@
-import { ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
-import { settingsButtonSize, settingsInputClass } from '@/shared/lib/settings-control'
-import { cn } from '@/shared/lib/utils'
-import { Button } from '@/shared/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui/collapsible'
+import { getLingo } from '@/shared/lib/lingo'
+import { settingsInputClass } from '@/shared/lib/settings-control'
+import {
+  settingsCardClass,
+  settingsRowClass,
+  settingsRowDescriptionClass,
+  settingsRowTextWrapClass,
+  settingsRowTitleClass,
+  settingsSectionTitleClass
+} from '@/shared/lib/settings-surface'
 import { Input } from '@/shared/ui/input'
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup } from '@/shared/ui/item'
-import { Label } from '@/shared/ui/label'
-import { useOpenRouterKey } from '../model/useOpenRouterKey'
+import { ItemDescription } from '@/shared/ui/item'
+import type { SecretProviderId } from '@/shared/types/ipc'
+import { useSecretKey } from '../model/useSecretKey'
 import { OpenRouterModelCombobox } from './OpenRouterModelCombobox'
 
-export function OpenRouterKeyForm() {
-  const { status, loading, apiError, save, clear, validate } = useOpenRouterKey()
-  const modelId = useSettingsStore((s) => s.modelId)
-  const setModelId = useSettingsStore((s) => s.setModelId)
+const PROVIDERS: { id: SecretProviderId; label: string; placeholder: string }[] = [
+  { id: 'openrouter', label: 'OpenRouter', placeholder: 'sk-or-…' },
+  { id: 'openai', label: 'OpenAI', placeholder: 'sk-…' },
+  { id: 'anthropic', label: 'Anthropic', placeholder: 'sk-ant-…' },
+  { id: 'google', label: 'Google', placeholder: 'AIza…' },
+  { id: 'groq', label: 'Groq', placeholder: 'gsk_…' },
+  { id: 'azure-speech', label: 'Azure Speech', placeholder: '…' }
+]
+
+const AUTOSAVE_DELAY_MS = 650
+
+function SecretKeySection({
+  providerId,
+  label,
+  placeholder,
+  onMessage
+}: {
+  providerId: SecretProviderId
+  label: string
+  placeholder: string
+  onMessage: (message: string | null) => void
+}) {
+  const { status, loading, apiError, save, clear, readKey } = useSecretKey(providerId)
   const [value, setValue] = useState('')
-  const [message, setMessage] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [showSecret, setShowSecret] = useState(false)
+  const [revealed, setRevealed] = useState(false)
+  const [testMessage, setTestMessage] = useState<string | null>(null)
+  const timerRef = useRef<number | null>(null)
+  const wasKeySetRef = useRef(false)
+  const prevMaskedRef = useRef<string | undefined>(undefined)
 
-  const onSave = async () => {
-    setBusy(true)
-    setMessage(null)
-    try {
-      await save(value)
-      setValue('')
-      setMessage('Key saved.')
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Could not save key.')
-    } finally {
-      setBusy(false)
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current)
     }
-  }
+  }, [])
 
-  const onValidate = async () => {
-    setBusy(true)
-    setMessage(null)
-    try {
-      const result = await validate()
-      setMessage(result.ok ? 'Key works.' : result.error ?? 'Validation failed.')
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Validation failed.')
-    } finally {
-      setBusy(false)
+  useEffect(() => {
+    if (!status) return
+    onMessage(null)
+    if (!status.isSet) {
+      if (wasKeySetRef.current) {
+        setValue('')
+      }
+      wasKeySetRef.current = false
+      prevMaskedRef.current = undefined
+      setShowSecret(false)
+      setRevealed(false)
+      setTestMessage(null)
+      return
     }
-  }
 
-  const onClear = async () => {
-    setBusy(true)
-    setMessage(null)
-    try {
-      await clear()
-      setMessage('Key removed.')
-    } finally {
-      setBusy(false)
+    wasKeySetRef.current = true
+    if (revealed) return
+
+    const masked = status.masked ?? '••••••••'
+    if (prevMaskedRef.current !== masked) {
+      prevMaskedRef.current = masked
+      setValue(masked)
     }
+  }, [status, onMessage, revealed])
+
+  const id = `api-key-${providerId}`
+
+  const schedule = (next: string) => {
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(async () => {
+      onMessage(null)
+      try {
+        if (next.trim().length === 0) {
+          if (status?.isSet) {
+            await clear()
+            onMessage('Key removed.')
+          }
+          setTestMessage(null)
+          return
+        }
+        await save(next)
+        if (providerId === 'openrouter') {
+          setTestMessage('Checking key...')
+          const result = await getLingo().secrets.validateOpenRouter()
+          setTestMessage(result.ok ? 'OpenRouter: key is valid.' : result.error ?? 'Validation failed.')
+        } else {
+          setTestMessage('Saved.')
+        }
+        onMessage('Saved.')
+      } catch (e) {
+        setTestMessage(null)
+        onMessage(e instanceof Error ? e.message : 'Could not save key.')
+      }
+    }, AUTOSAVE_DELAY_MS)
   }
 
   return (
-    <ItemGroup className="gap-4">
-      {apiError && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {apiError}
+    <div className={settingsRowClass}>
+      <div className={settingsRowTextWrapClass}>
+        <p className={settingsRowTitleClass}>{label} API key</p>
+        <p className={settingsRowDescriptionClass}>
+          {apiError
+            ? apiError
+            : testMessage
+              ? testMessage
+              : status?.isSet
+                ? 'Configured. Clear the field to remove.'
+                : 'Not configured.'}
         </p>
-      )}
+      </div>
+      <div className="relative w-[260px] min-w-0">
+        <Input
+          id={id}
+          className={`${settingsInputClass} w-full pr-10`}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => {
+            const next = e.target.value
+            setValue(next)
+            schedule(next)
+          }}
+          autoComplete="off"
+          disabled={loading}
+          type={showSecret ? 'text' : 'password'}
+        />
+        {(status?.isSet || value.trim().length > 0) && (
+          <button
+            type="button"
+            className="absolute top-1/2 right-0.5 inline-flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+            onClick={async () => {
+              if (showSecret) {
+                setShowSecret(false)
+                setRevealed(false)
+                if (status?.isSet) {
+                  setValue(status.masked ?? '••••••••')
+                }
+                return
+              }
+              if (status?.isSet && !revealed) {
+                try {
+                  const secret = await readKey()
+                  if (secret == null || secret === '') {
+                    onMessage('Could not read the saved key.')
+                    return
+                  }
+                  setValue(secret)
+                  setRevealed(true)
+                } catch (e) {
+                  onMessage(e instanceof Error ? e.message : 'Could not read the saved key.')
+                  return
+                }
+              }
+              setShowSecret(true)
+            }}
+            aria-label={showSecret ? 'Hide API key' : 'Show API key'}
+          >
+            {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
-      <Collapsible defaultOpen className="rounded-[8px] border border-border">
-        <CollapsibleTrigger
-          className={cn(
-            'flex w-full items-center justify-between gap-2 rounded-[8px] px-3 py-2.5 text-left outline-none',
-            'hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring [&[data-state=open]>svg]:rotate-180'
-          )}
-        >
-          <span className="text-xs font-medium text-foreground">OpenRouter API key</span>
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <Item size="sm" className="flex-col items-stretch border-t border-border p-3">
-            <ItemContent className="gap-1.5">
-              <Label htmlFor="openrouter-key" className="text-xs font-medium">
-                API key
-              </Label>
-              <Input
-                id="openrouter-key"
-                type="password"
-                className={settingsInputClass}
-                placeholder="sk-or-…"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                autoComplete="off"
-              />
-              {status?.isSet && (
-                <ItemDescription className="text-xs">
-                  Current: {status.masked ?? 'configured'}
-                </ItemDescription>
-              )}
-            </ItemContent>
-            <ItemActions className="mt-3 w-full flex-wrap">
-              <Button
-                size={settingsButtonSize}
-                onClick={() => void onSave()}
-                disabled={busy || !value.trim()}
-              >
-                Save
-              </Button>
-              <Button
-                size={settingsButtonSize}
-                variant="outline"
-                onClick={() => void onValidate()}
-                disabled={busy || loading}
-              >
-                Test
-              </Button>
-              <Button
-                size={settingsButtonSize}
-                variant="destructive"
-                onClick={() => void onClear()}
-                disabled={busy || !status?.isSet}
-              >
-                Clear
-              </Button>
-            </ItemActions>
-          </Item>
-        </CollapsibleContent>
-      </Collapsible>
+export function OpenRouterKeyForm() {
+  const modelId = useSettingsStore((s) => s.modelId)
+  const setModelId = useSettingsStore((s) => s.setModelId)
+  const [message, setMessage] = useState<string | null>(null)
 
-      <Collapsible defaultOpen className="rounded-[8px] border border-border">
-        <CollapsibleTrigger
-          className={cn(
-            'flex w-full items-center justify-between gap-2 rounded-[8px] px-3 py-2.5 text-left outline-none',
-            'hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring [&[data-state=open]>svg]:rotate-180'
-          )}
-        >
-          <span className="text-xs font-medium text-foreground">Model</span>
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <Item size="sm" className="flex-col items-stretch border-t border-border p-3">
-            <ItemContent className="gap-1.5">
-              <Label htmlFor="model" className="text-xs font-medium">
-                OpenRouter model
-              </Label>
-              <OpenRouterModelCombobox id="model" value={modelId} onChange={setModelId} />
-              <ItemDescription className="text-xs">
-                Pick a suggestion or type any OpenRouter model id (e.g. openai/gpt-4o-mini).
-              </ItemDescription>
-            </ItemContent>
-          </Item>
-        </CollapsibleContent>
-      </Collapsible>
+  return (
+    <section>
+      <h2 className={settingsSectionTitleClass}>API</h2>
+      <div className={settingsCardClass}>
+        {PROVIDERS.map((p) => (
+          <SecretKeySection
+            key={p.id}
+            providerId={p.id}
+            label={p.label}
+            placeholder={p.placeholder}
+            onMessage={setMessage}
+          />
+        ))}
+      </div>
 
-      {message && <ItemDescription className="px-1 text-xs">{message}</ItemDescription>}
-    </ItemGroup>
+      <div className={`${settingsCardClass} mt-3`}>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>OpenRouter model</p>
+            <p className={settingsRowDescriptionClass}>
+              Pick a suggestion or type any OpenRouter model id (e.g. openai/gpt-4o-mini).
+            </p>
+          </div>
+          <OpenRouterModelCombobox
+            id="model"
+            value={modelId}
+            onChange={setModelId}
+            className="w-[260px]"
+          />
+        </div>
+      </div>
+
+      {message && <ItemDescription className="mt-2 px-1 text-xs">{message}</ItemDescription>}
+    </section>
   )
 }

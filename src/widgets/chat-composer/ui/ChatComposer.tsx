@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { ArrowUp, Globe, Mic, Square } from 'lucide-react'
+import {
+  EMPTY_COMPOSER_ATTACHMENTS,
+  type MessageAttachment
+} from '@/entities/message/model/attachment'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
+import { ComposerAttachments } from '@/features/chat-attachments/ui/ComposerAttachments'
+import { ComposerTextareaContextMenu } from '@/features/chat-composer/ui/ComposerTextareaContextMenu'
+import { ComposerFileInput } from '@/features/chat-attachments/ui/ComposerFileInput'
+import { useNativeComposerDrop } from '@/features/chat-attachments/model/useNativeComposerDrop'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { VoiceRecordButton, type VoiceInteractionMode } from '@/features/voice-capture/ui/VoiceRecordButton'
 import { composerInputHoverClass } from '@/shared/lib/sidebar-filter-menu-styles'
@@ -8,7 +16,7 @@ import { CHAT_MODE_LABELS, composerToolbarIconClass } from '@/widgets/chat-compo
 import { ComposerAgentMenuSelect } from '@/widgets/chat-composer/ui/ComposerAgentMenuSelect'
 import { ContextUsageButton } from '@/widgets/chat-composer/ui/ContextUsageButton'
 import type { ChatContextUsageDetails } from '@/shared/lib/chat-context-usage'
-import { openRouterSuggestedModels } from '@/shared/config/openrouter'
+import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
@@ -17,15 +25,19 @@ const INPUT_MIN_HEIGHT_PX = 24
 const INPUT_MAX_HEIGHT_PX = 160
 
 const composerShellClass = cn(
-  'flex w-full flex-col overflow-hidden rounded-3xl border border-[#313131] bg-[#1e1e1e]',
+  'flex w-full flex-col overflow-hidden rounded-3xl border border-border bg-chat-composer',
   'transition-[border-color] duration-150',
-  'focus-within:border-[#383838]',
-  'has-[:focus-visible]:border-[#383838]'
+  'focus-within:border-ring/70',
+  'has-[:focus-visible]:border-ring/70'
 )
 
 interface ChatComposerProps {
   value: string
   onChange: (value: string) => void
+  attachments?: readonly MessageAttachment[]
+  onAddAttachments?: (items: MessageAttachment[]) => void
+  onRemoveAttachment?: (id: string) => void
+  onAttachmentError?: (message: string) => void
   onSend: () => void
   onStop?: () => void
   disabled?: boolean
@@ -42,6 +54,8 @@ interface ChatComposerProps {
   overlay?: boolean
   contextUsage?: ChatContextUsageDetails | null
   onResetContext?: () => void
+  /** When this id changes, focus the composer textarea. */
+  focusChatId?: string | null
 }
 
 function voiceMicLabel(
@@ -57,6 +71,10 @@ function voiceMicLabel(
   return listening ? 'Tap to finish' : 'Tap to speak'
 }
 
+function noopAddAttachments(_items: MessageAttachment[]): void {
+  // no-op when attachments are disabled
+}
+
 function resizeTextarea(el: HTMLTextAreaElement) {
   el.style.height = 'auto'
   const next = Math.min(
@@ -69,6 +87,10 @@ function resizeTextarea(el: HTMLTextAreaElement) {
 export function ChatComposer({
   value,
   onChange,
+  attachments = EMPTY_COMPOSER_ATTACHMENTS,
+  onAddAttachments,
+  onRemoveAttachment,
+  onAttachmentError,
   onSend,
   onStop,
   disabled,
@@ -84,20 +106,21 @@ export function ChatComposer({
   placeholder = 'Send follow-up',
   overlay = false,
   contextUsage,
-  onResetContext
+  onResetContext,
+  focusChatId
 }: ChatComposerProps) {
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
   const setChatComposerMode = useSettingsStore((s) => s.setChatComposerMode)
   const modelId = useSettingsStore((s) => s.modelId)
+  const customModels = useSettingsStore((s) => s.customModels ?? [])
   const setModelId = useSettingsStore((s) => s.setModelId)
   const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const setWebSearchEnabled = useSettingsStore((s) => s.setWebSearchEnabled)
 
-  const modelOptionIds = useMemo(() => {
-    const ids = new Set<string>(openRouterSuggestedModels)
-    if (modelId.trim()) ids.add(modelId.trim())
-    return [...ids]
-  }, [modelId])
+  const modelOptionIds = useMemo(
+    () => mergeOpenRouterModelIds(customModels, modelId),
+    [customModels, modelId]
+  )
 
   const modeSelectOptions = useMemo(
     () =>
@@ -108,7 +131,13 @@ export function ChatComposer({
     []
   )
 
-  const canSend = !disabled && value.trim().length > 0
+  const canSend = !disabled && (value.trim().length > 0 || attachments.length > 0)
+  const { zoneRef, dragOver } = useNativeComposerDrop({
+    enabled: !disabled && Boolean(onAddAttachments),
+    existingCount: attachments.length,
+    onAdd: onAddAttachments ?? noopAddAttachments,
+    onError: onAttachmentError
+  })
   const showStop = Boolean(
     onStop &&
       !canSend &&
@@ -116,6 +145,7 @@ export function ChatComposer({
         voiceBusy ||
         (liveConversationActive && chatComposerMode === 'conversation'))
   )
+  const sendTooltip = agentBusy && canSend ? 'Send follow-up (queued)' : 'Send'
   const micLabel = voiceMicLabel(chatComposerMode, liveConversationActive, Boolean(isListening))
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -124,32 +154,54 @@ export function ChatComposer({
     if (el) resizeTextarea(el)
   }, [value])
 
+  useEffect(() => {
+    if (!focusChatId) return
+    const frame = requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (!el || el.disabled) return
+      el.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [focusChatId])
+
   const showContext = contextUsage != null && onResetContext
 
   return (
     <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')}>
-      <div className={cn(composerShellClass, disabled && 'opacity-60')}>
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={1}
-          disabled={disabled}
-          style={{ height: INPUT_MIN_HEIGHT_PX }}
-          className={cn(
-            'max-h-40 min-h-6 w-full resize-none overflow-y-auto bg-transparent',
-            'px-3.5 pt-3.5 pb-1 text-sm leading-5 text-foreground placeholder:text-muted-foreground',
-            'outline-none disabled:cursor-not-allowed'
-          )}
-          onInput={(e) => resizeTextarea(e.currentTarget)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              if (canSend) onSend()
-            }
-          }}
-        />
+      <div
+        ref={zoneRef}
+        className={cn(
+          composerShellClass,
+          disabled && 'opacity-60',
+          dragOver && 'border-ring/80 bg-accent/50'
+        )}
+      >
+        {attachments.length > 0 && onRemoveAttachment ? (
+          <ComposerAttachments items={attachments} onRemove={onRemoveAttachment} />
+        ) : null}
+        <ComposerTextareaContextMenu onValueChange={onChange} textareaRef={textareaRef}>
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            rows={1}
+            disabled={disabled}
+            style={{ height: INPUT_MIN_HEIGHT_PX }}
+            className={cn(
+              'max-h-40 min-h-6 w-full resize-none overflow-y-auto bg-transparent',
+              'px-3.5 pt-3.5 pb-1 text-sm leading-5 text-foreground placeholder:text-muted-foreground',
+              'outline-none disabled:cursor-not-allowed'
+            )}
+            onInput={(e) => resizeTextarea(e.currentTarget)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (canSend) onSend()
+              }
+            }}
+          />
+        </ComposerTextareaContextMenu>
 
         <div className="flex shrink-0 items-center gap-0.5 px-2 pb-2 pt-0.5">
           {voiceSupported && onVoicePress && (onVoiceStop || onVoiceRelease) ? (
@@ -171,7 +223,11 @@ export function ChatComposer({
                 variant="ghost"
                 interactionMode={voiceInteractionMode}
                 isListening={!!isListening}
-                disabled={disabled || voiceBusy || agentBusy}
+                disabled={
+                  disabled ||
+                  voiceBusy ||
+                  (agentBusy && !(liveConversationActive && chatComposerMode === 'conversation'))
+                }
                 label={micLabel}
                 highlight={liveConversationActive && chatComposerMode === 'conversation'}
                 onPress={onVoicePress}
@@ -198,13 +254,22 @@ export function ChatComposer({
             </Button>
           )}
 
+          {onAddAttachments ? (
+            <ComposerFileInput
+              existingCount={attachments.length}
+              disabled={disabled}
+              onAdd={onAddAttachments}
+              onError={onAttachmentError}
+            />
+          ) : null}
+
           <TooltipIconButton
             type="button"
             variant="ghost"
             size="icon"
             className={cn(
               composerToolbarIconClass,
-              webSearchEnabled && cn(composerInputHoverClass, 'bg-[#303030] text-foreground')
+              webSearchEnabled && cn(composerInputHoverClass, 'bg-accent text-foreground')
             )}
             disabled={disabled}
             tooltip={webSearchEnabled ? 'Web search on' : 'Web search off'}
@@ -256,7 +321,7 @@ export function ChatComposer({
                   : 'bg-muted text-muted-foreground'
               )}
               disabled={!canSend}
-              tooltip="Send"
+              tooltip={sendTooltip}
               onClick={onSend}
             >
               <ArrowUp className="size-3.5" />

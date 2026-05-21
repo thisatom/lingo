@@ -9,8 +9,10 @@ import {
   attachTitlebarToWindow,
   setupTitlebar
 } from '@incanta/custom-electron-titlebar/main'
-import { titlebarTheme } from '../../src/shared/config/titlebar'
+import { getTitlebarTheme } from '../../src/shared/config/titlebar'
+import { backgroundUpdateCheck } from './app-update'
 import { registerIpcHandlers } from './ipc'
+import { registerWindowShortcuts } from './window-shortcuts'
 import { resolveAppIconPath } from './icon'
 import { resolvePreloadScript } from './paths'
 import { loadEnvBootstrap } from './secrets'
@@ -32,11 +34,14 @@ function createWindow(): BrowserWindow {
     titleBarStyle: 'hidden',
     titleBarOverlay:
       process.platform === 'win32'
-        ? {
-            color: titlebarTheme.background,
-            symbolColor: titlebarTheme.foreground,
-            height: titlebarTheme.overlayHeight
-          }
+        ? (() => {
+            const t = getTitlebarTheme('dark')
+            return {
+              color: t.background,
+              symbolColor: t.foreground,
+              height: t.overlayHeight
+            }
+          })()
         : false,
     webPreferences: {
       preload: resolvePreloadScript(),
@@ -47,17 +52,27 @@ function createWindow(): BrowserWindow {
   })
 
   attachTitlebarToWindow(mainWindow)
+  registerWindowShortcuts(mainWindow)
 
   if (process.platform === 'win32') {
+    const t = getTitlebarTheme('dark')
     mainWindow.setTitleBarOverlay({
-      color: titlebarTheme.background,
-      symbolColor: titlebarTheme.foreground,
-      height: titlebarTheme.overlayHeight
+      color: t.background,
+      symbolColor: t.foreground,
+      height: t.overlayHeight
     })
   }
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  mainWindow.webContents.once('did-finish-load', () => {
+    void backgroundUpdateCheck((info) => {
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('lingo:updater:available', info)
+      }
+    })
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

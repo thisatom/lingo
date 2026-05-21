@@ -1,0 +1,82 @@
+/* Syntax highlighting — tuned for Lingo light/dark themes */
+
+.markdown-prose pre.hljs,
+.markdown-prose pre code.hljs {
+  background: transparent;
+}
+
+.markdown-prose .hljs {
+  color: var(--md-code-fg);
+  background: var(--md-code-bg);
+}
+
+.markdown-prose .hljs-comment,
+.markdown-prose .hljs-quote {
+  color: var(--md-code-comment);
+  font-style: italic;
+}
+
+.markdown-prose .hljs-keyword,
+.markdown-prose .hljs-selector-tag,
+.markdown-prose .hljs-built_in,
+.markdown-prose .hljs-name {
+  color: var(--md-code-keyword);
+}
+
+.markdown-prose .hljs-string,
+.markdown-prose .hljs-regexp,
+.markdown-prose .hljs-addition,
+.markdown-prose .hljs-attribute,
+.markdown-prose .hljs-meta .hljs-string {
+  color: var(--md-code-string);
+}
+
+.markdown-prose .hljs-number,
+.markdown-prose .hljs-literal,
+.markdown-prose .hljs-symbol,
+.markdown-prose .hljs-bullet {
+  color: var(--md-code-number);
+}
+
+.markdown-prose .hljs-title,
+.markdown-prose .hljs-section,
+.markdown-prose .hljs-type,
+.markdown-prose .hljs-function .hljs-title,
+.markdown-prose .hljs-class .hljs-title {
+  color: var(--md-code-title);
+}
+
+.markdown-prose .hljs-variable,
+.markdown-prose .hljs-template-variable,
+.markdown-prose .hljs-params {
+  color: var(--md-code-variable);
+}
+
+.markdown-prose .hljs-meta,
+.markdown-prose .hljs-subst {
+  color: var(--md-code-meta);
+}
+
+.markdown-prose .hljs-tag,
+.markdown-prose .hljs-selector-id,
+.markdown-prose .hljs-selector-class {
+  color: var(--md-code-tag);
+}
+
+.markdown-prose .hljs-attr,
+.markdown-prose .hljs-property {
+  color: var(--md-code-attr);
+}
+
+.markdown-prose .hljs-emphasis {
+  font-style: italic;
+}
+
+.markdown-prose .hljs-strong {
+  font-weight: 600;
+}
+
+.markdown-prose .hljs-link {
+  color: var(--md-code-link);
+  text-decoration: underline;
+}

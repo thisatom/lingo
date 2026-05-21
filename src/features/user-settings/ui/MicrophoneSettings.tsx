@@ -1,7 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { useAudioInputDevices } from '@/features/voice-capture/model/useAudioInputDevices'
-import { settingsInputClass } from '@/shared/lib/settings-control'
+import {
+  settingsInputClass,
+  settingsSelectContentClass,
+  settingsSelectItemClass
+} from '@/shared/lib/settings-control'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { Item, ItemContent, ItemDescription } from '@/shared/ui/item'
@@ -109,10 +113,16 @@ export function MicrophoneSettings() {
           >
             <SelectValue placeholder="System default" />
           </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectItem value={DEFAULT_MIC_VALUE}>System default</SelectItem>
+          <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
+            <SelectItem value={DEFAULT_MIC_VALUE} className={settingsSelectItemClass}>
+              System default
+            </SelectItem>
             {devices.map((device) => (
-              <SelectItem key={device.deviceId} value={device.deviceId}>
+              <SelectItem
+                key={device.deviceId}
+                value={device.deviceId}
+                className={settingsSelectItemClass}
+              >
                 {device.label}
               </SelectItem>
             ))}

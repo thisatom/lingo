@@ -6,8 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "electron-vite dev",
+    "dev:web": "vite --config vite.config.ts",
     "build": "electron-vite build",
+    "build:web": "vite build --config vite.config.ts",
     "preview": "electron-vite preview",
+    "preview:web": "vite preview --config vite.config.ts",
     "postinstall": "electron-rebuild -f -w keytar",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json"
   },
@@ -28,6 +31,8 @@
     "cmdk": "^1.1.1",
     "edge-tts-universal": "^1.3.3",
     "gsap": "^3.15.0",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.16.47",
     "keytar": "^7.9.0",
     "lucide-react": "^0.511.0",
     "motion": "^12.39.0",
@@ -38,8 +43,11 @@
     "react-resizable-panels": "^4.11.1",
     "react-router-dom": "^7.6.1",
     "react-speech-recognition": "^4.0.1",
+    "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "tailwind-merge": "^3.3.0",
     "zod": "^3.25.28",
     "zustand": "^5.0.5"

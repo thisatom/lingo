@@ -22,7 +22,7 @@ export function SidebarUserFooter() {
           <AvatarFallback className="bg-muted text-xs font-medium text-foreground">{initials}</AvatarFallback>
         </Avatar>
         <p className="min-w-0 flex-1 truncate text-sm text-sidebar-foreground">{displayName}</p>
-        <SidebarFilterMenu />
+        {!isSettings && <SidebarFilterMenu />}
         <TooltipWrap label="Settings">
           <Button
             variant="ghost"
@@ -34,7 +34,7 @@ export function SidebarUserFooter() {
             asChild
             aria-label="Settings"
           >
-            <Link to="/settings/user">
+            <Link to={isSettings ? '/' : '/settings/user'}>
               <Settings className="size-4" />
             </Link>
           </Button>

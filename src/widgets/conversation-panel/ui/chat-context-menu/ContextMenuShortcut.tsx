@@ -10,7 +10,7 @@ export function ContextMenuShortcut({ children }: { children: ReactNode }) {
 export function CtrlCShortcut() {
   return (
     <ContextMenuShortcut>
-      <KbdGroup aria-hidden>
+      <KbdGroup className="[--kbd-divider:var(--kbd-divider)]" aria-hidden>
         <Kbd>Ctrl</Kbd>
         <Kbd>C</Kbd>
       </KbdGroup>
@@ -21,9 +21,31 @@ export function CtrlCShortcut() {
 export function CtrlAShortcut() {
   return (
     <ContextMenuShortcut>
-      <KbdGroup aria-hidden>
+      <KbdGroup className="[--kbd-divider:var(--kbd-divider)]" aria-hidden>
         <Kbd>Ctrl</Kbd>
         <Kbd>A</Kbd>
+      </KbdGroup>
+    </ContextMenuShortcut>
+  )
+}
+
+export function CtrlXShortcut() {
+  return (
+    <ContextMenuShortcut>
+      <KbdGroup className="[--kbd-divider:var(--kbd-divider)]" aria-hidden>
+        <Kbd>Ctrl</Kbd>
+        <Kbd>X</Kbd>
+      </KbdGroup>
+    </ContextMenuShortcut>
+  )
+}
+
+export function CtrlVShortcut() {
+  return (
+    <ContextMenuShortcut>
+      <KbdGroup className="[--kbd-divider:var(--kbd-divider)]" aria-hidden>
+        <Kbd>Ctrl</Kbd>
+        <Kbd>V</Kbd>
       </KbdGroup>
     </ContextMenuShortcut>
   )

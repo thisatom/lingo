@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  AppUpdateInfo,
   ChatCompleteRequest,
   ChatStreamEvent,
   ChatStreamHandlers,
@@ -9,12 +10,17 @@ import type {
   SttTranscribeRequest,
   TtsSynthesizeRequest
 } from '../../src/shared/types/ipc'
-import { initCustomTitlebar } from './titlebar'
+import { applyTitlebarTheme, initCustomTitlebar, updateTitlebarCaption } from './titlebar'
 
 const lingo: LingoApi = {
+  platform: 'electron',
   secrets: {
     getStatus: (provider: SecretProviderId) =>
       ipcRenderer.invoke('lingo:secrets:getStatus', provider),
+    readKey: (provider: SecretProviderId) =>
+      ipcRenderer.invoke('lingo:secrets:get', provider),
+    get: (provider: SecretProviderId) =>
+      ipcRenderer.invoke('lingo:secrets:get', provider),
     set: (provider: SecretProviderId, value: string) =>
       ipcRenderer.invoke('lingo:secrets:set', provider, value),
     clear: (provider: SecretProviderId) =>
@@ -83,6 +89,41 @@ const lingo: LingoApi = {
   },
   link: {
     preview: (url: string) => ipcRenderer.invoke('lingo:link:preview', url)
+  },
+  theme: {
+    apply: (resolved: 'light' | 'dark') => {
+      applyTitlebarTheme(resolved)
+      ipcRenderer.send('lingo:theme:apply', resolved)
+    }
+  },
+  window: {
+    setTitle: (title: string) => {
+      updateTitlebarCaption(title)
+      ipcRenderer.send('lingo:window:setTitle', title)
+    }
+  },
+  shortcuts: {
+    onNewChat: (handler: () => void) => {
+      const listener = () => handler()
+      ipcRenderer.on('lingo:shortcut:new-chat', listener)
+      return () => {
+        ipcRenderer.removeListener('lingo:shortcut:new-chat', listener)
+      }
+    }
+  },
+  updater: {
+    getCurrentVersion: () => ipcRenderer.invoke('lingo:updater:getVersion'),
+    check: () => ipcRenderer.invoke('lingo:updater:check'),
+    downloadAndInstall: () => ipcRenderer.invoke('lingo:updater:downloadAndInstall'),
+    openReleasesPage: () => ipcRenderer.invoke('lingo:updater:openReleasesPage'),
+    consumePendingNotice: () => ipcRenderer.invoke('lingo:updater:consumePendingNotice'),
+    onUpdateAvailable: (handler: (info: AppUpdateInfo) => void) => {
+      const listener = (_event: unknown, info: AppUpdateInfo) => handler(info)
+      ipcRenderer.on('lingo:updater:available', listener)
+      return () => {
+        ipcRenderer.removeListener('lingo:updater:available', listener)
+      }
+    }
   }
 }
 

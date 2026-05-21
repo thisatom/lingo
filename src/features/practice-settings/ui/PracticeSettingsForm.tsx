@@ -1,9 +1,21 @@
 import { useMemo } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
-import { settingsInputClass } from '@/shared/lib/settings-control'
+import {
+  settingsSelectContentClass,
+  settingsSelectItemClass,
+  settingsSelectTriggerClass
+} from '@/shared/lib/settings-control'
 import { cn } from '@/shared/lib/utils'
-import { Item, ItemContent, ItemDescription, ItemGroup } from '@/shared/ui/item'
-import { Label } from '@/shared/ui/label'
+import {
+  settingsCardClass,
+  settingsRowClass,
+  settingsRowDescriptionClass,
+  settingsSubsectionTitleClass,
+  settingsRowTextWrapClass,
+  settingsRowTitleClass,
+  settingsSectionTitleClass
+} from '@/shared/lib/settings-surface'
+import { PRACTICE_LANGUAGE_OPTIONS } from '@/shared/config/practice-languages'
 import {
   Select,
   SelectContent,
@@ -11,24 +23,6 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/shared/ui/select'
-
-const PRACTICE_LANGUAGE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'de', label: 'German' },
-  { value: 'fr', label: 'French' },
-  { value: 'it', label: 'Italian' },
-  { value: 'pt', label: 'Portuguese' },
-  { value: 'ru', label: 'Russian' },
-  { value: 'ja', label: 'Japanese' },
-  { value: 'zh', label: 'Chinese' },
-  { value: 'ko', label: 'Korean' },
-  { value: 'nl', label: 'Dutch' },
-  { value: 'pl', label: 'Polish' },
-  { value: 'tr', label: 'Turkish' },
-  { value: 'sv', label: 'Swedish' },
-  { value: 'uk', label: 'Ukrainian' }
-]
 
 export function PracticeSettingsForm() {
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
@@ -45,33 +39,33 @@ export function PracticeSettingsForm() {
   }, [practiceLanguage])
 
   return (
-    <ItemGroup className="gap-4">
-      <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
-        <ItemContent className="gap-1.5">
-          <Label htmlFor="lang" className="text-xs font-medium">
-            Practice language (ISO)
-          </Label>
+    <section>
+      <h2 className={settingsSectionTitleClass}>Practice</h2>
+      <p className={settingsSubsectionTitleClass}>Language</p>
+      <div className={settingsCardClass}>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Practice language</p>
+            <p className={settingsRowDescriptionClass}>Used for speech recognition and AI replies.</p>
+          </div>
           <Select value={practiceLanguage} onValueChange={setPracticeLanguage}>
             <SelectTrigger
               id="lang"
               size="sm"
-              className={cn(settingsInputClass, 'w-full min-w-0 border-input shadow-none')}
+              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
             >
               <SelectValue placeholder="Select language" />
             </SelectTrigger>
-            <SelectContent position="popper">
+            <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
               {options.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
+                <SelectItem key={opt.value} value={opt.value} className={settingsSelectItemClass}>
                   {opt.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <ItemDescription className="text-xs">
-            Used for speech recognition and AI replies.
-          </ItemDescription>
-        </ItemContent>
-      </Item>
-    </ItemGroup>
+        </div>
+      </div>
+    </section>
   )
 }

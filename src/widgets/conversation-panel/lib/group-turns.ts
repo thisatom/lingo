@@ -1,4 +1,5 @@
 import type { Message } from '@/entities/message/model/types'
+import { messageHasVisibleContent } from '@/shared/lib/chat-message-api'
 
 export type ConversationTurn = {
   id: string
@@ -6,11 +7,9 @@ export type ConversationTurn = {
   assistantMessages: Message[]
 }
 
-export function messageHasVisibleContent(message: Message): boolean {
-  return message.content.trim().length > 0
-}
+export { messageHasVisibleContent }
 
-export function groupMessagesIntoTurns(messages: Message[]): ConversationTurn[] {
+export function groupMessagesIntoTurns(messages: readonly Message[]): ConversationTurn[] {
   const turns: ConversationTurn[] = []
   let user: Message | null = null
   let assistantMessages: Message[] = []

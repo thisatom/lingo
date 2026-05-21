@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { useConversationStore } from '@/entities/conversation/model/store'
 
-const AUTO_LISTEN_DELAY_MS = 450
+const AUTO_LISTEN_DELAY_MS = 500
 
 interface Options {
   mode: ChatComposerMode
@@ -46,14 +46,9 @@ export function useLiveConversationLoop({
     setIsLiveConversationActive(true)
   }, [])
 
-  useEffect(() => {
-    if (mode !== 'conversation') {
-      stopLiveConversation()
-    }
-  }, [mode, stopLiveConversation])
-
-  useEffect(() => {
+  const scheduleAutoListen = useCallback(() => {
     if (mode !== 'conversation' || !activeRef.current) return
+    if (stage === 'listening' || stage === 'transcribing') return
     if (stage !== 'idle' || voiceBusy || agentBusy || speechError) return
 
     clearAutoListenTimer()
@@ -62,12 +57,10 @@ export function useLiveConversationLoop({
       autoListenTimerRef.current = null
       if (generation !== listenGenerationRef.current) return
       if (mode !== 'conversation' || !activeRef.current) return
-      if (useConversationStore.getState().stage !== 'idle') return
-      if (speechError) return
+      const { stage: currentStage } = useConversationStore.getState()
+      if (currentStage !== 'idle' || speechError) return
       onStartListening()
     }, AUTO_LISTEN_DELAY_MS)
-
-    return clearAutoListenTimer
   }, [
     agentBusy,
     clearAutoListenTimer,
@@ -78,9 +71,21 @@ export function useLiveConversationLoop({
     voiceBusy
   ])
 
+  useEffect(() => {
+    if (mode !== 'conversation') {
+      stopLiveConversation()
+    }
+  }, [mode, stopLiveConversation])
+
+  useEffect(() => {
+    scheduleAutoListen()
+    return clearAutoListenTimer
+  }, [clearAutoListenTimer, scheduleAutoListen])
+
   return {
     isLiveConversationActive,
     startLiveConversation,
-    stopLiveConversation
+    stopLiveConversation,
+    scheduleAutoListen
   }
 }

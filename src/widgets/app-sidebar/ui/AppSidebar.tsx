@@ -8,6 +8,7 @@ import { useChatSearchHotkey } from '@/features/chat-search/model/useChatSearchH
 import { ChatSearchDialog } from '@/features/chat-search/ui/ChatSearchDialog'
 import { groupChatsByDate } from '@/shared/lib/chat-sidebar'
 import { Button } from '@/shared/ui/button'
+import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
 import { Kbd, KbdGroup } from '@/shared/ui/kbd'
 import { APP_RADIUS_8_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
@@ -43,17 +44,6 @@ export function AppSidebar() {
   useEffect(() => {
     resortChats()
   }, [sidebarChatSort, resortChats])
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'n' || !(event.ctrlKey || event.metaKey)) return
-      if (location.pathname.startsWith('/settings')) return
-      event.preventDefault()
-      createChat()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [createChat, location.pathname])
 
   const [searchOpen, setSearchOpen] = useState(false)
   const openSearch = useCallback(() => setSearchOpen(true), [])
@@ -94,8 +84,10 @@ export function AppSidebar() {
         className="flex h-full w-full min-w-0 flex-col overflow-hidden bg-sidebar"
       >
         {isSettings ? (
-          <SidebarContent className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2">
-            <SettingsSidebarNav />
+          <SidebarContent className="min-h-0 flex-1 overflow-hidden px-2">
+            <CustomScrollArea variant="sidebar" className="h-full min-h-0">
+              <SettingsSidebarNav />
+            </CustomScrollArea>
           </SidebarContent>
         ) : (
           <>
@@ -103,7 +95,7 @@ export function AppSidebar() {
               <SidebarTopActions onOpenSearch={openSearch} />
               <Button
                 className={cn(
-                  'mx-1 h-8 w-[calc(100%-0.5rem)] justify-start gap-2 border-border/60 bg-muted/30 text-[#a3a3a3] hover:bg-muted/50 hover:text-[#c8c8c8]',
+                  'mx-1 h-8 w-[calc(100%-0.5rem)] justify-start gap-2 border-border/60 bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground',
                   APP_RADIUS_8_CLASS
                 )}
                 size="sm"
@@ -111,16 +103,20 @@ export function AppSidebar() {
                 aria-label="New chat"
                 onClick={() => createChat()}
               >
-                <MessageSquarePlus className="size-4 shrink-0 text-[#a3a3a3]" />
+                <MessageSquarePlus className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-left">New chat</span>
-                <KbdGroup className="shrink-0 opacity-80" aria-hidden>
+                <KbdGroup
+                  className="shrink-0 opacity-90 [--kbd-divider:var(--kbd-divider)]"
+                  aria-hidden
+                >
                   <Kbd>Ctrl</Kbd>
                   <Kbd>N</Kbd>
                 </KbdGroup>
               </Button>
             </SidebarHeader>
 
-            <SidebarContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <SidebarContent className="min-h-0 flex-1 overflow-hidden">
+              <CustomScrollArea variant="sidebar" className="h-full min-h-0">
               {pinnedChats.length > 0 && (
                 <SidebarGroup>
                   <SidebarGroupLabel className="text-xs text-muted-foreground">
@@ -150,6 +146,7 @@ export function AppSidebar() {
                       </SidebarGroupContent>
                     </SidebarGroup>
                   )}
+              </CustomScrollArea>
             </SidebarContent>
           </>
         )}

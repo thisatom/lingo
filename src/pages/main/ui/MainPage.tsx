@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAiChat } from '@/features/ai-chat/model/useAiChat'
 import { useChatContextUsage } from '@/features/chat-context/model/useChatContextUsage'
 import { useChatComposerModeHotkey } from '@/features/chat-composer/model/useChatComposerModeHotkey'
@@ -7,9 +6,14 @@ import { useOpenRouterKey } from '@/features/manage-api-keys/model/useOpenRouter
 import { useLiveConversationLoop } from '@/features/voice-input/model/useLiveConversationLoop'
 import { useVoiceInput } from '@/features/voice-input/model/useVoiceInput'
 import { useChatsStore } from '@/entities/chat/model/store'
+import {
+  EMPTY_COMPOSER_ATTACHMENTS,
+  type MessageAttachment
+} from '@/entities/message/model/attachment'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { ChatComposer } from '@/widgets/chat-composer/ui/ChatComposer'
+import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
 import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
 import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
 import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
@@ -28,10 +32,17 @@ export function MainPage() {
   const [showScrollToLatest, setShowScrollToLatest] = useState(false)
   const scrollToLatestRef = useRef<(() => void) | null>(null)
 
+  const scheduleAutoListenRef = useRef<(() => void) | null>(null)
+
   const {
     messages,
     stage,
+    queuedMessages,
     sendUserMessage,
+    updateQueuedMessage,
+    removeQueuedMessage,
+    sendQueuedMessageNow,
+    flushQueuedMessages,
     beginVoiceUserMessage,
     updateVoiceUserMessage,
     commitVoiceUserMessage,
@@ -40,13 +51,22 @@ export function MainPage() {
     stopAgent,
     retryLastRequest,
     clearError
-  } = useAiChat()
+  } = useAiChat({
+    onLiveConversationTurnComplete: () => scheduleAutoListenRef.current?.()
+  })
   const activeChat = useChatsStore((s) => s.getActiveChat())
   const activeChatId = activeChat?.id ?? null
   const draft = useChatsStore((s) =>
     activeChatId ? (s.composerDraftByChatId?.[activeChatId] ?? '') : ''
   )
+  const composerAttachments = useChatsStore((s) =>
+    activeChatId
+      ? (s.composerAttachmentsByChatId[activeChatId] ?? EMPTY_COMPOSER_ATTACHMENTS)
+      : EMPTY_COMPOSER_ATTACHMENTS
+  )
   const setComposerDraft = useChatsStore((s) => s.setComposerDraft)
+  const addComposerAttachments = useChatsStore((s) => s.addComposerAttachments)
+  const removeComposerAttachment = useChatsStore((s) => s.removeComposerAttachment)
   const { status } = useOpenRouterKey()
   const error = useConversationStore((s) => s.error)
   const speechError = useConversationStore((s) => s.speechError)
@@ -70,7 +90,31 @@ export function MainPage() {
     [activeChatId, setComposerDraft]
   )
 
+  const handleAddAttachments = useCallback(
+    (items: MessageAttachment[]) => {
+      if (!activeChatId) return
+      addComposerAttachments(activeChatId, items)
+    },
+    [activeChatId, addComposerAttachments]
+  )
+
+  const handleRemoveAttachment = useCallback(
+    (id: string) => {
+      if (!activeChatId) return
+      removeComposerAttachment(activeChatId, id)
+    },
+    [activeChatId, removeComposerAttachment]
+  )
+
+  const handleAttachmentError = useCallback(
+    (msg: string) => setSpeechError(msg),
+    [setSpeechError]
+  )
+
   const voiceMessageIdRef = useRef('')
+  const isLiveConversationActiveRef = useRef(false)
+
+  const startVoiceCaptureRef = useRef<(() => Promise<void>) | null>(null)
 
   const voiceHandlers = useMemo(
     () => ({
@@ -88,11 +132,24 @@ export function MainPage() {
       },
       onConversationCommit: async (messageId: string) => {
         voiceMessageIdRef.current = ''
+        const chat = useChatsStore.getState().getActiveChat()
+        const trimmed =
+          chat?.messages.find((m) => m.id === messageId)?.content.trim() ?? ''
+        if (!trimmed) {
+          cancelVoiceUserMessage(messageId)
+          if (isLiveConversationActiveRef.current) {
+            scheduleAutoListenRef.current?.()
+          }
+          return
+        }
         await commitVoiceUserMessage(messageId)
       },
       onConversationCancel: (messageId: string) => {
         voiceMessageIdRef.current = ''
         cancelVoiceUserMessage(messageId)
+        if (isLiveConversationActiveRef.current) {
+          scheduleAutoListenRef.current?.()
+        }
       }
     }),
     [
@@ -117,17 +174,12 @@ export function MainPage() {
     }
   }, [chatComposerMode, draft, setSpeechError, voice])
 
+  startVoiceCaptureRef.current = startVoiceCapture
+
   const agentBusy =
     stage === 'thinking' || stage === 'searching' || stage === 'speaking'
   const voiceBusy = voice.isBusy
   const actionsDisabled = agentBusy || voiceBusy
-
-  const showRecording =
-    voice.isTranscribing || (voice.isBusy && voice.backend === 'local')
-
-  const showErrorBanner = Boolean(error)
-  const showSpeechError = Boolean(speechError) && !showRecording
-  const errorRetryable = error ? isErrorRetryable(error) && messages.length > 0 : false
 
   const liveConversation = useLiveConversationLoop({
     mode: chatComposerMode,
@@ -135,8 +187,23 @@ export function MainPage() {
     voiceBusy,
     agentBusy,
     speechError,
-    onStartListening: startVoiceCapture
+    onStartListening: () => {
+      void startVoiceCaptureRef.current?.()
+    }
   })
+
+  scheduleAutoListenRef.current = liveConversation.scheduleAutoListen
+
+  useEffect(() => {
+    isLiveConversationActiveRef.current = liveConversation.isLiveConversationActive
+  }, [liveConversation.isLiveConversationActive])
+
+  const showRecording =
+    voice.isTranscribing || (voice.isBusy && voice.backend === 'local')
+
+  const showErrorBanner = Boolean(error)
+  const showSpeechError = Boolean(speechError) && !showRecording
+  const errorRetryable = error ? isErrorRetryable(error) && messages.length > 0 : false
 
   const onVoiceStop = useCallback(async () => {
     if (!voice.isBusy) return
@@ -231,10 +298,28 @@ export function MainPage() {
   const onSend = useCallback(async () => {
     if (!status?.isSet) return
     const text = draft
+    const attachments = [...composerAttachments]
     if (activeChatId) setComposerDraft(activeChatId, '')
     setSpeechError(null)
-    await sendUserMessage(text)
-  }, [activeChatId, draft, sendUserMessage, setComposerDraft, setSpeechError, status?.isSet])
+    await sendUserMessage(text, attachments)
+  }, [
+    activeChatId,
+    composerAttachments,
+    draft,
+    sendUserMessage,
+    setComposerDraft,
+    setSpeechError,
+    status?.isSet
+  ])
+
+  const prevAgentBusyRef = useRef(agentBusy)
+  useEffect(() => {
+    const wasBusy = prevAgentBusyRef.current
+    prevAgentBusyRef.current = agentBusy
+    if (!activeChatId || agentBusy || !wasBusy) return
+    if (queuedMessages.length === 0) return
+    void flushQueuedMessages(activeChatId)
+  }, [activeChatId, agentBusy, flushQueuedMessages, queuedMessages.length])
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
@@ -245,19 +330,6 @@ export function MainPage() {
         </h1>
         <ChatHeaderMenu chatId={activeChatId} messages={messages} />
       </header>
-
-      {!status?.isSet && (
-        <div className="relative z-10 shrink-0 border-b border-border/40 bg-background px-4 py-2.5 text-sm text-muted-foreground">
-          Add your{' '}
-          <Link
-            to="/settings/user"
-            className="text-foreground underline-offset-4 hover:underline"
-          >
-            OpenRouter API key
-          </Link>{' '}
-          in Settings to start.
-        </div>
-      )}
 
       <div className="relative min-h-0 flex-1">
         <ConversationPanel
@@ -328,9 +400,23 @@ export function MainPage() {
               />
             )}
 
+            {queuedMessages.length > 0 && (
+              <ChatMessageQueue
+                items={queuedMessages}
+                onUpdate={updateQueuedMessage}
+                onRemove={removeQueuedMessage}
+                onSendNow={(id) => void sendQueuedMessageNow(id)}
+              />
+            )}
+
               <ChatComposer
+                focusChatId={activeChatId}
                 value={draft}
                 onChange={setDraft}
+                attachments={composerAttachments}
+                onAddAttachments={handleAddAttachments}
+                onRemoveAttachment={handleRemoveAttachment}
+                onAttachmentError={handleAttachmentError}
                 onSend={() => void onSend()}
                 onStop={handleStopAgent}
                 disabled={!status?.isSet}
@@ -342,7 +428,13 @@ export function MainPage() {
                 onVoiceStop={onVoiceStop}
                 voiceInteractionMode="toggle"
                 liveConversationActive={liveConversation.isLiveConversationActive}
-                placeholder={status?.isSet ? 'Send follow-up' : 'Add API key in Settings…'}
+                placeholder={
+                  !status?.isSet
+                    ? 'Add API key in Settings…'
+                    : agentBusy
+                      ? 'Queue follow-up…'
+                      : 'Send follow-up'
+                }
               contextUsage={showIndicator ? contextUsage : null}
               onResetContext={showIndicator ? resetContext : undefined}
                 overlay

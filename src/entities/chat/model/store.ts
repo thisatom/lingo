@@ -1,15 +1,24 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { chatPersistStorage } from '@/entities/chat/lib/chat-persist-storage'
+import {
+  EMPTY_COMPOSER_ATTACHMENTS,
+  type MessageAttachment
+} from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
 import { notifyActiveChatChange } from '@/entities/chat/model/active-chat-effects'
 import { sortChatsForSidebar } from '@/shared/lib/chat-sidebar'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import type { Chat } from './types'
 
+/** Stable empty reference for Zustand selectors. */
+export const EMPTY_CHAT_HISTORY: readonly string[] = []
+
 interface ChatsState {
   chats: Chat[]
   activeChatId: string | null
   composerDraftByChatId: Record<string, string>
+  composerAttachmentsByChatId: Record<string, MessageAttachment[]>
   chatHistoryPast: string[]
   chatHistoryFuture: string[]
   createChat: () => string
@@ -21,27 +30,67 @@ interface ChatsState {
   renameChat: (id: string, title: string) => void
   togglePinChat: (id: string) => void
   setChatHasError: (id: string, hasError: boolean) => void
+  setChatUnreadReply: (id: string, hasUnreadReply: boolean) => void
+  /** Mark unread when the user is not viewing this chat on the main screen. */
+  notifyChatReplyReady: (chatId: string) => void
   addMessage: (message: Omit<Message, 'id' | 'createdAt'>, targetChatId?: string) => string
   removeMessagesFrom: (messageId: string) => void
-  updateUserMessageContent: (messageId: string, content: string) => void
+  /** Keeps the message with `messageId` and removes everything after it. */
+  removeMessagesAfter: (messageId: string, targetChatId?: string) => void
+  updateUserMessageContent: (
+    messageId: string,
+    content: string,
+    attachments?: MessageAttachment[]
+  ) => void
   updateMessageContent: (
     messageId: string,
     content: string,
     targetChatId?: string,
-    options?: { allowEmptyUser?: boolean }
+    options?: { allowEmptyUser?: boolean; attachments?: MessageAttachment[] }
   ) => void
   getComposerDraft: (chatId: string) => string
   setComposerDraft: (chatId: string, draft: string) => void
+  getComposerAttachments: (chatId: string) => MessageAttachment[]
+  addComposerAttachments: (chatId: string, items: MessageAttachment[]) => void
+  removeComposerAttachment: (chatId: string, attachmentId: string) => void
+  clearComposerAttachments: (chatId: string) => void
   setChatMessages: (chatId: string, messages: Message[]) => void
   getActiveChat: () => Chat | null
   ensureActiveChat: () => string
   resortChats: () => void
+  resetChats: () => void
 }
 
 type PersistedChatsState = Pick<
   ChatsState,
-  'chats' | 'activeChatId' | 'composerDraftByChatId' | 'chatHistoryPast' | 'chatHistoryFuture'
+  | 'chats'
+  | 'activeChatId'
+  | 'composerDraftByChatId'
+  | 'chatHistoryPast'
+  | 'chatHistoryFuture'
 >
+
+/** Drop heavy base64 from persisted messages (images); keep text payloads short. */
+function chatsForPersist(chats: Chat[]): Chat[] {
+  return chats.map((chat) => ({
+    ...chat,
+    messages: chat.messages.map((message) => {
+      if (!message.attachments?.length) return message
+      return {
+        ...message,
+        attachments: message.attachments.map((att) => ({
+          ...att,
+          payload:
+            att.kind === 'image'
+              ? ''
+              : att.payload.length > 4_000
+                ? `${att.payload.slice(0, 4_000)}…`
+                : att.payload
+        }))
+      }
+    })
+  }))
+}
 
 function newMessageId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -75,7 +124,9 @@ function withSortedChats(chats: Chat[]): Chat[] {
   return sortChatsForSidebar(chats, sort)
 }
 
-function normalizePersistedState(state: PersistedChatsState): PersistedChatsState {
+function normalizePersistedState(
+  state: Partial<PersistedChatsState> & { composerAttachmentsByChatId?: unknown }
+): PersistedChatsState {
   return {
     chats: state.chats ?? [],
     activeChatId: state.activeChatId ?? null,
@@ -91,6 +142,7 @@ export const useChatsStore = create<ChatsState>()(
       chats: [],
       activeChatId: null,
       composerDraftByChatId: {},
+      composerAttachmentsByChatId: {},
       chatHistoryPast: [],
       chatHistoryFuture: [],
 
@@ -159,10 +211,31 @@ export const useChatsStore = create<ChatsState>()(
           return {
             activeChatId: id,
             chatHistoryPast,
-            chatHistoryFuture: []
+            chatHistoryFuture: [],
+            chats: state.chats.map((c) =>
+              c.id === id ? { ...c, hasUnreadReply: false } : c
+            )
           }
         })
         notifyActiveChatChange()
+      },
+
+      setChatUnreadReply: (id, hasUnreadReply) => {
+        set((state) => ({
+          chats: state.chats.map((c) =>
+            c.id === id ? { ...c, hasUnreadReply } : c
+          )
+        }))
+      },
+
+      notifyChatReplyReady: (chatId) => {
+        const onSettings = window.location.hash.startsWith('#/settings')
+        const active = get().activeChatId
+        if (!onSettings && active === chatId) {
+          get().setChatUnreadReply(chatId, false)
+          return
+        }
+        get().setChatUnreadReply(chatId, true)
       },
 
       goBackInChatHistory: () => {
@@ -180,7 +253,10 @@ export const useChatsStore = create<ChatsState>()(
           chatHistoryPast: state.chatHistoryPast.slice(0, -1),
           chatHistoryFuture: activeChatId
             ? [activeChatId, ...state.chatHistoryFuture]
-            : state.chatHistoryFuture
+            : state.chatHistoryFuture,
+          chats: state.chats.map((c) =>
+            c.id === previousId ? { ...c, hasUnreadReply: false } : c
+          )
         }))
         notifyActiveChatChange()
       },
@@ -200,7 +276,10 @@ export const useChatsStore = create<ChatsState>()(
           chatHistoryFuture: state.chatHistoryFuture.slice(1),
           chatHistoryPast: activeChatId
             ? [...state.chatHistoryPast, activeChatId]
-            : state.chatHistoryPast
+            : state.chatHistoryPast,
+          chats: state.chats.map((c) =>
+            c.id === nextId ? { ...c, hasUnreadReply: false } : c
+          )
         }))
         notifyActiveChatChange()
       },
@@ -294,8 +373,13 @@ export const useChatsStore = create<ChatsState>()(
                 ...c,
                 messages: [...c.messages, fullMessage],
                 title:
-                  isFirstUser && message.content.trim()
-                    ? titleFromMessage(message.content)
+                  isFirstUser &&
+                  (message.content.trim() || (message.attachments?.[0]?.name ?? ''))
+                    ? titleFromMessage(
+                        message.content.trim() ||
+                          message.attachments?.[0]?.name ||
+                          'Attachment'
+                      )
                     : c.title,
                 updatedAt: Date.now()
               }
@@ -326,8 +410,28 @@ export const useChatsStore = create<ChatsState>()(
         }))
       },
 
-      updateUserMessageContent: (messageId, content) => {
-        get().updateMessageContent(messageId, content)
+      removeMessagesAfter: (messageId, targetChatId) => {
+        const chatId = targetChatId ?? get().activeChatId
+        if (!chatId) return
+
+        set((state) => ({
+          chats: withSortedChats(
+            state.chats.map((c) => {
+              if (c.id !== chatId) return c
+              const index = c.messages.findIndex((m) => m.id === messageId)
+              if (index === -1) return c
+              return {
+                ...c,
+                messages: c.messages.slice(0, index + 1),
+                updatedAt: Date.now()
+              }
+            })
+          )
+        }))
+      },
+
+      updateUserMessageContent: (messageId, content, attachments) => {
+        get().updateMessageContent(messageId, content, undefined, { attachments })
       },
 
       updateMessageContent: (messageId, content, targetChatId, options) => {
@@ -342,7 +446,17 @@ export const useChatsStore = create<ChatsState>()(
               if (index === -1) return c
               const message = c.messages[index]
               const trimmed = message.role === 'user' ? content.trim() : content
-              if (message.role === 'user' && !trimmed && !options?.allowEmptyUser) return c
+              const nextAttachments =
+                options?.attachments !== undefined ? options.attachments : message.attachments
+              const hasAttachments = (nextAttachments?.length ?? 0) > 0
+              if (
+                message.role === 'user' &&
+                !trimmed &&
+                !hasAttachments &&
+                !options?.allowEmptyUser
+              ) {
+                return c
+              }
               const nextContent = message.role === 'user' ? content : content
               const isFirstUser =
                 message.role === 'user' &&
@@ -350,9 +464,15 @@ export const useChatsStore = create<ChatsState>()(
                 chatNeedsTitleFromFirstUser(c.title)
               return {
                 ...c,
-                messages: c.messages.map((m) =>
-                  m.id === messageId ? { ...m, content: nextContent } : m
-                ),
+                messages: c.messages.map((m) => {
+                  if (m.id !== messageId) return m
+                  const next = { ...m, content: nextContent }
+                  if (options?.attachments !== undefined) {
+                    next.attachments =
+                      options.attachments.length > 0 ? options.attachments : undefined
+                  }
+                  return next
+                }),
                 title:
                   isFirstUser && trimmed
                     ? titleFromMessage(trimmed)
@@ -373,6 +493,39 @@ export const useChatsStore = create<ChatsState>()(
             [chatId]: draft
           }
         }))
+      },
+
+      getComposerAttachments: (chatId) =>
+        get().composerAttachmentsByChatId[chatId] ?? EMPTY_COMPOSER_ATTACHMENTS,
+
+      addComposerAttachments: (chatId, items) => {
+        if (items.length === 0) return
+        set((state) => ({
+          composerAttachmentsByChatId: {
+            ...state.composerAttachmentsByChatId,
+            [chatId]: [...(state.composerAttachmentsByChatId[chatId] ?? []), ...items]
+          }
+        }))
+      },
+
+      removeComposerAttachment: (chatId, attachmentId) => {
+        set((state) => {
+          const list = state.composerAttachmentsByChatId[chatId] ?? []
+          const next = list.filter((a) => a.id !== attachmentId)
+          const composerAttachmentsByChatId = { ...state.composerAttachmentsByChatId }
+          if (next.length === 0) delete composerAttachmentsByChatId[chatId]
+          else composerAttachmentsByChatId[chatId] = next
+          return { composerAttachmentsByChatId }
+        })
+      },
+
+      clearComposerAttachments: (chatId) => {
+        set((state) => {
+          if (!state.composerAttachmentsByChatId[chatId]) return state
+          const composerAttachmentsByChatId = { ...state.composerAttachmentsByChatId }
+          delete composerAttachmentsByChatId[chatId]
+          return { composerAttachmentsByChatId }
+        })
       },
 
       setChatMessages: (chatId, messages) => {
@@ -409,19 +562,48 @@ export const useChatsStore = create<ChatsState>()(
         set((state) => ({
           chats: withSortedChats(state.chats)
         }))
+      },
+
+      resetChats: () => {
+        set({
+          chats: [],
+          activeChatId: null,
+          composerDraftByChatId: {},
+          composerAttachmentsByChatId: {},
+          chatHistoryPast: [],
+          chatHistoryFuture: []
+        })
+        notifyActiveChatChange()
       }
     }),
     {
-      name: 'lingo-chats',
-      version: 1,
-      migrate: (persisted) => normalizePersistedState(persisted as PersistedChatsState),
+      name: 'lingo-chats-v3',
+      storage: createJSONStorage(() => chatPersistStorage),
+      version: 2,
+      partialize: (state): PersistedChatsState => ({
+        chats: chatsForPersist(state.chats),
+        activeChatId: state.activeChatId,
+        composerDraftByChatId: state.composerDraftByChatId,
+        chatHistoryPast: state.chatHistoryPast,
+        chatHistoryFuture: state.chatHistoryFuture
+      }),
+      migrate: (persisted, version) => {
+        const state = normalizePersistedState(
+          persisted as Partial<PersistedChatsState> & { composerAttachmentsByChatId?: unknown }
+        )
+        if (version < 2) return state
+        return state
+      },
       merge: (persisted, current) => ({
         ...current,
-        ...normalizePersistedState(persisted as PersistedChatsState)
+        ...normalizePersistedState(
+          persisted as Partial<PersistedChatsState> & { composerAttachmentsByChatId?: unknown }
+        )
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.composerDraftByChatId = state.composerDraftByChatId ?? {}
+          state.composerAttachmentsByChatId = state.composerAttachmentsByChatId ?? {}
           state.chatHistoryPast = state.chatHistoryPast ?? []
           state.chatHistoryFuture = state.chatHistoryFuture ?? []
         }

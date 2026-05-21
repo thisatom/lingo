@@ -1,12 +1,15 @@
 import { useChatsStore } from '@/entities/chat/model/store'
 import { isAgentRunActive } from '@/features/ai-chat/model/agent-run'
-import { takeCompleteSentences } from '@/features/text-to-speech/lib/split-speech-sentences'
+import { takeSpeechChunks } from '@/features/text-to-speech/lib/split-speech-sentences'
 import {
   enqueueTtsFromBase64,
+  prepareTtsFromBase64,
   resetTtsPlaybackQueue,
   stopTtsPlayback
 } from '@/features/text-to-speech/model/playTts'
 import { getLingo } from '@/shared/lib/lingo'
+import { buildTtsSynthesizeRequest } from '@/shared/lib/tts-synthesize-options'
+import { prepareTextForSpeech } from '@/shared/lib/prepare-text-for-speech'
 import { stripTextForSpeech } from '@/shared/lib/strip-text-for-speech'
 
 export interface StreamingSentenceTtsOptions {
@@ -15,6 +18,8 @@ export interface StreamingSentenceTtsOptions {
   targetChatId: string
   onSpeaking?: () => void
 }
+
+const MAX_SYNTH_IN_FLIGHT = 3
 
 export class StreamingSentenceTts {
   private readonly locale: string
@@ -25,7 +30,8 @@ export class StreamingSentenceTts {
   private cancelled = false
   private plainText = ''
   private consumedLength = 0
-  private pipeline: Promise<void> = Promise.resolve()
+  private playChain: Promise<void> = Promise.resolve()
+  private synthInFlight = 0
   private hasStartedSpeaking = false
 
   constructor(options: StreamingSentenceTtsOptions) {
@@ -42,21 +48,25 @@ export class StreamingSentenceTts {
   feed(rawText: string): void {
     if (this.cancelled) return
 
-    const plain = stripTextForSpeech(rawText)
+    const stripped = stripTextForSpeech(rawText)
+    const plain = prepareTextForSpeech(stripped, this.locale)
     if (!plain) return
 
-    if (plain.length < this.plainText.length && !plain.startsWith(this.plainText.slice(0, this.consumedLength))) {
+    if (
+      plain.length < this.plainText.length &&
+      !plain.startsWith(this.plainText.slice(0, this.consumedLength))
+    ) {
       this.cancel()
       return
     }
 
     this.plainText = plain
     const pending = plain.slice(this.consumedLength)
-    const { sentences, remainder } = takeCompleteSentences(pending, false)
+    const { chunks, remainder } = takeSpeechChunks(pending, false)
     this.consumedLength = plain.length - remainder.length
 
-    for (const sentence of sentences) {
-      this.scheduleSentence(sentence)
+    for (const chunk of chunks) {
+      this.scheduleChunk(chunk)
     }
   }
 
@@ -64,34 +74,55 @@ export class StreamingSentenceTts {
     if (this.cancelled) return
 
     const pending = this.plainText.slice(this.consumedLength)
-    const { sentences, remainder } = takeCompleteSentences(pending, true)
+    const { chunks, remainder } = takeSpeechChunks(pending, true)
     this.consumedLength = this.plainText.length - remainder.length
 
-    for (const sentence of sentences) {
-      this.scheduleSentence(sentence)
+    for (const chunk of chunks) {
+      this.scheduleChunk(chunk)
     }
 
-    await this.pipeline
+    await this.playChain
   }
 
   cancel(): void {
     this.cancelled = true
     resetTtsPlaybackQueue()
     stopTtsPlayback()
-    this.pipeline = Promise.resolve()
+    this.playChain = Promise.resolve()
+    this.synthInFlight = 0
   }
 
-  private scheduleSentence(text: string): void {
+  private scheduleChunk(text: string): void {
     if (this.cancelled || text.length < 2) return
     if (!this.shouldContinue()) return
 
-    const synthPromise = getLingo().tts.synthesize({ text, locale: this.locale })
+    const runSynth = async () => {
+      while (this.synthInFlight >= MAX_SYNTH_IN_FLIGHT) {
+        await new Promise((r) => setTimeout(r, 16))
+        if (this.cancelled || !this.shouldContinue()) return null
+      }
+      this.synthInFlight++
+      try {
+        return await getLingo().tts.synthesize(buildTtsSynthesizeRequest(text, this.locale))
+      } finally {
+        this.synthInFlight--
+      }
+    }
 
-    this.pipeline = this.pipeline.then(async () => {
+    const synthPromise = runSynth()
+
+    void synthPromise.then((result) => {
+      if (!result || this.cancelled) return
+      prepareTtsFromBase64(result.audioBase64, result.mimeType)
+    })
+
+    this.playChain = this.playChain.then(async () => {
       if (this.cancelled || !this.shouldContinue()) return
 
-      const { audioBase64, mimeType } = await synthPromise
-      if (this.cancelled || !this.shouldContinue()) return
+      const result = await synthPromise
+      if (!result || this.cancelled || !this.shouldContinue()) return
+
+      const { audioBase64, mimeType } = result
 
       if (!this.hasStartedSpeaking) {
         this.hasStartedSpeaking = true

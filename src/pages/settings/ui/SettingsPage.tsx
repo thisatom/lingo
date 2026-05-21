@@ -2,8 +2,10 @@ import { Navigate, useParams } from 'react-router-dom'
 import { isSettingsSectionId } from '@/entities/settings/config/sections'
 import { OpenRouterKeyForm } from '@/features/manage-api-keys/ui/OpenRouterKeyForm'
 import { PracticeSettingsForm } from '@/features/practice-settings/ui/PracticeSettingsForm'
+import { TtsSettingsForm } from '@/features/text-to-speech/ui/TtsSettingsForm'
 import { DevicesSettingsForm } from '@/features/user-settings/ui/DevicesSettingsForm'
 import { UserSettingsForm } from '@/features/user-settings/ui/UserSettingsForm'
+import { settingsPageContentClass } from '@/shared/lib/settings-surface'
 import { SidebarExpandButton } from '@/widgets/app-sidebar/ui/SidebarExpandButton'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 
@@ -28,9 +30,10 @@ export function SettingsPage() {
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="mx-auto w-full max-w-2xl pb-4">
+        <div className={settingsPageContentClass}>
           {section === 'user' && <UserSettingsForm />}
           {section === 'devices' && <DevicesSettingsForm />}
+          {section === 'speech' && <TtsSettingsForm />}
           {section === 'practice' && <PracticeSettingsForm />}
           {section === 'api' && <OpenRouterKeyForm />}
         </div>

@@ -19,7 +19,7 @@ import {
 
 interface ChatHeaderMenuProps {
   chatId: string | null
-  messages: Message[]
+  messages: readonly Message[]
 }
 
 export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {

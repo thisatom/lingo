@@ -37,17 +37,80 @@
   --color-sidebar: var(--sidebar);
   --color-chat-user: var(--chat-user);
   --color-chat-composer: var(--chat-composer);
+  --color-chat-assistant: var(--chat-assistant);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-tooltip: var(--tooltip);
   --color-tooltip-foreground: var(--tooltip-foreground);
+  --color-menu-hover: var(--menu-hover);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-overlay: var(--overlay);
 }
 
-/* Cursor-inspired dark theme (default) */
+/* Light theme (default when .dark is absent) */
 :root {
   --radius: 0.5rem;
   --lingo-titlebar-height: env(titlebar-area-height, 32px);
 
+  --background: #f5f5f5;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --primary: #171717;
+  --primary-foreground: #fafafa;
+  --secondary: #ededed;
+  --secondary-foreground: #171717;
+  --muted: #f0f0f0;
+  --muted-foreground: #525252;
+  --accent: #e8e8e8;
+  --accent-foreground: #171717;
+  --destructive: #c42b1c;
+  --border: #d6d6d6;
+  --input: #ffffff;
+  --ring: #a3a3a3;
+  --chat-user: #ebebeb;
+  --chat-composer: #ffffff;
+  --chat-assistant: #ffffff;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --tooltip: #ffffff;
+  --tooltip-foreground: #404040;
+  --menu-hover: #e4e4e4;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --overlay: rgb(0 0 0 / 0.28);
+
+  --sidebar: #f0f0f0;
+  --sidebar-foreground: #171717;
+  --sidebar-primary: #171717;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #e6e6e6;
+  --sidebar-accent-foreground: #171717;
+  --sidebar-border: #d6d6d6;
+  --sidebar-ring: #a3a3a3;
+
+  --scrollbar-thumb: #c8c8c8;
+  --scrollbar-thumb-hover: #a3a3a3;
+  --kbd-divider: #d6d6d6;
+  --titlebar-border: #d6d6d6;
+
+  --md-code-bg: #f0f0f0;
+  --md-code-fg: #1a1a1a;
+  --md-code-comment: #6b6b6b;
+  --md-code-keyword: #8250df;
+  --md-code-string: #0a6f31;
+  --md-code-number: #0550ae;
+  --md-code-title: #953800;
+  --md-code-variable: #24292f;
+  --md-code-meta: #57606a;
+  --md-code-tag: #116329;
+  --md-code-attr: #0550ae;
+  --md-code-link: #0969da;
+}
+
+/* Dark theme (Cursor-inspired) */
+.dark {
   --background: #121212;
   --foreground: #e4e4e4;
   --card: #1c1c1c;
@@ -66,21 +129,42 @@
   --ring: #5c5c5c;
   --chat-user: #252525;
   --chat-composer: #1c1c1c;
+  --chat-assistant: #212121;
   --popover: #242424;
   --popover-foreground: #eaeaea;
-  /* Tooltips */
   --tooltip: #181818;
   --tooltip-foreground: #cccccc;
+  --menu-hover: #252525;
+  --surface-raised: #1a1a1a;
+  --surface-overlay: #181818;
 
   --sidebar: #121212;
   --sidebar-foreground: #e0e0e0;
   --sidebar-primary: #e8e8e8;
   --sidebar-primary-foreground: #121212;
   --sidebar-accent: #212121;
-  --menu-hover: #252525;
   --sidebar-accent-foreground: #eaeaea;
   --sidebar-border: #303030;
   --sidebar-ring: #5c5c5c;
+
+  --scrollbar-thumb: #3a3a3a;
+  --scrollbar-thumb-hover: #4a4a4a;
+  --kbd-divider: #181818;
+  --titlebar-border: #242424;
+  --overlay: rgb(0 0 0 / 0.55);
+
+  --md-code-bg: #161616;
+  --md-code-fg: #d4d4d4;
+  --md-code-comment: #7a7a7a;
+  --md-code-keyword: #c792ea;
+  --md-code-string: #c3e88d;
+  --md-code-number: #f78c6c;
+  --md-code-title: #ffcb6b;
+  --md-code-variable: #eeffff;
+  --md-code-meta: #89ddff;
+  --md-code-tag: #f07178;
+  --md-code-attr: #ffcb6b;
+  --md-code-link: #82aaff;
 }
 
 @layer base {
@@ -95,17 +179,33 @@
     @apply font-sans;
     height: 100%;
     overflow: hidden;
+  }
+
+  html:not(.dark) {
+    color-scheme: light;
+  }
+
+  html.dark {
     color-scheme: dark;
   }
 
+  html.lingo-web body {
+    padding-top: 0;
+  }
+
   body {
-    @apply bg-background font-sans text-foreground antialiased;
+    @apply bg-background font-sans text-foreground antialiased select-none;
     height: 100%;
     margin: 0;
     overflow: hidden;
     padding-top: var(--lingo-titlebar-height);
     font-size: 13px;
     line-height: 1.5;
+  }
+
+  input,
+  textarea {
+    user-select: text;
   }
 
   #root {
@@ -134,7 +234,7 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #3a3a3a transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -143,8 +243,12 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background: #3a3a3a;
+    background: var(--scrollbar-thumb);
     border-radius: 4px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
   }
 
   *::-webkit-scrollbar-track {
@@ -152,30 +256,6 @@
   }
 }
 
-/* Tooltip: стрелка + border (Radix — стрелка в отдельном span с transform) */
-[data-slot='tooltip-content'][data-side='bottom'] [data-slot='tooltip-arrow'] {
-  position: relative;
-  top: 1px;
-}
-[data-slot='tooltip-content'][data-side='top'] [data-slot='tooltip-arrow'] {
-  position: relative;
-  top: -1px;
-}
-[data-slot='tooltip-content'][data-side='left'] [data-slot='tooltip-arrow'] {
-  position: relative;
-  left: 1px;
-}
-[data-slot='tooltip-content'][data-side='right'] [data-slot='tooltip-arrow'] {
-  position: relative;
-  left: -1px;
-}
-
-/* Radix popper wrapper defaults to overflow:hidden and clips the tooltip arrow */
-body > [data-radix-popper-content-wrapper]:has([data-slot='tooltip-content']) {
-  overflow: visible !important;
-}
-
-/* App shell: fill area below custom titlebar (no page-level scrollbar) */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -184,9 +264,15 @@ body > [data-radix-popper-content-wrapper]:has([data-slot='tooltip-content']) {
   overflow: hidden;
 }
 
-/* Titlebar: library uses backgroundColor + update-window-controls IPC on Windows */
 .cet-titlebar {
   font-family: 'Segoe WPC', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.cet-titlebar .cet-window-controls {
+  transition: background-color 0.2s ease;
 }
 
 .cet-titlebar:not(.light) {
@@ -197,24 +283,40 @@ body > [data-radix-popper-content-wrapper]:has([data-slot='tooltip-content']) {
   background-color: #121212;
 }
 
-.cet-container {
-  border-top: 1px solid #242424;
+.cet-titlebar.light {
+  background-color: #f5f5f5;
 }
 
-/* Kbd dividers match the surface behind the key group */
+.cet-titlebar.light .cet-window-controls {
+  background-color: #f5f5f5;
+}
+
+.cet-container {
+  border-top: 1px solid var(--titlebar-border);
+}
+
 [data-slot='tooltip-content'] [data-slot='kbd-group'],
 [data-slot='select-content'] [data-slot='kbd-group'],
 [data-slot='dropdown-menu-content'] [data-slot='kbd-group'],
-[data-slot='dropdown-menu-sub-content'] [data-slot='kbd-group'] {
-  --kbd-divider: #181818;
+[data-slot='dropdown-menu-sub-content'] [data-slot='kbd-group'],
+[data-slot='command'] [data-slot='kbd-group'] {
+  --kbd-divider: var(--kbd-divider);
 }
 
 .cet-titlebar:not(.light) .cet-control-icon svg {
   fill: #e0e0e0;
 }
 
+.cet-titlebar.light .cet-control-icon svg {
+  fill: #1e1e1e;
+}
+
 .cet-titlebar:not(.light) .cet-control-icon:not(.inactive):hover {
   background-color: #333333;
+}
+
+.cet-titlebar.light .cet-control-icon:not(.inactive):hover {
+  background-color: #e0e0e0;
 }
 
 .cet-titlebar .cet-control-close:not(.inactive):hover {

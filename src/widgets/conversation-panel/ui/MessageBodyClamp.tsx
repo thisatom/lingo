@@ -16,7 +16,7 @@ export function MessageBodyClamp({
   children,
   className,
   bodyClassName,
-  fadeFromClass = 'from-[#212121]'
+  fadeFromClass = 'from-chat-assistant'
 }: MessageBodyClampProps) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const [overflowing, setOverflowing] = useState(false)
@@ -39,7 +39,7 @@ export function MessageBodyClamp({
     <div className={cn('relative', className)}>
       <div
         ref={bodyRef}
-        className={cn('overflow-hidden', bodyClassName)}
+        className={cn('h-auto overflow-hidden', bodyClassName)}
         style={{ maxHeight: MESSAGE_BODY_MAX_HEIGHT_PX }}
       >
         {children}

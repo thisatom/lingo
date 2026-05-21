@@ -33,12 +33,21 @@ export function TooltipWrap({
 type TooltipIconButtonProps = ButtonProps & {
   tooltip: ReactNode
   children: ReactNode
+  /** Layout/position classes for the Radix trigger wrapper (e.g. absolute overlay). */
+  triggerClassName?: string
+  tooltipSide?: ComponentProps<typeof TooltipContent>['side']
+  tooltipAlign?: ComponentProps<typeof TooltipContent>['align']
+  tooltipSideOffset?: number
 }
 
 export function TooltipIconButton({
   tooltip,
   disabled,
   className,
+  triggerClassName,
+  tooltipSide,
+  tooltipAlign,
+  tooltipSideOffset,
   children,
   type = 'button',
   'aria-label': ariaLabelProp,
@@ -47,21 +56,24 @@ export function TooltipIconButton({
   const ariaFallback =
     typeof tooltip === 'string' || typeof tooltip === 'number' ? String(tooltip) : undefined
 
-  const button = (
-    <Button
-      type={type}
-      disabled={disabled}
-      className={cn(className)}
-      {...props}
-      aria-label={ariaLabelProp ?? ariaFallback}
-    >
-      {children}
-    </Button>
-  )
-
   return (
-    <TooltipWrap label={tooltip}>
-      {disabled ? <span className="inline-flex">{button}</span> : button}
+    <TooltipWrap
+      label={tooltip}
+      side={tooltipSide}
+      align={tooltipAlign}
+      sideOffset={tooltipSideOffset}
+    >
+      <span className={cn('inline-flex items-center justify-center', triggerClassName)}>
+        <Button
+          type={type}
+          disabled={disabled}
+          className={cn(className)}
+          {...props}
+          aria-label={ariaLabelProp ?? ariaFallback}
+        >
+          {children}
+        </Button>
+      </span>
     </TooltipWrap>
   )
 }

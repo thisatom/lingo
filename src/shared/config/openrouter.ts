@@ -1,6 +1,6 @@
 export const openRouterConfig = {
   baseURL: 'https://openrouter.ai/api/v1',
-  defaultModel: 'openai/gpt-4o-mini',
+  defaultModel: 'nvidia/nemotron-3-super-120b-a12b:free',
   /** Reliable web-search model (also used when user picks `openrouter/auto`). */
   webSearchModel: 'perplexity/sonar',
   /** Legacy; STT uses free local Whisper in the desktop app. */
@@ -23,9 +23,10 @@ export function normalizeOpenRouterModelId(modelId: string): string {
 
 /** Common OpenRouter model ids for the settings combobox (any id can still be applied). */
 export const openRouterSuggestedModels: readonly string[] = [
+  openRouterConfig.defaultModel,
   'openrouter/auto',
   openRouterConfig.webSearchModel,
-  openRouterConfig.defaultModel,
+  'openai/gpt-4o-mini',
   'openai/gpt-4o',
   'openai/gpt-4.1-mini',
   'openai/gpt-4.1',

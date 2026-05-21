@@ -41,7 +41,7 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
       onOpenChange={onOpenChange}
       title="Search chats"
       description="Find and open a chat"
-      className="max-w-lg border-border"
+      className="max-w-lg border-border bg-popover"
     >
       <CommandInput placeholder="Search chats…" />
       <CommandList className="max-h-[min(50vh,20rem)]">

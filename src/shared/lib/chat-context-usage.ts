@@ -35,7 +35,7 @@ export function estimateTextTokens(text: string): number {
 }
 
 export function estimateChatContextTokens(
-  messages: Pick<Message, 'role' | 'content'>[]
+  messages: readonly Pick<Message, 'role' | 'content'>[]
 ): number {
   return (
     SYSTEM_PROMPT_RESERVE +
@@ -48,7 +48,7 @@ export function estimateChatContextTokens(
 }
 
 export function getChatContextUsagePercent(
-  messages: Pick<Message, 'role' | 'content'>[],
+  messages: readonly Pick<Message, 'role' | 'content'>[],
   modelId: string,
   reservedOutputTokens = openRouterConfig.maxTokens
 ): number {
@@ -66,7 +66,7 @@ export type ChatContextUsageDetails = {
 }
 
 export function getChatContextUsageDetails(
-  messages: Pick<Message, 'role' | 'content'>[],
+  messages: readonly Pick<Message, 'role' | 'content'>[],
   modelId: string,
   reservedOutputTokens = openRouterConfig.maxTokens
 ): ChatContextUsageDetails {
@@ -93,11 +93,11 @@ export function getChatContextUsageDetails(
 }
 
 export function trimMessagesForContext(
-  messages: Message[],
+  messages: readonly Message[],
   modelId: string,
   targetPercent = 50
 ): Message[] {
-  if (messages.length <= 2) return messages
+  if (messages.length <= 2) return [...messages]
 
   const limit = getModelContextLimit(modelId)
   const targetTokens = Math.floor((limit * targetPercent) / 100)

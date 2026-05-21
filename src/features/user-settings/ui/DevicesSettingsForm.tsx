@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { useAudioLevelMonitor } from '@/features/audio-devices/model/useAudioLevelMonitor'
@@ -5,11 +6,24 @@ import { useAudioOutputDevices } from '@/features/audio-devices/model/useAudioOu
 import { MicLevelVisualizer } from '@/features/audio-devices/ui/MicLevelVisualizer'
 import { MIC_NOISE_SUPPRESSION_OPTIONS } from '@/features/speech-to-text/lib/mic-noise-suppression'
 import { useAudioInputDevices } from '@/features/voice-capture/model/useAudioInputDevices'
-import { settingsInputClass } from '@/shared/lib/settings-control'
+import {
+  settingsInputClass,
+  settingsSelectContentClass,
+  settingsSelectItemClass,
+  settingsSelectTriggerClass
+} from '@/shared/lib/settings-control'
+import {
+  settingsCardClass,
+  settingsRowClass,
+  settingsRowDescriptionClass,
+  settingsSubsectionTitleClass,
+  settingsRowTextWrapClass,
+  settingsRowTitleClass,
+  settingsSectionTitleClass
+} from '@/shared/lib/settings-surface'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
-import { Item, ItemContent, ItemDescription, ItemGroup } from '@/shared/ui/item'
-import { Label } from '@/shared/ui/label'
+import { ItemDescription } from '@/shared/ui/item'
 import {
   Select,
   SelectContent,
@@ -17,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/shared/ui/select'
+import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
 const DEFAULT_DEVICE_VALUE = '__default__'
 
@@ -111,166 +126,157 @@ export function DevicesSettingsForm() {
       : DEFAULT_DEVICE_VALUE
 
   return (
-    <ItemGroup className="gap-4">
-      <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
-        <ItemContent className="gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="devices-microphone" className="text-xs font-medium">
-              Microphone
-            </Label>
-            <Button
+    <section>
+      <h2 className={settingsSectionTitleClass}>Devices</h2>
+      <p className={settingsSubsectionTitleClass}>Input & Output</p>
+      <div className={settingsCardClass}>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Microphone</p>
+            <p className={settingsRowDescriptionClass}>
+              {micPermissionDenied
+                ? 'Microphone access denied. Allow access and refresh.'
+                : 'Input device for voice capture and speech recognition.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <TooltipIconButton
               type="button"
               variant="ghost"
-              size="compact"
-              className="h-6 px-2 text-xs"
+              size="iconSm"
+              className="size-7 text-muted-foreground hover:text-foreground"
               disabled={micLoading}
+              tooltip="Refresh"
               onClick={() => void refreshMics()}
             >
-              Refresh
-            </Button>
-          </div>
-
-          <Select
-            value={micSelectValue}
-            onValueChange={(value) => {
-              if (value === DEFAULT_DEVICE_VALUE) {
-                setMicrophoneDevice('', '')
-                return
-              }
-              const device = micDevices.find((d) => d.deviceId === value)
-              setMicrophoneDevice(value, device?.label ?? '')
-            }}
-            disabled={micLoading || micPermissionDenied}
-          >
-            <SelectTrigger
-              id="devices-microphone"
-              size="sm"
-              className={cn(settingsInputClass, 'w-full min-w-0 border-input shadow-none')}
-            >
-              <SelectValue placeholder="System default" />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectItem value={DEFAULT_DEVICE_VALUE}>System default</SelectItem>
-              {micDevices.map((device) => (
-                <SelectItem key={device.deviceId} value={device.deviceId}>
-                  {device.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="mt-2 space-y-1.5">
-            <Label htmlFor="devices-noise-suppression" className="text-xs font-medium">
-              Noise suppression
-            </Label>
+              <RefreshCw className="size-3.5" />
+            </TooltipIconButton>
             <Select
-              value={micNoiseSuppression}
+              value={micSelectValue}
               onValueChange={(value) => {
-                const option = MIC_NOISE_SUPPRESSION_OPTIONS.find((o) => o.value === value)
-                if (option) setMicNoiseSuppression(option.value)
+                if (value === DEFAULT_DEVICE_VALUE) {
+                  setMicrophoneDevice('', '')
+                  return
+                }
+                const device = micDevices.find((d) => d.deviceId === value)
+                setMicrophoneDevice(value, device?.label ?? '')
               }}
+              disabled={micLoading || micPermissionDenied}
             >
-              <SelectTrigger
-                id="devices-noise-suppression"
-                size="sm"
-                className={cn(settingsInputClass, 'w-full min-w-0 border-input shadow-none')}
-              >
-                <SelectValue />
+              <SelectTrigger id="devices-microphone" size="sm" className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}>
+                <SelectValue placeholder="System default" />
               </SelectTrigger>
-              <SelectContent position="popper">
-                {MIC_NOISE_SUPPRESSION_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+              <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
+                <SelectItem value={DEFAULT_DEVICE_VALUE} className={settingsSelectItemClass}>
+                  System default
+                </SelectItem>
+                {micDevices.map((device) => (
+                  <SelectItem
+                    key={device.deviceId}
+                    value={device.deviceId}
+                    className={settingsSelectItemClass}
+                  >
+                    {device.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <ItemDescription className="text-xs">
-              {
-                MIC_NOISE_SUPPRESSION_OPTIONS.find((o) => o.value === micNoiseSuppression)
-                  ?.description
-              }
-            </ItemDescription>
           </div>
+        </div>
 
-          {micPermissionDenied ? (
-            <ItemDescription className="text-xs text-destructive">
-              Microphone access denied. Allow the mic in Windows / system settings, then refresh.
-            </ItemDescription>
-          ) : (
-            <ItemDescription className="text-xs">
-              Input device for voice capture and speech recognition.
-            </ItemDescription>
-          )}
-        </ItemContent>
-      </Item>
-
-      <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
-        <ItemContent className="gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="devices-speaker" className="text-xs font-medium">
-              Headphones / speaker
-            </Label>
-            <Button
-              type="button"
-              variant="ghost"
-              size="compact"
-              className="h-6 px-2 text-xs"
-              disabled={speakerLoading}
-              onClick={() => void refreshSpeakers()}
-            >
-              Refresh
-            </Button>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Noise suppression</p>
+            <p className={settingsRowDescriptionClass}>
+              {MIC_NOISE_SUPPRESSION_OPTIONS.find((o) => o.value === micNoiseSuppression)
+                ?.description ?? 'Control input cleanup before speech-to-text.'}
+            </p>
           </div>
-
           <Select
-            value={speakerSelectValue}
+            value={micNoiseSuppression}
             onValueChange={(value) => {
-              if (value === DEFAULT_DEVICE_VALUE) {
-                setSpeakerDevice('', '')
-                return
-              }
-              const device = speakerDevices.find((d) => d.deviceId === value)
-              setSpeakerDevice(value, device?.label ?? '')
+              const option = MIC_NOISE_SUPPRESSION_OPTIONS.find((o) => o.value === value)
+              if (option) setMicNoiseSuppression(option.value)
             }}
-            disabled={speakerLoading || !sinkSupported}
           >
-            <SelectTrigger
-              id="devices-speaker"
-              size="sm"
-              className={cn(settingsInputClass, 'w-full min-w-0 border-input shadow-none')}
-            >
-              <SelectValue placeholder="System default" />
+            <SelectTrigger id="devices-noise-suppression" size="sm" className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}>
+              <SelectValue />
             </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectItem value={DEFAULT_DEVICE_VALUE}>System default</SelectItem>
-              {speakerDevices.map((device) => (
-                <SelectItem key={device.deviceId} value={device.deviceId}>
-                  {device.label}
+            <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
+              {MIC_NOISE_SUPPRESSION_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value} className={settingsSelectItemClass}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </div>
 
-          <ItemDescription className="text-xs">
-            {sinkSupported
-              ? 'Output for AI voice replies in Conversation mode.'
-              : 'Output device selection is not supported in this environment — system default is used.'}
-          </ItemDescription>
-        </ItemContent>
-      </Item>
-
-      <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
-        <ItemContent className="gap-3">
-          <div>
-            <Label className="text-xs font-medium">Microphone test</Label>
-            <ItemDescription className="mt-1 text-xs">
-              Start the test and speak — bars should move. &quot;Signal OK&quot; means audio is
-              reaching the app.
-            </ItemDescription>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Headphones / speaker</p>
+            <p className={settingsRowDescriptionClass}>
+              {sinkSupported
+                ? 'Output for assistant voice — rate and voice are under Settings → Speech.'
+                : 'Output selection is unavailable here — system default is used.'}
+            </p>
           </div>
+          <div className="flex items-center gap-2">
+            <TooltipIconButton
+              type="button"
+              variant="ghost"
+              size="iconSm"
+              className="size-7 text-muted-foreground hover:text-foreground"
+              disabled={speakerLoading}
+              tooltip="Refresh"
+              onClick={() => void refreshSpeakers()}
+            >
+              <RefreshCw className="size-3.5" />
+            </TooltipIconButton>
+            <Select
+              value={speakerSelectValue}
+              onValueChange={(value) => {
+                if (value === DEFAULT_DEVICE_VALUE) {
+                  setSpeakerDevice('', '')
+                  return
+                }
+                const device = speakerDevices.find((d) => d.deviceId === value)
+                setSpeakerDevice(value, device?.label ?? '')
+              }}
+              disabled={speakerLoading || !sinkSupported}
+            >
+              <SelectTrigger id="devices-speaker" size="sm" className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}>
+                <SelectValue placeholder="System default" />
+              </SelectTrigger>
+              <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
+                <SelectItem value={DEFAULT_DEVICE_VALUE} className={settingsSelectItemClass}>
+                  System default
+                </SelectItem>
+                {speakerDevices.map((device) => (
+                  <SelectItem
+                    key={device.deviceId}
+                    value={device.deviceId}
+                    className={settingsSelectItemClass}
+                  >
+                    {device.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
+      </div>
+
+      <p className={settingsSubsectionTitleClass}>Diagnostics</p>
+      <div className={settingsCardClass}>
+        <div className="px-4 py-3">
+          <p className={settingsRowTitleClass}>Microphone test</p>
+          <p className={settingsRowDescriptionClass}>
+            Start the test and speak — bars should move. &quot;Signal OK&quot; means audio is reaching
+            the app.
+          </p>
+          <div className="mt-3 flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
             <MicLevelVisualizer levels={levels} isReceiving={isReceiving} />
             <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
               {micTestActive ? durationLabel : '0:00'}
@@ -295,12 +301,13 @@ export function DevicesSettingsForm() {
             </span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="mt-2 flex gap-2">
             {!micTestActive ? (
               <Button
                 type="button"
-                size="sm"
+                size="xs"
                 variant="secondary"
+                className="h-6 px-2 text-[11px]"
                 disabled={micPermissionDenied}
                 onClick={() => setMicTestActive(true)}
               >
@@ -309,16 +316,17 @@ export function DevicesSettingsForm() {
             ) : (
               <Button
                 type="button"
-                size="sm"
+                size="xs"
                 variant="outline"
+                className="h-6 px-2 text-[11px]"
                 onClick={() => setMicTestActive(false)}
               >
                 Stop test
               </Button>
             )}
           </div>
-        </ItemContent>
-      </Item>
-    </ItemGroup>
+        </div>
+      </div>
+    </section>
   )
 }

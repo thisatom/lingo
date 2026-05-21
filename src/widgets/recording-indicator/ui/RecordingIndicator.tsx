@@ -41,13 +41,7 @@ export function RecordingIndicator({
         )}
       />
       <div className="min-w-0 flex-1 space-y-1">
-        <ShinyText
-          text={statusText}
-          className="text-xs font-medium"
-          color="#777777"
-          shineColor="#d1d1d1"
-          speed={2.2}
-        />
+        <ShinyText text={statusText} className="text-xs font-medium" speed={2.2} />
         {interimTranscript && (
           <p className="text-sm text-foreground italic">{interimTranscript}</p>
         )}

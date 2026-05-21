@@ -22,11 +22,12 @@ export function shouldUseResearchMode(userMessage: string): boolean {
   return false
 }
 
-export function getLastUserMessageContent(
-  messages: Array<{ role: string; content: string }>
-): string {
+import type { ChatMessagePayload } from '../types/ipc'
+import { extractPlainTextFromPayload } from './chat-message-api'
+
+export function getLastUserMessageContent(messages: ChatMessagePayload[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user') return messages[i].content
+    if (messages[i].role === 'user') return extractPlainTextFromPayload(messages[i].content)
   }
   return ''
 }

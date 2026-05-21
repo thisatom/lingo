@@ -42,7 +42,7 @@ function ContextMenuItem({
       data-inset={inset}
       className={cn(
         'relative flex cursor-pointer items-center gap-2 rounded-[8px] px-2.5 py-1 text-xs leading-normal outline-hidden select-none',
-        'focus:bg-[#252525] data-[highlighted]:bg-[#252525] data-[highlighted]:text-popover-foreground',
+        'focus:bg-menu-hover data-[highlighted]:bg-menu-hover data-[highlighted]:text-popover-foreground dark:focus:bg-[#252525] dark:data-[highlighted]:bg-[#252525]',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         inset && 'pl-8',
         className

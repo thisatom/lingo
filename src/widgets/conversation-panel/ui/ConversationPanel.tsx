@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AgentChatScrollArea } from './AgentChatScrollArea'
+import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
 import type { PipelineStage } from '@/entities/conversation/model/store'
 import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { CHAT_BOTTOM_INSET } from '@/widgets/conversation-panel/lib/chat-layout'
-import { messageTextClass } from './agent-layout'
-import { groupMessagesIntoTurns } from '@/widgets/conversation-panel/lib/group-turns'
+import {
+  groupMessagesIntoTurns,
+  messageHasVisibleContent
+} from '@/widgets/conversation-panel/lib/group-turns'
 import { cn } from '@/shared/lib/utils'
-import { ChatTextContextMenu } from './chat-context-menu/ChatTextContextMenu'
+import { agentContentIndentClass } from './agent-layout'
 import { AgentStatus } from './AgentStatus'
+import { ChatEmptyPrompt } from './ChatEmptyPrompt'
 import { ConversationTurn } from './ConversationTurn'
 
 const ACTIVE_STAGES: PipelineStage[] = [
@@ -20,11 +24,15 @@ const ACTIVE_STAGES: PipelineStage[] = [
 ]
 
 interface ConversationPanelProps {
-  messages: Message[]
+  messages: readonly Message[]
   stage: PipelineStage
   activeChatId: string | null
   actionsDisabled?: boolean
-  onSubmitEditedUserMessage: (messageId: string, text: string) => void
+  onSubmitEditedUserMessage: (
+    messageId: string,
+    text: string,
+    attachments?: MessageAttachment[]
+  ) => void
   onAtBottomChange?: (atBottom: boolean) => void
   onShowScrollToLatestChange?: (show: boolean) => void
   onScrollToLatestReady?: (scrollToLatest: () => void) => void
@@ -80,32 +88,41 @@ export function ConversationPanel({
   }, [editingUserMessageId])
 
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages])
+  const hasVisibleMessages = useMemo(
+    () => messages.some(messageHasVisibleContent),
+    [messages]
+  )
 
   useEffect(() => {
     if (!atBottom) return
     scrollToLatest()
   }, [messages, stage, showStatus, atBottom, scrollToLatest])
 
+  const showEmptyPrompt = !hasVisibleMessages && !showStatus
+
   return (
     <div className="absolute inset-0 overflow-hidden">
+      {showEmptyPrompt ? (
+        <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center px-4">
+          <ChatEmptyPrompt className="w-full max-w-md" />
+        </div>
+      ) : null}
+
       <AgentChatScrollArea
         className="h-full min-h-0"
         onAtBottomChange={handleAtBottomChange}
         onShowScrollToLatestChange={onShowScrollToLatestChange}
       >
-        <ChatTextContextMenu
-          className={cn('mx-auto px-4 pt-[18px] sm:px-6', CHAT_COLUMN_MAX_WIDTH_CLASS)}
+        <div
+          className={cn(
+            'mx-auto min-h-full px-4 pt-[18px] sm:px-6',
+            CHAT_COLUMN_MAX_WIDTH_CLASS
+          )}
         >
           <div
-            className="space-y-5"
+            className={cn('relative min-h-full', turns.length > 0 && 'space-y-5')}
             style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
           >
-            {messages.length === 0 && !showStatus && (
-              <p className={cn('pb-1 text-muted-foreground', messageTextClass)}>
-                Hold the mic and speak, or type a message below to start practicing.
-              </p>
-            )}
-
             {turns.map((turn) => (
               <ConversationTurn
                 key={turn.id}
@@ -115,17 +132,21 @@ export function ConversationPanel({
                 actionsDisabled={actionsDisabled}
                 onEnterEdit={setEditingUserMessageId}
                 onExitEdit={() => setEditingUserMessageId(null)}
-                onSubmitEdit={(messageId, text) => {
-                  void onSubmitEditedUserMessage(messageId, text)
+                onSubmitEdit={(messageId, text, attachments) => {
+                  void onSubmitEditedUserMessage(messageId, text, attachments)
                 }}
               />
             ))}
 
-            {showStatus && <AgentStatus stage={stage} />}
+            {showStatus ? (
+              <div className={agentContentIndentClass}>
+                <AgentStatus stage={stage} />
+              </div>
+            ) : null}
 
             <div ref={bottomRef} className="h-px shrink-0" />
           </div>
-        </ChatTextContextMenu>
+        </div>
       </AgentChatScrollArea>
     </div>
   )

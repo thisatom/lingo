@@ -8,7 +8,7 @@ import {
 
 const HIGH_USAGE_PERCENT = 85
 
-export function useChatContextUsage(messages: Message[], modelId: string) {
+export function useChatContextUsage(messages: readonly Message[], modelId: string) {
   const setChatMessages = useChatsStore((s) => s.setChatMessages)
   const activeChatId = useChatsStore((s) => s.activeChatId)
 

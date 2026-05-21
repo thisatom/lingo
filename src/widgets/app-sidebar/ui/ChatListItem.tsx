@@ -41,6 +41,7 @@ export function ChatListItem({
 }: ChatListItemProps) {
   const pinned = Boolean(chat.pinned)
   const hasError = Boolean(chat.hasError)
+  const hasUnreadReply = Boolean(chat.hasUnreadReply)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   return (
@@ -49,6 +50,7 @@ export function ChatListItem({
         <ChatSidebarIndicator
           pinned={pinned}
           hasError={hasError}
+          hasUnreadReply={hasUnreadReply}
           agentActive={agentActive}
           onTogglePin={onTogglePin}
         />
@@ -56,7 +58,7 @@ export function ChatListItem({
         <SidebarMenuButton
           isActive={isActive}
           className={cn(
-            'h-8 pl-8 pr-8',
+            'h-8 items-center pl-8 pr-8',
             sidebarChatRowRadiusClass,
             sidebarChatTextClass,
             sidebarChatHoverTextClass,
@@ -64,15 +66,16 @@ export function ChatListItem({
           )}
           onClick={onOpen}
         >
-          <span className="truncate">{chat.title}</span>
+          <span className="min-w-0 flex-1 truncate leading-none">{chat.title}</span>
         </SidebarMenuButton>
 
         <TooltipIconButton
           variant="ghost"
           size="icon"
+          triggerClassName="absolute top-1/2 right-1 z-10 -translate-y-1/2"
           className={cn(
-            'absolute top-1/2 right-1 z-10 size-7 -translate-y-1/2',
-            'text-[#a3a3a3] opacity-0 transition-opacity hover:text-[#c8c8c8]',
+            'size-7',
+            'text-muted-foreground opacity-0 transition-opacity hover:text-foreground',
             'group-hover/chat:opacity-100 focus-visible:opacity-100'
           )}
           tooltip="Delete chat"
@@ -95,8 +98,9 @@ export function ChatListItem({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel size="xs">Cancel</AlertDialogCancel>
             <AlertDialogAction
+              size="xs"
               variant="destructive"
               onClick={() => {
                 onDelete()

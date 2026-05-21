@@ -93,7 +93,7 @@ export function ContextUsageButton({
         side="top"
         align="end"
         sideOffset={8}
-        className="w-72 border-[#383838] bg-[#1e1e1e] p-3 text-xs"
+        className="w-72 border-border bg-popover p-3 text-xs"
       >
         <p className="mb-2 text-sm text-foreground">Context usage</p>
         <div className="space-y-1.5">

@@ -4,41 +4,52 @@ import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 import {
   sidebarChatDotClass,
   sidebarChatDotErrorClass,
-  sidebarChatDotSizeClass
+  sidebarChatDotSizeClass,
+  sidebarChatUnreadDotClass
 } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { AgentClusterDots } from './AgentClusterDots'
 
 interface ChatSidebarIndicatorProps {
   pinned: boolean
   hasError: boolean
+  hasUnreadReply: boolean
   agentActive: boolean
   onTogglePin: () => void
 }
 
+const pinTriggerClass = 'pointer-events-auto absolute inset-0 flex items-center justify-center'
+
 const pinButtonClass = cn(
-  'pointer-events-auto absolute inset-0 size-6 opacity-0 transition-opacity',
-  'text-[#a3a3a3] hover:text-[#c8c8c8]',
+  'size-6 opacity-0 transition-opacity',
+  'text-muted-foreground hover:text-foreground',
   'group-hover/chat:opacity-100 focus-visible:opacity-100'
 )
 
 export function ChatSidebarIndicator({
   pinned,
   hasError,
+  hasUnreadReply,
   agentActive,
   onTogglePin
 }: ChatSidebarIndicatorProps) {
+  const showUnreadDot = hasUnreadReply && !agentActive && !hasError
+
   return (
-    <div className="absolute top-1/2 left-1 z-10 flex size-6 -translate-y-1/2 items-center justify-center">
+    <div className="absolute top-1/2 left-1 z-10 size-6 -translate-y-1/2">
       {agentActive ? (
-        <span className="flex items-center justify-center transition-opacity group-hover/chat:opacity-0">
+        <span className="absolute inset-0 flex items-center justify-center transition-opacity group-hover/chat:opacity-0">
           <AgentClusterDots />
         </span>
       ) : (
         <span
           className={cn(
-            'shrink-0 rounded-full transition-opacity group-hover/chat:opacity-0',
+            'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full transition-opacity group-hover/chat:opacity-0',
             sidebarChatDotSizeClass,
-            hasError ? sidebarChatDotErrorClass : sidebarChatDotClass
+            hasError
+              ? sidebarChatDotErrorClass
+              : showUnreadDot
+                ? sidebarChatUnreadDotClass
+                : sidebarChatDotClass
           )}
           aria-hidden
         />
@@ -47,7 +58,8 @@ export function ChatSidebarIndicator({
       <TooltipIconButton
         variant="ghost"
         size="icon"
-        className={cn(pinButtonClass, pinned && 'text-[#d4d4d4]')}
+        triggerClassName={pinTriggerClass}
+        className={cn(pinButtonClass, pinned && 'text-sidebar-accent-foreground')}
         tooltip={pinned ? 'Unpin chat' : 'Pin chat'}
         aria-pressed={pinned}
         onClick={(e) => {
@@ -55,7 +67,7 @@ export function ChatSidebarIndicator({
           onTogglePin()
         }}
       >
-        <Pin className={cn('size-3.5', pinned && 'fill-current')} />
+        <Pin className="size-3.5" />
       </TooltipIconButton>
     </div>
   )

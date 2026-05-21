@@ -1,5 +1,17 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  readonly VITE_LINGO_PLATFORM?: 'web'
+  readonly VITE_APP_VERSION?: string
+  readonly VITE_LINGO_OPENROUTER_MODEL?: string
+  readonly VITE_LINGO_APP_URL?: string
+  readonly VITE_LINGO_APP_NAME?: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}
+
 interface SpeechRecognitionEventMap {
   audioend: Event
   audiostart: Event

@@ -1,36 +1,27 @@
 import { UniversalEdgeTTS } from 'edge-tts-universal'
 import type { TtsSynthesizeRequest, TtsSynthesizeResponse } from '../../src/shared/types/ipc'
+import { getDefaultVoiceForLanguage } from '../../src/shared/config/tts-voices'
+import { prepareTextForSpeech } from '../../src/shared/lib/prepare-text-for-speech'
 import { stripTextForSpeech } from '../../src/shared/lib/strip-text-for-speech'
-
-const DEFAULT_VOICE = 'en-US-EmmaMultilingualNeural'
-
-const LOCALE_VOICE: Record<string, string> = {
-  en: 'en-US-EmmaMultilingualNeural',
-  de: 'de-DE-KatjaNeural',
-  es: 'es-ES-ElviraNeural',
-  fr: 'fr-FR-DeniseNeural',
-  it: 'it-IT-ElsaNeural',
-  pt: 'pt-BR-FranciscaNeural',
-  ru: 'ru-RU-SvetlanaNeural',
-  ja: 'ja-JP-NanamiNeural',
-  zh: 'zh-CN-XiaoxiaoNeural'
-}
+import { resolveTtsProsody } from './tts-prosody'
 
 export function resolveVoice(request: TtsSynthesizeRequest): string {
-  if (request.voice) return request.voice
+  if (request.voice?.trim()) return request.voice.trim()
   const locale = request.locale?.split('-')[0] ?? 'en'
-  return LOCALE_VOICE[locale] ?? DEFAULT_VOICE
+  return getDefaultVoiceForLanguage(locale)
 }
 
 export async function synthesizeSpeech(
   request: TtsSynthesizeRequest
 ): Promise<TtsSynthesizeResponse> {
   const voice = resolveVoice(request)
-  const text = stripTextForSpeech(request.text)
+  const stripped = stripTextForSpeech(request.text)
+  const text = prepareTextForSpeech(stripped, request.locale)
   if (!text) {
     throw new Error('TTS_EMPTY')
   }
-  const tts = new UniversalEdgeTTS(text, voice)
+  const prosody = resolveTtsProsody(request)
+  const tts = new UniversalEdgeTTS(text, voice, prosody)
   const result = await tts.synthesize()
   const buffer = Buffer.from(await result.audio.arrayBuffer())
   const mimeType = result.audio.type || 'audio/mpeg'

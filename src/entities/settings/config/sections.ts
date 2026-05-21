@@ -1,4 +1,4 @@
-export type SettingsSectionId = 'user' | 'devices' | 'practice' | 'api'
+export type SettingsSectionId = 'user' | 'devices' | 'speech' | 'practice' | 'api'
 
 export interface SettingsSection {
   id: SettingsSectionId
@@ -16,6 +16,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     id: 'devices',
     label: 'Devices',
     path: '/settings/devices'
+  },
+  {
+    id: 'speech',
+    label: 'Speech',
+    path: '/settings/speech'
   },
   {
     id: 'practice',

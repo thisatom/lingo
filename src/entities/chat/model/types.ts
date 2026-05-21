@@ -9,4 +9,6 @@ export interface Chat {
   pinned?: boolean
   /** Last failed assistant request in this chat (sidebar red dot). */
   hasError?: boolean
+  /** Assistant reply finished while this chat was in the background (sidebar blue dot). */
+  hasUnreadReply?: boolean
 }

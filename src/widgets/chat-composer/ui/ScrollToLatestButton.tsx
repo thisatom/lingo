@@ -19,7 +19,7 @@ export function ScrollToLatestButton({ show, onClick, className }: ScrollToLates
       aria-label="Scroll to latest"
       onClick={onClick}
       className={cn(
-        'size-8 shrink-0 rounded-full border border-[#383838] bg-[#2a2a2a] text-foreground shadow-lg hover:bg-[#333333]',
+        'size-8 shrink-0 rounded-full border border-border bg-secondary text-foreground shadow-lg hover:bg-accent',
         className
       )}
     >

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { copyToClipboard } from '@/shared/lib/copy-to-clipboard'
 import { sidebarMenuItemClass, sidebarMenuSurfaceClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from '@/shared/lib/utils'
+import { chatSelectableClass } from '@/widgets/conversation-panel/ui/agent-layout'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -26,7 +27,10 @@ export function UserQuestionContextMenu({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className={cn('min-w-0', className)} data-user-question-block>
+        <div
+          className={cn('min-w-0', chatSelectableClass, className)}
+          data-user-question-block
+        >
           {children}
         </div>
       </ContextMenuTrigger>
