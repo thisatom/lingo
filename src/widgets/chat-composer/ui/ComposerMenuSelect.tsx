@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown } from '@/shared/ui/icons'
 import {
   sidebarMenuItemClass,
   sidebarMenuPickerChevronClass,

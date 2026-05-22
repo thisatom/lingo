@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Settings } from 'lucide-react'
+import { Settings } from '@/shared/ui/icons'
 import { SidebarFilterMenu } from '@/features/sidebar-customize/ui/SidebarFilterMenu'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { getInitials } from '@/shared/lib/user'

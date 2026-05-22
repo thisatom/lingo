@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { ArrowUp, Globe, Mic, Square } from 'lucide-react'
+import { ArrowUp, Globe, Mic, Square } from '@/shared/ui/icons'
 import {
   EMPTY_COMPOSER_ATTACHMENTS,
   type MessageAttachment
@@ -18,10 +18,10 @@ import { ComposerAgentMenuSelect } from '@/widgets/chat-composer/ui/ComposerAgen
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
+import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
 const INPUT_MIN_HEIGHT_PX = 24
-const INPUT_MAX_HEIGHT_PX = 160
 
 const composerShellClass = cn(
   'flex w-full flex-col overflow-hidden rounded-3xl border border-border bg-chat-composer',
@@ -74,11 +74,7 @@ function noopAddAttachments(_items: MessageAttachment[]): void {
 
 function resizeTextarea(el: HTMLTextAreaElement) {
   el.style.height = 'auto'
-  const next = Math.min(
-    Math.max(el.scrollHeight, INPUT_MIN_HEIGHT_PX),
-    INPUT_MAX_HEIGHT_PX
-  )
-  el.style.height = `${next}px`
+  el.style.height = `${Math.max(el.scrollHeight, INPUT_MIN_HEIGHT_PX)}px`
 }
 
 export function ChatComposer({
@@ -182,29 +178,31 @@ export function ChatComposer({
         {attachments.length > 0 && onRemoveAttachment ? (
           <ComposerAttachments items={attachments} onRemove={onRemoveAttachment} />
         ) : null}
-        <ComposerTextareaContextMenu onValueChange={onChange} textareaRef={textareaRef}>
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            rows={1}
-            disabled={disabled}
-            style={{ height: INPUT_MIN_HEIGHT_PX }}
-            className={cn(
-              'max-h-40 min-h-6 w-full resize-none overflow-y-auto bg-transparent',
-              'px-3.5 pt-3.5 pb-1 text-sm leading-5 text-foreground placeholder:text-muted-foreground',
-              'outline-none disabled:cursor-not-allowed'
-            )}
-            onInput={(e) => resizeTextarea(e.currentTarget)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                if (canSend) onSend()
-              }
-            }}
-          />
-        </ComposerTextareaContextMenu>
+        <CustomScrollArea variant="menu" className="max-h-40 w-full">
+          <ComposerTextareaContextMenu onValueChange={onChange} textareaRef={textareaRef}>
+            <textarea
+              ref={textareaRef}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              rows={1}
+              disabled={disabled}
+              style={{ height: INPUT_MIN_HEIGHT_PX }}
+              className={cn(
+                'block min-h-6 w-full resize-none overflow-hidden bg-transparent',
+                'px-3.5 pt-3.5 pb-1 text-sm leading-5 text-foreground placeholder:text-muted-foreground',
+                'outline-none disabled:cursor-not-allowed'
+              )}
+              onInput={(e) => resizeTextarea(e.currentTarget)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  if (canSend) onSend()
+                }
+              }}
+            />
+          </ComposerTextareaContextMenu>
+        </CustomScrollArea>
 
         <div className="flex shrink-0 items-center gap-0.5 px-2 pb-2 pt-0.5">
           {voiceSupported && onVoicePress && (onVoiceStop || onVoiceRelease) ? (
@@ -219,7 +217,7 @@ export function ChatComposer({
                 aria-label="Stop recording"
                 onClick={onVoiceStop}
               >
-                <Square className="size-3 fill-current" />
+                <Square className="size-3.5" />
               </TooltipIconButton>
             ) : (
               <VoiceRecordButton
@@ -304,7 +302,7 @@ export function ChatComposer({
               tooltip="Stop"
               onClick={onStop}
             >
-              <Square className="size-2 fill-current" />
+              <Square className="size-3.5" />
             </TooltipIconButton>
           ) : (
             <TooltipIconButton

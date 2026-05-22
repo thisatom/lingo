@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { MessageSquarePlus } from 'lucide-react'
+import { NewChat } from '@/shared/ui/icons'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
@@ -98,7 +98,7 @@ export function AppSidebar() {
               <SidebarTopActions onOpenSearch={openSearch} />
               <Button
                 className={cn(
-                  'mx-1 w-[calc(100%-0.5rem)] justify-start gap-2 border-border/60 bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground',
+                  'w-full justify-start gap-2 px-2 has-[>svg]:px-2 border-border/60 bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground',
                   sidebarRowHeightClass,
                   APP_RADIUS_8_CLASS
                 )}
@@ -107,7 +107,7 @@ export function AppSidebar() {
                 aria-label="New chat"
                 onClick={() => createChat()}
               >
-                <MessageSquarePlus className="size-4 shrink-0 text-muted-foreground" />
+                <NewChat className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-left">New chat</span>
                 <KbdGroup
                   className="shrink-0 opacity-90 [--kbd-divider:var(--kbd-divider)]"

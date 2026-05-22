@@ -76,7 +76,7 @@ export function MicrophoneSettings() {
       : DEFAULT_MIC_VALUE
 
   return (
-    <Item size="sm" className="flex-col items-stretch rounded-[8px] border border-border p-3">
+    <Item size="sm" className="flex-col items-stretch rounded-[8px] border-0 p-3">
       <ItemContent className="gap-1.5">
         <div className="flex items-center justify-between gap-2">
           <Label htmlFor="microphone-device" className="text-xs font-medium">

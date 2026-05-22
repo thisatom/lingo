@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowUp, ChevronDown, CornerDownLeft, Pencil, Trash2 } from 'lucide-react'
+import { ArrowUp, ChevronDown, CornerDownLeft, Pencil, Trash2 } from '@/shared/ui/icons'
 import type { QueuedMessage } from '@/entities/message-queue/model/store'
 import { QueuedMessageAttachments } from '@/features/chat-attachments/ui/QueuedMessageAttachments'
 import { cn } from '@/shared/lib/utils'

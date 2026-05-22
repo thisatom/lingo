@@ -1,4 +1,4 @@
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal } from '@/shared/ui/icons'
 import type { Message } from '@/entities/message/model/types'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { formatChatMessagesForCopy } from '@/features/chat-actions/lib/format-chat-messages'
@@ -48,10 +48,10 @@ export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+          className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
           aria-label="Chat options"
         >
-          <MoreHorizontal className="size-4" />
+          <MoreHorizontal className="size-4 shrink-0" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

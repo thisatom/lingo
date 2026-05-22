@@ -1,3 +1,4 @@
+import { ipcRenderer } from 'electron'
 import { getTitlebarTheme } from '../../src/shared/config/titlebar'
 import { resolveThemePreference } from '../../src/shared/lib/theme'
 import type { AppTheme } from '../../src/shared/types/app-theme'
@@ -16,6 +17,7 @@ export async function initCustomTitlebar(): Promise<void> {
 
   const resolved = resolveThemePreference(readThemePreference())
   const colors = getTitlebarTheme(resolved)
+  const iconPath = await ipcRenderer.invoke('lingo:app:iconPath')
 
   titlebarInstance = new Titlebar({
     minWidth: 400,
@@ -24,6 +26,9 @@ export async function initCustomTitlebar(): Promise<void> {
     menuBarBackgroundColor: TitlebarColor.fromHex(colors.background),
     itemBackgroundColor: TitlebarColor.fromHex(colors.itemHover),
     svgColor: TitlebarColor.fromHex(colors.foreground),
+    ...(typeof iconPath === 'string' && iconPath
+      ? { icon: iconPath, iconSize: 16 as const }
+      : {}),
     unfocusEffect: false,
     removeMenuBar: true
   }) as unknown as TitlebarHandle

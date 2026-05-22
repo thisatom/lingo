@@ -16,13 +16,15 @@ interface UserQuestionContextMenuProps {
   prompt: string
   chatId: string | null
   className?: string
+  onDoubleClick?: React.MouseEventHandler<HTMLDivElement>
 }
 
 export function UserQuestionContextMenu({
   children,
   prompt,
   chatId,
-  className
+  className,
+  onDoubleClick
 }: UserQuestionContextMenuProps) {
   return (
     <ContextMenu>
@@ -30,6 +32,7 @@ export function UserQuestionContextMenu({
         <div
           className={cn('min-w-0', chatSelectableClass, className)}
           data-user-question-block
+          onDoubleClick={onDoubleClick}
         >
           {children}
         </div>

@@ -11,14 +11,14 @@ export const settingsInputClass = cn(
 
 /** Select / popover / command panel in settings — dark: #181818, border #303030. */
 export const settingsMenuSurfaceClass = cn(
-  'rounded-md border bg-popover text-popover-foreground shadow-md',
-  'dark:border-[#303030] dark:bg-[#181818]'
+  'rounded-md border border-menu-border bg-popover text-popover-foreground shadow-md',
+  'dark:bg-[#181818]'
 )
 
 export const settingsSelectTriggerClass = cn(
-  '!h-6 rounded-md border px-2.5 py-0 text-sm shadow-none transition-colors outline-none',
-  'border-border bg-input hover:border-ring/60 focus-visible:ring-0',
-  'dark:border-[#303030] dark:bg-[#181818] dark:hover:border-[#444444]',
+  '!h-6 rounded-md border px-2 py-0 text-xs leading-tight shadow-none transition-colors outline-none',
+  'border-menu-border bg-input hover:border-ring/60 focus-visible:ring-0',
+  'dark:bg-[#181818] dark:hover:border-[#444444]',
   'dark:focus:border-[#444444] dark:focus:bg-[#181818]',
   'dark:focus-visible:border-[#444444] dark:focus-visible:bg-[#181818]',
   'dark:data-[state=open]:border-[#444444] dark:data-[state=open]:bg-[#181818]'
@@ -34,7 +34,7 @@ export const settingsMenuItemHighlightClass = cn(
 )
 
 export const settingsSelectItemClass = cn(
-  '!h-6 !min-h-6 rounded-sm py-0 text-sm leading-none',
+  '!h-6 !min-h-6 rounded-sm py-0 text-xs leading-none',
   settingsMenuItemHighlightClass
 )
 
@@ -44,20 +44,20 @@ export const settingsButtonSize = 'compact' as const
 
 export const settingsPopoverTriggerClass = cn(
   'h-7 w-full justify-between rounded-md border px-2.5 text-sm font-normal shadow-none',
-  'border-border bg-input hover:bg-input',
-  'dark:border-[#303030] dark:bg-[#181818] dark:hover:border-[#444444] dark:hover:bg-[#181818]',
+  'border-menu-border bg-input hover:bg-input',
+  'dark:bg-[#181818] dark:hover:border-[#444444] dark:hover:bg-[#181818]',
   'dark:data-[state=open]:border-[#444444] dark:data-[state=open]:bg-[#181818]'
 )
 
 export const settingsCommandItemClass = cn(
-  '!h-8 !min-h-8 rounded-sm py-0 text-sm leading-none',
+  '!h-6 !min-h-6 rounded-sm px-2 py-0 text-xs leading-none',
   settingsMenuItemHighlightClass,
   'dark:data-[selected=true]:!bg-[#252525] dark:data-[selected=true]:!text-popover-foreground'
 )
 
 export const settingsCommandInputWrapperClass = cn(
   'border-b px-2',
-  'border-border dark:border-[#303030]'
+  'border-menu-border'
 )
 
 export const settingsCommandInputClass =

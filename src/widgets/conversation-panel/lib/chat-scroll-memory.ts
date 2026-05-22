@@ -1,26 +1,14 @@
-/** In-memory scroll cache (survives ConversationPanel remount within the same session). */
-const scrollByChatId = new Map<string, { scrollTop: number; userMessageId: string | null }>()
+/** In-memory scrollTop per chat (fast restore when switching chats in one session). */
+const scrollTopByChatId = new Map<string, number>()
 
-const MIN_SAVED_SCROLL_TOP_PX = 8
-
-export function rememberChatScrollPosition(
-  chatId: string,
-  scrollTop: number,
-  userMessageId: string | null
-): void {
-  if (scrollTop < MIN_SAVED_SCROLL_TOP_PX) {
-    scrollByChatId.delete(chatId)
+export function rememberChatScrollTop(chatId: string, scrollTop: number): void {
+  if (scrollTop < 8) {
+    scrollTopByChatId.delete(chatId)
     return
   }
-  scrollByChatId.set(chatId, {
-    scrollTop: Math.round(scrollTop),
-    userMessageId
-  })
+  scrollTopByChatId.set(chatId, Math.round(scrollTop))
 }
 
-export function recallChatScrollPosition(chatId: string): {
-  scrollTop: number
-  userMessageId: string | null
-} | null {
-  return scrollByChatId.get(chatId) ?? null
+export function recallChatScrollTop(chatId: string): number | null {
+  return scrollTopByChatId.get(chatId) ?? null
 }

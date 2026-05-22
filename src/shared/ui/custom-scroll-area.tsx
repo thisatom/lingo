@@ -11,7 +11,6 @@ import { cn } from '@/shared/lib/utils'
 
 const THUMB_MIN_HEIGHT_PX = 32
 const HIDE_DELAY_MS = 500
-const SCROLL_IDLE_MS = 250
 const AT_BOTTOM_THRESHOLD_PX = 80
 const EDGE_FADE_THRESHOLD_PX = 6
 const EDGE_FADE_HEIGHT_PX = 28
@@ -30,7 +29,7 @@ const VARIANT_CONFIG: Record<
   }
 > = {
   chat: {
-    zIndex: 5,
+    zIndex: 40,
     thumbIdleOpacity: 1,
     thumbHoverOpacity: 1,
     scrollbarWidth: 8,
@@ -137,17 +136,16 @@ export function CustomScrollArea({
   const [edgeFade, setEdgeFade] = useState({ top: false, bottom: false })
 
   const isMenu = variant === 'menu'
+  const isChat = variant === 'chat'
 
   const thumbOpacity =
-    isMenu && metrics.canScroll
-      ? thumbHovered
-        ? config.thumbHoverOpacity
-        : scrollbarVisible
-          ? config.thumbIdleOpacity
-          : 0.35
+    !metrics.canScroll || (!scrollbarVisible && !thumbHovered)
+      ? 0
       : thumbHovered
         ? config.thumbHoverOpacity
-        : config.thumbIdleOpacity
+        : isMenu && !scrollbarVisible
+          ? 0.35
+          : config.thumbIdleOpacity
 
   const syncEdgeFade = useCallback(() => {
     if (!config.edgeFades) return
@@ -245,12 +243,6 @@ export function CustomScrollArea({
       showScrollToLatestRef.current = true
       onShowScrollToLatestChange(true)
     }
-
-    clearScrollIdleTimer()
-    scrollIdleTimerRef.current = setTimeout(() => {
-      showScrollToLatestRef.current = false
-      onShowScrollToLatestChange(false)
-    }, SCROLL_IDLE_MS)
   }, [clearScrollIdleTimer, onShowScrollToLatestChange])
 
   useEffect(() => {
@@ -265,7 +257,12 @@ export function CustomScrollArea({
       updateScrollToLatestVisibility()
     })
     observer.observe(viewport)
-    if (viewport.firstElementChild) observer.observe(viewport.firstElementChild)
+    const scrollContent = viewport.querySelector('[data-chat-scroll-content]')
+    if (scrollContent) {
+      observer.observe(scrollContent)
+    } else if (viewport.firstElementChild) {
+      observer.observe(viewport.firstElementChild)
+    }
 
     reportAtBottom()
     updateScrollToLatestVisibility()
@@ -282,16 +279,22 @@ export function CustomScrollArea({
   const handleViewportScroll = useCallback(() => {
     const viewport = viewportRef.current
     revealScrollbar()
-    scheduleSyncMetrics()
+    if (variant === 'chat') {
+      syncMetrics()
+    } else {
+      scheduleSyncMetrics()
+    }
     scheduleHideScrollbar()
     reportAtBottom()
     updateScrollToLatestVisibility()
     if (config.edgeFades) syncEdgeFade()
     if (viewport) onViewportScroll?.(viewport)
   }, [
+    variant,
     revealScrollbar,
     scheduleHideScrollbar,
     scheduleSyncMetrics,
+    syncMetrics,
     reportAtBottom,
     updateScrollToLatestVisibility,
     config.edgeFades,
@@ -318,8 +321,13 @@ export function CustomScrollArea({
       syncMetrics()
     })
     observer.observe(viewport)
-    const inner = viewport.firstElementChild
-    if (inner) observer.observe(inner)
+    const scrollContent = viewport.querySelector('[data-chat-scroll-content]')
+    if (scrollContent) {
+      observer.observe(scrollContent)
+    } else {
+      const inner = viewport.firstElementChild
+      if (inner) observer.observe(inner)
+    }
 
     syncMetrics()
     const frame = requestAnimationFrame(syncMetrics)
@@ -344,9 +352,11 @@ export function CustomScrollArea({
         maxThumbTop
       )
       const maxScroll = viewport.scrollHeight - viewport.clientHeight
-      viewport.scrollTop = (nextThumbTop / maxThumbTop) * maxScroll
+      viewport.scrollTop =
+        maxThumbTop > 0 ? (nextThumbTop / maxThumbTop) * maxScroll : 0
+      syncMetrics()
     },
-    [metrics.canScroll, metrics.thumbHeight]
+    [metrics.canScroll, metrics.thumbHeight, syncMetrics]
   )
 
   const onThumbPointerDown = useCallback(
@@ -376,10 +386,14 @@ export function CustomScrollArea({
       const maxScroll = viewport.scrollHeight - viewport.clientHeight
       const maxThumbTop = trackHeight - metrics.thumbHeight
       const deltaY = event.clientY - drag.startY
-      const scrollDelta = (deltaY / maxThumbTop) * maxScroll
-      viewport.scrollTop = drag.startScrollTop + scrollDelta
+      const scrollDelta = maxThumbTop > 0 ? (deltaY / maxThumbTop) * maxScroll : 0
+      viewport.scrollTop = Math.min(
+        maxScroll,
+        Math.max(0, drag.startScrollTop + scrollDelta)
+      )
+      syncMetrics()
     },
-    [metrics.canScroll, metrics.thumbHeight]
+    [metrics.canScroll, metrics.thumbHeight, syncMetrics]
   )
 
   const onThumbPointerUp = useCallback(
@@ -400,7 +414,7 @@ export function CustomScrollArea({
       revealScrollbar()
       scheduleHideScrollbar()
     },
-    [revealScrollbar, scheduleHideScrollbar, scrollToThumbPosition]
+    [revealScrollbar, scheduleHideScrollbar, scrollToThumbPosition, syncMetrics]
   )
 
   const thumbStyle: CSSProperties = {
@@ -444,7 +458,9 @@ export function CustomScrollArea({
           aria-hidden={!scrollbarVisible}
           className={cn(
             'absolute top-0 bottom-0 transition-opacity duration-200',
-            scrollbarVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+            scrollbarVisible
+              ? 'pointer-events-auto opacity-100'
+              : 'pointer-events-none opacity-0'
           )}
           style={{ ...trackStyle, zIndex: config.zIndex }}
           onPointerDown={onTrackPointerDown}
@@ -475,6 +491,13 @@ export function CustomScrollArea({
           aria-hidden
           className="pointer-events-none absolute inset-x-0 bottom-0 z-[28] bg-gradient-to-t from-sidebar via-sidebar/70 to-transparent"
           style={{ height: EDGE_FADE_HEIGHT_PX }}
+        />
+      ) : null}
+
+      {isChat ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[41] h-24 bg-gradient-to-t from-background to-transparent"
         />
       ) : null}
     </div>

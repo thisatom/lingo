@@ -23,7 +23,13 @@ export function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   useEffect(() => {
-    ensureActiveChat()
+    if (useChatsStore.persist.hasHydrated()) {
+      ensureActiveChat()
+      return
+    }
+    return useChatsStore.persist.onFinishHydration(() => {
+      ensureActiveChat()
+    })
   }, [ensureActiveChat])
 
   const toggleSidebarPanel = useCallback(() => {

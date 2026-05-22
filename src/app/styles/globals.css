@@ -43,6 +43,10 @@
   --color-tooltip: var(--tooltip);
   --color-tooltip-foreground: var(--tooltip-foreground);
   --color-menu-hover: var(--menu-hover);
+  --color-menu-border: var(--menu-border);
+  --color-chat-header-hover: var(--chat-header-hover);
+  --color-chat-message-border: var(--chat-message-border);
+  --color-chat-message-border-hover: var(--chat-message-border-hover);
   --color-surface-raised: var(--surface-raised);
   --color-surface-overlay: var(--surface-overlay);
   --color-overlay: var(--overlay);
@@ -77,6 +81,10 @@
   --tooltip: #ffffff;
   --tooltip-foreground: #404040;
   --menu-hover: #e4e4e4;
+  --menu-border: #d6d6d6;
+  --chat-header-hover: #ebebeb;
+  --chat-message-border: #d6d6d6;
+  --chat-message-border-hover: #c8c8c8;
   --surface-raised: #ffffff;
   --surface-overlay: #ffffff;
   --overlay: rgb(0 0 0 / 0.28);
@@ -135,6 +143,10 @@
   --tooltip: #181818;
   --tooltip-foreground: #cccccc;
   --menu-hover: #252525;
+  --menu-border: #303030;
+  --chat-header-hover: #212121;
+  --chat-message-border: #2f2f2f;
+  --chat-message-border-hover: #373737;
   --surface-raised: #1a1a1a;
   --surface-overlay: #181818;
 
@@ -325,4 +337,48 @@
 
 .cet-titlebar .cet-control-close:not(.inactive):hover svg {
   fill: #ffffff !important;
+}
+
+/* Codicons: align font icons with former lucide size-* classes */
+.codicon.size-2\.5 {
+  font-size: 0.625rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  line-height: 0.625rem;
+}
+.codicon.size-3 {
+  font-size: 0.75rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  line-height: 0.75rem;
+}
+.codicon.size-3\.5 {
+  font-size: 0.875rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  line-height: 0.875rem;
+}
+.codicon.size-4 {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+  line-height: 1rem;
+}
+.codicon.size-5 {
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  line-height: 1.25rem;
+}
+.codicon.size-6 {
+  font-size: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  line-height: 1.5rem;
+}
+.codicon.size-7 {
+  font-size: 1.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  line-height: 1.75rem;
 }

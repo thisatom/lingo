@@ -2,6 +2,12 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { chatPersistStorage } from '@/entities/chat/lib/chat-persist-storage'
 import {
+  chatScrollFromLegacyChat,
+  isValidChatScrollTop,
+  normalizeChatScrollByChatId,
+  type ChatScrollByChatId
+} from '@/entities/chat/lib/chat-scroll-persist'
+import {
   EMPTY_COMPOSER_ATTACHMENTS,
   type MessageAttachment
 } from '@/entities/message/model/attachment'
@@ -21,6 +27,7 @@ interface ChatsState {
   composerAttachmentsByChatId: Record<string, MessageAttachment[]>
   chatHistoryPast: string[]
   chatHistoryFuture: string[]
+  chatScrollByChatId: ChatScrollByChatId
   createChat: () => string
   forkChat: (sourceChatId: string) => string
   selectChat: (id: string) => void
@@ -54,11 +61,8 @@ interface ChatsState {
   addComposerAttachments: (chatId: string, items: MessageAttachment[]) => void
   removeComposerAttachment: (chatId: string, attachmentId: string) => void
   clearComposerAttachments: (chatId: string) => void
-  setChatScrollAnchor: (
-    chatId: string,
-    userMessageId: string | null,
-    scrollTop?: number | null
-  ) => void
+  setChatScrollPosition: (chatId: string, scrollTop: number) => void
+  clearChatScrollPosition: (chatId: string) => void
   setChatMessages: (chatId: string, messages: Message[]) => void
   getActiveChat: () => Chat | null
   ensureActiveChat: () => string
@@ -74,9 +78,10 @@ type PersistedChatsState = Pick<
   | 'composerAttachmentsByChatId'
   | 'chatHistoryPast'
   | 'chatHistoryFuture'
+  | 'chatScrollByChatId'
 >
 
-/** Persist chats as-is; attachment blobs live in IndexedDB (`lingo-att:` refs). */
+/** Persist chats as-is; scroll positions live in `chatScrollByChatId`. */
 function chatsForPersist(chats: Chat[]): Chat[] {
   return chats
 }
@@ -123,7 +128,8 @@ function normalizePersistedState(
     composerAttachmentsByChatId:
       (state.composerAttachmentsByChatId as Record<string, MessageAttachment[]>) ?? {},
     chatHistoryPast: state.chatHistoryPast ?? [],
-    chatHistoryFuture: state.chatHistoryFuture ?? []
+    chatHistoryFuture: state.chatHistoryFuture ?? [],
+    chatScrollByChatId: state.chatScrollByChatId ?? {}
   }
 }
 
@@ -136,6 +142,7 @@ export const useChatsStore = create<ChatsState>()(
       composerAttachmentsByChatId: {},
       chatHistoryPast: [],
       chatHistoryFuture: [],
+      chatScrollByChatId: {},
 
       createChat: () => {
         const chat = newChat()
@@ -280,6 +287,7 @@ export const useChatsStore = create<ChatsState>()(
         set((state) => {
           const drafts = state.composerDraftByChatId ?? {}
           const { [id]: _removed, ...composerDraftByChatId } = drafts
+          const { [id]: _scroll, ...chatScrollByChatId } = state.chatScrollByChatId
           const chats = state.chats.filter((c) => c.id !== id)
           let activeChatId = state.activeChatId
           if (activeChatId === id) {
@@ -298,7 +306,8 @@ export const useChatsStore = create<ChatsState>()(
               activeChatId: chat.id,
               composerDraftByChatId,
               chatHistoryPast: [],
-              chatHistoryFuture: []
+              chatHistoryFuture: [],
+              chatScrollByChatId
             }
           }
           return {
@@ -306,7 +315,8 @@ export const useChatsStore = create<ChatsState>()(
             activeChatId,
             composerDraftByChatId,
             chatHistoryPast,
-            chatHistoryFuture
+            chatHistoryFuture,
+            chatScrollByChatId
           }
         })
         if (get().activeChatId !== prevActive) {
@@ -510,45 +520,33 @@ export const useChatsStore = create<ChatsState>()(
         })
       },
 
-      setChatScrollAnchor: (chatId, userMessageId, scrollTop) => {
+      setChatScrollPosition: (chatId, scrollTop) => {
+        if (!get().chats.some((c) => c.id === chatId)) return
+
+        const rounded = Math.round(scrollTop)
         set((state) => {
-          const chat = state.chats.find((c) => c.id === chatId)
-          if (!chat) return state
-
-          const nextScrollTop =
-            scrollTop != null && scrollTop > 0 ? Math.round(scrollTop) : undefined
-
-          if (userMessageId == null) {
-            if (
-              chat.scrollAnchorUserMessageId == null &&
-              chat.scrollAnchorScrollTop == null
-            ) {
-              return state
-            }
-          } else if (
-            chat.scrollAnchorUserMessageId === userMessageId &&
-            chat.scrollAnchorScrollTop === nextScrollTop
-          ) {
-            return state
+          if (!isValidChatScrollTop(rounded)) {
+            if (state.chatScrollByChatId[chatId] == null) return state
+            const { [chatId]: _removed, ...chatScrollByChatId } = state.chatScrollByChatId
+            return { chatScrollByChatId }
           }
+
+          if (state.chatScrollByChatId[chatId] === rounded) return state
 
           return {
-            chats: state.chats.map((c) => {
-              if (c.id !== chatId) return c
-              if (userMessageId == null) {
-                return {
-                  ...c,
-                  scrollAnchorUserMessageId: undefined,
-                  scrollAnchorScrollTop: undefined
-                }
-              }
-              return {
-                ...c,
-                scrollAnchorUserMessageId: userMessageId,
-                scrollAnchorScrollTop: nextScrollTop
-              }
-            })
+            chatScrollByChatId: {
+              ...state.chatScrollByChatId,
+              [chatId]: rounded
+            }
           }
+        })
+      },
+
+      clearChatScrollPosition: (chatId) => {
+        set((state) => {
+          if (!state.chatScrollByChatId[chatId]) return state
+          const { [chatId]: _removed, ...chatScrollByChatId } = state.chatScrollByChatId
+          return { chatScrollByChatId }
         })
       },
 
@@ -604,7 +602,8 @@ export const useChatsStore = create<ChatsState>()(
           composerDraftByChatId: {},
           composerAttachmentsByChatId: {},
           chatHistoryPast: [],
-          chatHistoryFuture: []
+          chatHistoryFuture: [],
+          chatScrollByChatId: {}
         })
         notifyActiveChatChange()
       }
@@ -612,21 +611,33 @@ export const useChatsStore = create<ChatsState>()(
     {
       name: 'lingo-chats-v3',
       storage: createJSONStorage(() => chatPersistStorage),
-      version: 3,
+      version: 5,
       partialize: (state): PersistedChatsState => ({
         chats: chatsForPersist(state.chats),
         activeChatId: state.activeChatId,
         composerDraftByChatId: state.composerDraftByChatId,
         composerAttachmentsByChatId: state.composerAttachmentsByChatId,
         chatHistoryPast: state.chatHistoryPast,
-        chatHistoryFuture: state.chatHistoryFuture
+        chatHistoryFuture: state.chatHistoryFuture,
+        chatScrollByChatId: state.chatScrollByChatId
       }),
       migrate: (persisted, version) => {
-        const state = normalizePersistedState(
-          persisted as Partial<PersistedChatsState> & { composerAttachmentsByChatId?: unknown }
-        )
-        if (version >= 3) return state
-        return state
+        const raw = persisted as Partial<PersistedChatsState> & {
+          composerAttachmentsByChatId?: unknown
+        }
+        const state = normalizePersistedState(raw)
+        let chatScrollByChatId = normalizeChatScrollByChatId(raw.chatScrollByChatId)
+
+        if (version < 5) {
+          const migrated: ChatScrollByChatId = { ...chatScrollByChatId }
+          for (const chat of state.chats) {
+            const top = chatScrollFromLegacyChat(chat)
+            if (top != null) migrated[chat.id] = top
+          }
+          chatScrollByChatId = migrated
+        }
+
+        return { ...state, chatScrollByChatId }
       },
       merge: (persisted, current) => ({
         ...current,
@@ -640,6 +651,7 @@ export const useChatsStore = create<ChatsState>()(
           state.composerAttachmentsByChatId = state.composerAttachmentsByChatId ?? {}
           state.chatHistoryPast = state.chatHistoryPast ?? []
           state.chatHistoryFuture = state.chatHistoryFuture ?? []
+          state.chatScrollByChatId = state.chatScrollByChatId ?? {}
         }
         state?.ensureActiveChat()
       }

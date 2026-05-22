@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, PanelLeft, Search } from 'lucide-react'
+import { ArrowLeft, ArrowRight, PanelLeft, Search } from '@/shared/ui/icons'
+import { sidebarChromeIconButtonClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 import { EMPTY_CHAT_HISTORY, useChatsStore } from '@/entities/chat/model/store'
 import { Kbd, KbdGroup } from '@/shared/ui/kbd'
@@ -25,17 +26,17 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
       <TooltipIconButton
         variant="ghost"
         size="icon"
-        className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+        className={sidebarChromeIconButtonClass}
         tooltip="Hide sidebar"
         onClick={toggleSidebarPanel}
       >
-        <PanelLeft className="size-4" />
+        <PanelLeft className="size-4 shrink-0" />
       </TooltipIconButton>
 
       <TooltipIconButton
         variant="ghost"
         size="icon"
-        className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+        className={sidebarChromeIconButtonClass}
         aria-label="Search chats"
         tooltip={
           <span className="inline-flex flex-wrap items-center gap-1.5">
@@ -48,7 +49,7 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
         }
         onClick={onOpenSearch}
       >
-        <Search className="size-4" />
+        <Search className="size-4 shrink-0" />
       </TooltipIconButton>
 
       <div className="min-w-0 flex-1" />
@@ -56,22 +57,22 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
       <TooltipIconButton
         variant="ghost"
         size="icon"
-        className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+        className={sidebarChromeIconButtonClass}
         disabled={!canGoBack}
         tooltip="Previous chat"
         onClick={goBackInChatHistory}
       >
-        <ArrowLeft className="size-4" />
+        <ArrowLeft className="size-4 shrink-0" />
       </TooltipIconButton>
       <TooltipIconButton
         variant="ghost"
         size="icon"
-        className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+        className={sidebarChromeIconButtonClass}
         disabled={!canGoForward}
         tooltip="Next chat"
         onClick={goForwardInChatHistory}
       >
-        <ArrowRight className="size-4" />
+        <ArrowRight className="size-4 shrink-0" />
       </TooltipIconButton>
     </div>
   )

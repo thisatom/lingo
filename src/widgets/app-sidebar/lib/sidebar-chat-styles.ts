@@ -31,6 +31,14 @@ export const sidebarChatUnreadDotClass = 'bg-blue-500'
 
 export const sidebarChatDotSizeClass = 'size-1.5'
 
+/** Sidebar chrome icon buttons (top bar, filter) — not settings. */
+export const sidebarChromeIconButtonClass =
+  'size-6 shrink-0 text-muted-foreground hover:text-foreground'
+
+/** Pin / delete: keep hit area, no hover background. */
+export const sidebarRowActionNoHoverBgClass =
+  'hover:bg-transparent active:bg-transparent dark:hover:bg-transparent dark:active:bg-transparent data-[state=open]:bg-transparent'
+
 export const sidebarAgentDotClass = 'bg-muted-foreground'
 
 export const SIDEBAR_AGENT_STAGES: PipelineStage[] = ['thinking', 'searching', 'speaking']

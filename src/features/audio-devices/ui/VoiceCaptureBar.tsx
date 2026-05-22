@@ -1,4 +1,4 @@
-import { Check, X } from 'lucide-react'
+import { Check, X } from '@/shared/ui/icons'
 import { useAudioLevelMonitor } from '@/features/audio-devices/model/useAudioLevelMonitor'
 import { MicLevelVisualizer } from '@/features/audio-devices/ui/MicLevelVisualizer'
 import { cn } from '@/shared/lib/utils'

@@ -1,4 +1,4 @@
-import { GripVerticalIcon } from "lucide-react"
+import { GripVerticalIcon } from "@/shared/ui/icons"
 import * as ResizablePrimitive from "react-resizable-panels"
 
 import { cn } from "@/shared/lib/utils"

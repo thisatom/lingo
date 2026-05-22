@@ -352,12 +352,7 @@ export function MainPage() {
           }}
         />
 
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-[12] h-24 bg-gradient-to-t from-background to-transparent"
-          aria-hidden
-        />
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[50]">
           <div
             className={cn(
               'pointer-events-auto mx-auto w-full px-4 pb-3 sm:px-6',
@@ -368,7 +363,7 @@ export function MainPage() {
               <ScrollToLatestButton
                 show={showScrollToLatest}
                 onClick={() => scrollToLatestRef.current?.()}
-                className="absolute bottom-full right-0 z-50 mb-2 shrink-0"
+                className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2"
               />
               <div className="space-y-1">
             {showSpeechError && speechError && (

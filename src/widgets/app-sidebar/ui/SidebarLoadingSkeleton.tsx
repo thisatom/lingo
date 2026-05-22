@@ -13,11 +13,11 @@ export function SidebarLoadingSkeleton() {
     <Sidebar collapsible="none" className="flex h-full w-full min-w-0 flex-col overflow-hidden bg-sidebar">
       <SidebarHeader className="gap-2 p-2">
         <div className="flex items-center gap-0.5 px-1">
-          <Skeleton className="size-7 rounded-md" />
-          <Skeleton className="size-7 rounded-md" />
+          <Skeleton className="size-6 rounded-md" />
+          <Skeleton className="size-6 rounded-md" />
           <div className="min-w-0 flex-1" />
-          <Skeleton className="size-7 rounded-md" />
-          <Skeleton className="size-7 rounded-md" />
+          <Skeleton className="size-6 rounded-md" />
+          <Skeleton className="size-6 rounded-md" />
         </div>
         <Skeleton className="mx-1 h-8 w-[calc(100%-0.5rem)] rounded-md" />
       </SidebarHeader>

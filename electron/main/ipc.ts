@@ -11,6 +11,7 @@ import { completeChat, validateOpenRouterKey } from './chat'
 import { streamChat } from './chat-stream'
 import { abortStream, clearStream, registerStreamAbort } from './chat-stream-registry'
 import { clearSecret, getSecret, getSecretStatus, setSecret } from './secrets'
+import { resolveAppIconPath } from './icon'
 import { fetchLinkPreview } from './link-preview'
 import { transcribeAudio } from './stt'
 import { synthesizeSpeech } from './tts'
@@ -83,6 +84,8 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('lingo:link:preview', (_e, url: string) => fetchLinkPreview(url))
+
+  ipcMain.handle('lingo:app:iconPath', () => resolveAppIconPath() ?? null)
 
   ipcMain.on('lingo:theme:apply', (event, resolved: ResolvedTheme) => {
     const win = BrowserWindow.fromWebContents(event.sender)

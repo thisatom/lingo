@@ -1,4 +1,4 @@
-import { ArrowDown } from 'lucide-react'
+import { ChevronDown } from '@/shared/ui/icons'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 
@@ -19,11 +19,11 @@ export function ScrollToLatestButton({ show, onClick, className }: ScrollToLates
       aria-label="Scroll to latest"
       onClick={onClick}
       className={cn(
-        'size-8 shrink-0 rounded-full border border-border bg-secondary text-foreground shadow-lg hover:bg-accent',
+        'grid size-8 shrink-0 place-items-center gap-0 rounded-full border border-menu-border bg-secondary p-0 text-foreground shadow-lg hover:bg-accent',
         className
       )}
     >
-      <ArrowDown className="size-4" />
+      <ChevronDown className="size-3.5 translate-y-px" />
     </Button>
   )
 }

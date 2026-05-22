@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2 } from '@/shared/ui/icons'
+import { sidebarRowActionNoHoverBgClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import type { Chat } from '@/entities/chat/model/types'
 import { cn } from '@/shared/lib/utils'
 import {
@@ -47,7 +48,14 @@ export function ChatListItem({
 
   return (
     <>
-      <SidebarMenuItem className="group/chat relative">
+      <SidebarMenuItem
+        className={cn(
+          'group/chat relative',
+          sidebarChatRowRadiusClass,
+          !isActive && sidebarChatHoverTextClass,
+          isActive && 'bg-sidebar-accent'
+        )}
+      >
         <ChatSidebarIndicator
           pinned={pinned}
           hasError={hasError}
@@ -61,9 +69,8 @@ export function ChatListItem({
           className={cn(
             sidebarRowHeightClass,
             'items-center pl-8 pr-8',
-            sidebarChatRowRadiusClass,
             sidebarChatTextClass,
-            sidebarChatHoverTextClass,
+            'bg-transparent hover:bg-transparent',
             sidebarChatActiveTextClass
           )}
           onClick={onOpen}
@@ -74,10 +81,12 @@ export function ChatListItem({
         <TooltipIconButton
           variant="ghost"
           size="icon"
+          data-chat-row-action=""
           triggerClassName="absolute top-1/2 right-1 z-10 -translate-y-1/2"
           className={cn(
             'size-7',
             'text-muted-foreground opacity-0 transition-opacity hover:text-foreground',
+            sidebarRowActionNoHoverBgClass,
             'group-hover/chat:opacity-100 focus-visible:opacity-100'
           )}
           tooltip="Delete chat"
@@ -87,7 +96,7 @@ export function ChatListItem({
             setDeleteOpen(true)
           }}
         >
-          <Trash2 className="size-3.5" />
+          <Trash2 className="size-3.5 shrink-0" />
         </TooltipIconButton>
       </SidebarMenuItem>
 

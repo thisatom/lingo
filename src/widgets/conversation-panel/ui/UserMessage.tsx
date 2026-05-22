@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, X } from 'lucide-react'
+import { ArrowUp, X } from '@/shared/ui/icons'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { useComposerPaste } from '@/features/chat-attachments/model/useComposerPaste'
 import { ComposerAttachments } from '@/features/chat-attachments/ui/ComposerAttachments'
@@ -182,7 +182,15 @@ export function UserMessage({
 
   return (
     <div className="w-full min-w-0 max-w-full">
-      <UserQuestionContextMenu prompt={content} chatId={chatId} className={userMessageBubbleClass}>
+      <UserQuestionContextMenu
+        prompt={content}
+        chatId={chatId}
+        className={userMessageBubbleClass}
+        onDoubleClick={() => {
+          if (disabled) return
+          onEnterEdit()
+        }}
+      >
         <MessageBodyClamp bodyClassName="pr-8">
           {attachments && attachments.length > 0 ? (
             <UserMessageAttachments attachments={attachments} />

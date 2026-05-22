@@ -47,12 +47,14 @@ export function ChatHeaderTitle({
   const hasContext = contextUsage != null && messageCount > 0
 
   return (
+    <div className="min-w-0 flex-1">
     <HoverCard openDelay={200} closeDelay={80}>
       <HoverCardTrigger asChild>
         <h1
           className={cn(
-            'min-w-0 flex-1 cursor-default truncate text-[13px] font-normal leading-[1.5] text-foreground',
-            'rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-ring'
+            'inline-flex max-w-full min-w-0 cursor-default truncate rounded-md px-2 py-1',
+            'text-[13px] font-normal leading-[1.5] text-foreground transition-colors hover:bg-chat-header-hover',
+            'outline-none focus-visible:ring-1 focus-visible:ring-ring'
           )}
         >
           {title}
@@ -101,5 +103,6 @@ export function ChatHeaderTitle({
         )}
       </HoverCardContent>
     </HoverCard>
+    </div>
   )
 }

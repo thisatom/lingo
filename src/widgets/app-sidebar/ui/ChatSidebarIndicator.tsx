@@ -1,4 +1,5 @@
-import { Pin } from 'lucide-react'
+import { Pin } from '@/shared/ui/icons'
+import { sidebarRowActionNoHoverBgClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { cn } from '@/shared/lib/utils'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 import {
@@ -22,6 +23,7 @@ const pinTriggerClass = 'pointer-events-auto absolute inset-0 flex items-center 
 const pinButtonClass = cn(
   'size-6 opacity-0 transition-opacity',
   'text-muted-foreground hover:text-foreground',
+  sidebarRowActionNoHoverBgClass,
   'group-hover/chat:opacity-100 focus-visible:opacity-100'
 )
 
@@ -60,6 +62,7 @@ export function ChatSidebarIndicator({
       <TooltipIconButton
         variant="ghost"
         size="icon"
+        data-chat-row-action=""
         triggerClassName={pinTriggerClass}
         className={cn(pinButtonClass, pinned && 'text-sidebar-accent-foreground')}
         tooltip={pinned ? 'Unpin chat' : 'Pin chat'}
@@ -69,7 +72,7 @@ export function ChatSidebarIndicator({
           onTogglePin()
         }}
       >
-        <Pin className="size-3.5" />
+        <Pin className="size-3.5 shrink-0" />
       </TooltipIconButton>
     </div>
   )

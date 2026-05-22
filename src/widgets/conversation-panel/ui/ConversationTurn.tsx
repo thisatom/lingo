@@ -6,6 +6,8 @@ import { UserMessage } from './UserMessage'
 
 interface ConversationTurnProps {
   turn: Turn
+  /** Stack order when multiple question headers stick (later turns on top). */
+  turnIndex: number
   activeChatId: string | null
   editingUserMessageId: string | null
   actionsDisabled?: boolean
@@ -17,6 +19,7 @@ interface ConversationTurnProps {
 
 export function ConversationTurn({
   turn,
+  turnIndex,
   activeChatId,
   editingUserMessageId,
   actionsDisabled,
@@ -29,15 +32,16 @@ export function ConversationTurn({
 
   return (
     <section
-      className="w-full min-w-0 max-w-full space-y-3.5"
+      className="w-full min-w-0 max-w-full scroll-mt-[18px] space-y-3.5"
       data-conversation-turn
       data-turn-id={turn.user.id}
     >
       <div
         className={cn(
-          'z-20 w-full min-w-0 max-w-full bg-background',
-          isEditing ? 'relative' : 'sticky top-0'
+          'w-full min-w-0 max-w-full bg-background',
+          isEditing ? 'relative' : 'sticky top-0 pb-px'
         )}
+        style={isEditing ? undefined : { zIndex: turnIndex }}
       >
         <UserMessage
           messageId={turn.user.id}

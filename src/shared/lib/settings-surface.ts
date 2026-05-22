@@ -6,11 +6,10 @@ export const settingsSectionTitleClass = 'mb-3 px-1 text-sm font-semibold text-f
 export const settingsSubsectionTitleClass =
   'mb-2 mt-4 px-1 text-xs font-medium text-muted-foreground/90 first:mt-0'
 
-/** Settings cards — dark: #1c1c1c surface, #242424 dividers/border. */
+/** Settings cards — dark: #1c1c1c surface, #242424 row dividers. */
 export const settingsCardClass = cn(
-  'rounded-xl border shadow-sm',
-  'border-border/60 bg-card',
-  'dark:border-[#242424] dark:bg-[#1c1c1c] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
+  'rounded-xl bg-card shadow-sm',
+  'dark:bg-[#1c1c1c] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
 )
 
 export const settingsRowClass = cn(

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowDownAZ, ArrowUpAZ, Calendar, Check, Clock, List, ListFilter } from 'lucide-react'
+import { ArrowDownAZ, ArrowUpAZ, Calendar, Check, Clock, List, ListFilter } from '@/shared/ui/icons'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import {
@@ -11,6 +11,7 @@ import {
   sidebarMenuLabelClass,
   sidebarMenuSurfaceClass
 } from '@/shared/lib/sidebar-filter-menu-styles'
+import { sidebarChromeIconButtonClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import {
@@ -85,7 +86,7 @@ export function SidebarFilterMenu() {
               variant="ghost"
               size="icon"
               className={cn(
-                'size-7 shrink-0 text-muted-foreground hover:text-foreground',
+                sidebarChromeIconButtonClass,
                 menuOpen && 'bg-sidebar-accent text-sidebar-accent-foreground'
               )}
               aria-label="Filter chats"
@@ -94,7 +95,7 @@ export function SidebarFilterMenu() {
               onFocus={() => setTooltipOpen(false)}
               onPointerDown={() => setTooltipOpen(false)}
             >
-              <ListFilter className="size-4" />
+              <ListFilter className="size-4 shrink-0" />
             </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>

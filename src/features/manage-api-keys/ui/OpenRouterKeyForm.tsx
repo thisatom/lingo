@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from '@/shared/ui/icons'
 import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { getLingo } from '@/shared/lib/lingo'
@@ -203,7 +203,8 @@ export function OpenRouterKeyForm() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>OpenRouter model</p>
             <p className={settingsRowDescriptionClass}>
-              Pick a suggestion or type any OpenRouter model id (e.g. openai/gpt-4o-mini).
+              Same height as other settings selects. Browse OpenRouter or type any model id
+              (e.g. openai/gpt-4o-mini).
             </p>
           </div>
           <OpenRouterModelCombobox

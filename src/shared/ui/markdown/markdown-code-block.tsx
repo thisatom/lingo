@@ -1,5 +1,5 @@
 import { isValidElement, useCallback, useRef, useState, type ReactNode } from 'react'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy } from '@/shared/ui/icons'
 import { copyToClipboard } from '@/shared/lib/copy-to-clipboard'
 import { cn } from '@/shared/lib/utils'
 import { typography } from '@/shared/ui/typography'

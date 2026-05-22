@@ -1,4 +1,4 @@
-import { FileText, X } from 'lucide-react'
+import { FileText, X } from '@/shared/ui/icons'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { useAttachmentDisplayUrl } from '@/features/chat-attachments/model/useAttachmentDisplayUrl'
 import { cn } from '@/shared/lib/utils'

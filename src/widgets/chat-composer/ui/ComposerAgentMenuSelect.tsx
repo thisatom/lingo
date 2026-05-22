@@ -1,8 +1,9 @@
-import { Check } from 'lucide-react'
+import { Check, ChevronDown } from '@/shared/ui/icons'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { shortOpenRouterModelLabel } from '@/widgets/chat-composer/lib/model-label'
 import {
   sidebarMenuItemClass,
+  sidebarMenuPickerChevronClass,
   sidebarMenuPickerDotClass,
   sidebarMenuPickerTriggerClass,
   sidebarMenuSubTriggerClass,
@@ -56,20 +57,23 @@ export function ComposerAgentMenuSelect({
       <DropdownMenuTrigger asChild disabled={disabled}>
         <button
           type="button"
-          className={cn(sidebarMenuPickerTriggerClass, 'justify-center px-2.5')}
+          className={sidebarMenuPickerTriggerClass}
           aria-label="Agent mode and model"
         >
-          <span className="inline-flex min-w-0 items-center justify-center gap-1.5">
-            <span className="text-[13px] leading-[13px]">{selectedMode?.label ?? mode}</span>
+          <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+            <span className="truncate text-[13px] leading-normal">
+              {selectedMode?.label ?? mode}
+            </span>
             {modelAutoFallback ? (
               <>
                 <span className={sidebarMenuPickerDotClass} aria-hidden />
-                <span className="shrink-0 text-[13px] leading-[13px] text-muted-foreground/80">
+                <span className="shrink-0 text-[13px] leading-normal text-muted-foreground/80">
                   Auto
                 </span>
               </>
             ) : null}
           </span>
+          <ChevronDown className={sidebarMenuPickerChevronClass} aria-hidden />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

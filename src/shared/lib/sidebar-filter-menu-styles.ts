@@ -18,9 +18,12 @@ export const composerInputHoverClass =
 
 
 
-export const sidebarMenuSurfaceClass =
+export const menuSurfaceBorderClass = 'border-menu-border'
 
-  'border-border/60 bg-popover text-popover-foreground shadow-lg dark:bg-[#181818]'
+export const sidebarMenuSurfaceClass = cn(
+  menuSurfaceBorderClass,
+  'bg-popover text-popover-foreground shadow-lg dark:bg-[#181818]'
+)
 
 /** Row highlight — dropdown, command palette, context menus. */
 export const menuItemHighlightClass =
@@ -30,7 +33,7 @@ export const menuItemHighlightClass =
 
 export const sidebarMenuItemClass = cn(
 
-  'min-h-7 cursor-pointer gap-2 px-2.5 py-1 text-xs leading-normal',
+  'min-h-7 cursor-pointer gap-2 px-2 py-0.5 text-xs leading-normal',
 
   sidebarMenuRadiusClass,
 
@@ -46,7 +49,7 @@ export const sidebarMenuSubTriggerClass = cn(sidebarMenuItemClass, 'pr-8')
 
 export const sidebarMenuLabelClass =
 
-  'px-2 py-1 text-xs font-normal leading-normal text-muted-foreground'
+  'px-2 py-0.5 text-xs font-normal leading-normal text-muted-foreground'
 
 
 

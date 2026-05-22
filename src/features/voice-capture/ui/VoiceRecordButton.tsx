@@ -1,4 +1,4 @@
-import { Mic, Square } from 'lucide-react'
+import { Mic, Square } from '@/shared/ui/icons'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 import { TooltipWrap } from '@/shared/ui/tooltip-wrap'

@@ -1,61 +1,15 @@
 import type { LinkPreviewResponse } from '../../src/shared/types/ipc'
+import { linkHostname } from '../../src/shared/lib/link-display'
+import {
+  readMetaContent,
+  readTitleFromHtml,
+  resolvePreviewAssetUrl
+} from '../../src/shared/lib/link-preview-parse'
 
 const MAX_HTML_BYTES = 256_000
 const FETCH_TIMEOUT_MS = 8_000
 
 const previewCache = new Map<string, LinkPreviewResponse>()
-
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&apos;/gi, "'")
-}
-
-function readMetaContent(html: string, key: string): string | null {
-  const patterns = [
-    new RegExp(
-      `<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["']`,
-      'i'
-    ),
-    new RegExp(
-      `<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${key}["']`,
-      'i'
-    )
-  ]
-
-  for (const pattern of patterns) {
-    const match = html.match(pattern)
-    if (match?.[1]) return decodeHtmlEntities(match[1].trim())
-  }
-
-  return null
-}
-
-function readTitle(html: string): string | null {
-  const match = html.match(/<title[^>]*>([^<]+)<\/title>/i)
-  return match?.[1] ? decodeHtmlEntities(match[1].trim()) : null
-}
-
-function resolvePreviewUrl(baseUrl: string, value: string | null): string | undefined {
-  if (!value) return undefined
-  try {
-    return new URL(value, baseUrl).href
-  } catch {
-    return undefined
-  }
-}
-
-function hostnameFromUrl(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./i, '')
-  } catch {
-    return url
-  }
-}
 
 async function readLimitedHtml(response: Response): Promise<string> {
   const reader = response.body?.getReader()
@@ -84,7 +38,7 @@ function parsePreviewFromHtml(url: string, html: string): LinkPreviewResponse {
   const title =
     readMetaContent(html, 'og:title') ??
     readMetaContent(html, 'twitter:title') ??
-    readTitle(html) ??
+    readTitleFromHtml(html) ??
     undefined
 
   const description =
@@ -93,13 +47,12 @@ function parsePreviewFromHtml(url: string, html: string): LinkPreviewResponse {
     readMetaContent(html, 'description') ??
     undefined
 
-  const image = resolvePreviewUrl(
+  const image = resolvePreviewAssetUrl(
     url,
     readMetaContent(html, 'og:image') ?? readMetaContent(html, 'twitter:image')
   )
 
-  const siteName =
-    readMetaContent(html, 'og:site_name') ?? hostnameFromUrl(url)
+  const siteName = readMetaContent(html, 'og:site_name') ?? linkHostname(url)
 
   return {
     url,
@@ -114,9 +67,6 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreviewResponse
   const trimmed = url.trim()
   if (!trimmed) throw new Error('Empty URL')
 
-  const cached = previewCache.get(trimmed)
-  if (cached) return cached
-
   let parsed: URL
   try {
     parsed = new URL(trimmed)
@@ -128,11 +78,15 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreviewResponse
     throw new Error('Only HTTP(S) links are supported')
   }
 
+  const canonical = parsed.href
+  const cached = previewCache.get(canonical)
+  if (cached) return cached
+
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
   try {
-    const response = await fetch(parsed.href, {
+    const response = await fetch(canonical, {
       signal: controller.signal,
       redirect: 'follow',
       headers: {
@@ -142,24 +96,38 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreviewResponse
     })
 
     if (!response.ok) {
-      throw new Error(`Preview request failed (${response.status})`)
+      const fallback: LinkPreviewResponse = {
+        url: canonical,
+        siteName: linkHostname(canonical),
+        title: linkHostname(canonical)
+      }
+      previewCache.set(canonical, fallback)
+      return fallback
     }
 
     const contentType = response.headers.get('content-type') ?? ''
     if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
       const fallback: LinkPreviewResponse = {
-        url: parsed.href,
-        siteName: hostnameFromUrl(parsed.href),
-        title: hostnameFromUrl(parsed.href)
+        url: canonical,
+        siteName: linkHostname(canonical),
+        title: linkHostname(canonical)
       }
-      previewCache.set(trimmed, fallback)
+      previewCache.set(canonical, fallback)
       return fallback
     }
 
     const html = await readLimitedHtml(response)
-    const preview = parsePreviewFromHtml(parsed.href, html)
-    previewCache.set(trimmed, preview)
+    const preview = parsePreviewFromHtml(canonical, html)
+    previewCache.set(canonical, preview)
     return preview
+  } catch {
+    const fallback: LinkPreviewResponse = {
+      url: canonical,
+      siteName: linkHostname(canonical),
+      title: linkHostname(canonical)
+    }
+    previewCache.set(canonical, fallback)
+    return fallback
   } finally {
     clearTimeout(timeout)
   }

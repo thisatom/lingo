@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw } from '@/shared/ui/icons'
 import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { useAudioLevelMonitor } from '@/features/audio-devices/model/useAudioLevelMonitor'

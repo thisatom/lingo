@@ -63,17 +63,15 @@ export function TooltipIconButton({
       align={tooltipAlign}
       sideOffset={tooltipSideOffset}
     >
-      <span className={cn('inline-flex items-center justify-center', triggerClassName)}>
-        <Button
-          type={type}
-          disabled={disabled}
-          className={cn(className)}
-          {...props}
-          aria-label={ariaLabelProp ?? ariaFallback}
-        >
-          {children}
-        </Button>
-      </span>
+      <Button
+        type={type}
+        disabled={disabled}
+        className={cn(className, triggerClassName)}
+        {...props}
+        aria-label={ariaLabelProp ?? ariaFallback}
+      >
+        {children}
+      </Button>
     </TooltipWrap>
   )
 }

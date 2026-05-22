@@ -1,4 +1,4 @@
-import { Reply } from 'lucide-react'
+import { Reply } from '@/shared/ui/icons'
 import { userMessageEditButtonClass } from './agent-layout'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'

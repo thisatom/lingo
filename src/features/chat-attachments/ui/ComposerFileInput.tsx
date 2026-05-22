@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Paperclip } from 'lucide-react'
+import { Paperclip } from '@/shared/ui/icons'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { processDroppedFiles } from '@/features/chat-attachments/lib/process-files'
 import { composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'

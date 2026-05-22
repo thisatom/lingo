@@ -1,4 +1,5 @@
-import { PanelLeft } from 'lucide-react'
+import { PanelLeft } from '@/shared/ui/icons'
+import { sidebarChromeIconButtonClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
@@ -11,11 +12,11 @@ export function SidebarExpandButton() {
     <TooltipIconButton
       variant="ghost"
       size="icon"
-      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+      className={sidebarChromeIconButtonClass}
       tooltip="Show sidebar"
       onClick={toggleSidebarPanel}
     >
-      <PanelLeft className="size-4" />
+      <PanelLeft className="size-4 shrink-0" />
     </TooltipIconButton>
   )
 }

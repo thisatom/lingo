@@ -1,4 +1,4 @@
-import { ArrowLeft, Cpu, Mic, User, Volume2, WandSparkles } from 'lucide-react'
+import { ArrowLeft, Cpu, Mic, User, Volume2, WandSparkles } from '@/shared/ui/icons'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { SETTINGS_SECTIONS } from '@/entities/settings/config/sections'

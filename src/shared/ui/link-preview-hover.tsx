@@ -1,6 +1,11 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { ExternalLink } from '@/shared/ui/icons'
 import type { LinkPreviewResponse } from '@/shared/types/ipc'
+import {
+  linkHostname,
+  normalizeLinkHref,
+  resolveMarkdownLinkLabel
+} from '@/shared/lib/link-display'
 import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
 import {
   HoverCard,
@@ -8,6 +13,8 @@ import {
   HoverCardTrigger
 } from '@/shared/ui/hover-card'
 import { Skeleton } from '@/shared/ui/skeleton'
+import { menuSurfaceBorderClass } from '@/shared/lib/sidebar-filter-menu-styles'
+import { cn } from '@/shared/lib/utils'
 
 const previewCache = new Map<string, LinkPreviewResponse>()
 
@@ -21,12 +28,9 @@ function isPreviewableHref(href: string | undefined): href is string {
   }
 }
 
-function hostnameFromUrl(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./i, '')
-  } catch {
-    return url
-  }
+function fallbackPreview(href: string): LinkPreviewResponse {
+  const host = linkHostname(href)
+  return { url: href, siteName: host, title: host }
 }
 
 interface LinkPreviewHoverProps {
@@ -43,9 +47,9 @@ function LinkPreviewCard({
   href: string
 }) {
   const [imageFailed, setImageFailed] = useState(false)
-  const title = preview.title?.trim() || preview.siteName || hostnameFromUrl(href)
+  const title = preview.title?.trim() || preview.siteName || linkHostname(href)
   const description = preview.description?.trim()
-  const siteName = preview.siteName ?? hostnameFromUrl(href)
+  const siteName = preview.siteName ?? linkHostname(href)
   const showImage = Boolean(preview.image) && !imageFailed
 
   return (
@@ -95,17 +99,22 @@ function PreviewSkeleton() {
 }
 
 export function LinkPreviewHover({ href, className, children }: LinkPreviewHoverProps) {
+  const canonicalHref = useMemo(() => normalizeLinkHref(href), [href])
   const [open, setOpen] = useState(false)
   const [preview, setPreview] = useState<LinkPreviewResponse | null>(() =>
-    previewCache.get(href) ?? null
+    previewCache.get(canonicalHref) ?? null
   )
   const [loading, setLoading] = useState(false)
-  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    if (!open || preview || failed || !isLingoAvailable() || !window.lingo?.link) return
+    setPreview(previewCache.get(canonicalHref) ?? null)
+    setLoading(false)
+  }, [canonicalHref])
 
-    const cached = previewCache.get(href)
+  useEffect(() => {
+    if (!open || preview || !isLingoAvailable() || !window.lingo?.link) return
+
+    const cached = previewCache.get(canonicalHref)
     if (cached) {
       setPreview(cached)
       return
@@ -115,14 +124,19 @@ export function LinkPreviewHover({ href, className, children }: LinkPreviewHover
     setLoading(true)
 
     void getLingo()
-      .link.preview(href)
+      .link.preview(canonicalHref)
       .then((data) => {
         if (cancelled) return
-        previewCache.set(href, data)
-        setPreview(data)
+        const next = data.title || data.description || data.image ? data : fallbackPreview(canonicalHref)
+        previewCache.set(canonicalHref, next)
+        setPreview(next)
       })
       .catch(() => {
-        if (!cancelled) setFailed(true)
+        if (!cancelled) {
+          const next = fallbackPreview(canonicalHref)
+          previewCache.set(canonicalHref, next)
+          setPreview(next)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -131,26 +145,28 @@ export function LinkPreviewHover({ href, className, children }: LinkPreviewHover
     return () => {
       cancelled = true
     }
-  }, [open, href, preview, failed])
+  }, [open, canonicalHref, preview])
+
+  const cardPreview = preview ?? fallbackPreview(canonicalHref)
 
   return (
     <HoverCard open={open} onOpenChange={setOpen} openDelay={350} closeDelay={120}>
       <HoverCardTrigger asChild>
-        <a href={href} className={className} target="_blank" rel="noopener noreferrer">
+        <a href={canonicalHref} className={className} target="_blank" rel="noopener noreferrer">
           {children}
         </a>
       </HoverCardTrigger>
-      {!failed ? (
-        <HoverCardContent className="w-80 p-0" side="top" align="start">
-          {loading && !preview ? (
-            <PreviewSkeleton />
-          ) : preview ? (
-            <LinkPreviewCard preview={preview} href={href} />
-          ) : (
-            <div className="p-3 text-xs text-muted-foreground">{hostnameFromUrl(href)}</div>
-          )}
-        </HoverCardContent>
-      ) : null}
+      <HoverCardContent
+        className={cn('w-80 p-0', menuSurfaceBorderClass)}
+        side="top"
+        align="start"
+      >
+        {loading && !preview ? (
+          <PreviewSkeleton />
+        ) : (
+          <LinkPreviewCard preview={cardPreview} href={canonicalHref} />
+        )}
+      </HoverCardContent>
     </HoverCard>
   )
 }
@@ -164,17 +180,20 @@ export function MarkdownLink({
   className?: string
   children?: ReactNode
 }) {
-  if (!isPreviewableHref(href) || !isLingoAvailable() || !window.lingo?.link) {
+  const label = resolveMarkdownLinkLabel(href, children) ?? children
+  const canonicalHref = href ? normalizeLinkHref(href) : href
+
+  if (!isPreviewableHref(canonicalHref) || !isLingoAvailable() || !window.lingo?.link) {
     return (
-      <a href={href} className={className} target="_blank" rel="noopener noreferrer">
-        {children}
+      <a href={canonicalHref} className={className} target="_blank" rel="noopener noreferrer">
+        {label}
       </a>
     )
   }
 
   return (
-    <LinkPreviewHover href={href} className={className}>
-      {children}
+    <LinkPreviewHover href={canonicalHref} className={className}>
+      {label}
     </LinkPreviewHover>
   )
 }
