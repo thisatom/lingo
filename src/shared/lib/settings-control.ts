@@ -56,11 +56,12 @@ export const settingsCommandItemClass = cn(
 )
 
 export const settingsCommandInputWrapperClass = cn(
+  'h-[30px] min-h-[30px]',
   'border-b px-2',
   'border-menu-border'
 )
 
 export const settingsCommandInputClass =
-  'h-8 border-0 bg-transparent text-sm text-foreground shadow-none focus-visible:ring-0'
+  'h-[30px] min-h-[30px] border-0 bg-transparent text-sm leading-none text-foreground shadow-none focus-visible:ring-0'
 
 export const settingsCommandListClass = 'max-h-[min(280px,50vh)]'

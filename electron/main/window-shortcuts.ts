@@ -10,16 +10,14 @@ export function registerWindowShortcuts(
     const mod = input.control || input.meta
     if (!mod || input.alt) return
 
-    const key = input.key.toLowerCase()
-
-    if (input.shift && key === 'n' && onNewWindow) {
+    if (input.shift && input.code === 'KeyN' && onNewWindow) {
       event.preventDefault()
       const next = onNewWindow()
       if (!next.isDestroyed()) next.focus()
       return
     }
 
-    if (!input.shift && key === 'n') {
+    if (!input.shift && input.code === 'KeyN') {
       event.preventDefault()
       if (!win.webContents.isDestroyed()) {
         win.webContents.send('lingo:shortcut:new-chat')

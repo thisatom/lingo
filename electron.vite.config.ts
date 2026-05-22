@@ -5,6 +5,25 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import type { Plugin } from 'vite'
 
+/** Keep Node-only MCP client out of the Electron renderer bundle. */
+function stubWebsearchMcpForRenderer(): Plugin {
+  const stub = resolve(__dirname, 'src/shared/lib/websearch-mcp-client.stub.ts')
+  return {
+    name: 'stub-websearch-mcp-renderer',
+    enforce: 'pre',
+    resolveId(source) {
+      if (
+        source === '@/shared/lib/websearch-mcp-client' ||
+        source.endsWith('/websearch-mcp-client.ts') ||
+        source.endsWith('/websearch-mcp-client')
+      ) {
+        return stub
+      }
+      return null
+    }
+  }
+}
+
 function copyAppResources(): Plugin {
   const resourcesDir = resolve(__dirname, 'resources')
   return {
@@ -53,9 +72,9 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        '@': resolve('src')
+        '@': resolve(__dirname, 'src')
       }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [stubWebsearchMcpForRenderer(), react(), tailwindcss()]
   }
 })

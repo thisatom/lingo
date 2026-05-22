@@ -56,7 +56,10 @@ function createWebChatStream(
           break
       }
     },
-    () => getWebSecret('openrouter'),
+    () =>
+      request.llmBackend === 'custom'
+        ? getWebSecret('custom-llm')
+        : getWebSecret('openrouter'),
     {
       defaultModel:
         typeof import.meta !== 'undefined' && import.meta.env?.VITE_LINGO_OPENROUTER_MODEL

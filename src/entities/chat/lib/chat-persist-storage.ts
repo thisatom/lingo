@@ -32,8 +32,29 @@ function readRaw(name: string): string | null {
   return null
 }
 
+function safeGetItem(name: string): string | null {
+  const raw = readRaw(name)
+  if (!raw) return null
+
+  try {
+    JSON.parse(raw)
+    return raw
+  } catch (error) {
+    console.warn('[lingo] Corrupt chat storage, resetting:', name, error)
+    try {
+      localStorage.removeItem(name)
+      for (const legacy of LEGACY_KEYS) {
+        localStorage.removeItem(legacy)
+      }
+    } catch {
+      // ignore quota errors while clearing
+    }
+    return null
+  }
+}
+
 export const chatPersistStorage: StateStorage = {
-  getItem: (name) => readRaw(name),
+  getItem: (name) => safeGetItem(name),
   setItem: (name, value) => {
     try {
       localStorage.setItem(name, value)

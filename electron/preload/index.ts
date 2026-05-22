@@ -124,6 +124,20 @@ const lingo: LingoApi = {
         ipcRenderer.removeListener('lingo:updater:available', listener)
       }
     }
+  },
+  app: {
+    onPrepareShutdown: (handler: () => void | Promise<void>) => {
+      const listener = () => {
+        void Promise.resolve(handler())
+      }
+      ipcRenderer.on('lingo:app:prepare-shutdown', listener)
+      return () => {
+        ipcRenderer.removeListener('lingo:app:prepare-shutdown', listener)
+      }
+    },
+    notifyShutdownComplete: () => {
+      ipcRenderer.send('lingo:app:shutdown-complete')
+    }
   }
 }
 

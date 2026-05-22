@@ -1,6 +1,6 @@
 import { Navigate, useParams } from 'react-router-dom'
 import { isSettingsSectionId } from '@/entities/settings/config/sections'
-import { OpenRouterKeyForm } from '@/features/manage-api-keys/ui/OpenRouterKeyForm'
+import { ApiSettingsForm } from '@/features/manage-api-keys/ui/ApiSettingsForm'
 import { PracticeSettingsForm } from '@/features/practice-settings/ui/PracticeSettingsForm'
 import { TtsSettingsForm } from '@/features/text-to-speech/ui/TtsSettingsForm'
 import { DevicesSettingsForm } from '@/features/user-settings/ui/DevicesSettingsForm'
@@ -35,7 +35,7 @@ export function SettingsPage() {
           {section === 'devices' && <DevicesSettingsForm />}
           {section === 'speech' && <TtsSettingsForm />}
           {section === 'practice' && <PracticeSettingsForm />}
-          {section === 'api' && <OpenRouterKeyForm />}
+          {section === 'api' && <ApiSettingsForm />}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/app/layouts/AppLayout'
+import { AppShutdownSaver } from '@/app/ui/AppShutdownSaver'
 import { AppUpdateGate } from '@/app/ui/AppUpdateGate'
 import { OnboardingGate } from '@/app/ui/OnboardingGate'
 import { MainPage } from '@/pages/main/ui/MainPage'
@@ -8,6 +9,7 @@ import { SettingsPage } from '@/pages/settings/ui/SettingsPage'
 export function App() {
   return (
     <div className="app-shell">
+      <AppShutdownSaver />
       <OnboardingGate />
       <AppUpdateGate />
       <HashRouter>

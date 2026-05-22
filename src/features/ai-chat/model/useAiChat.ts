@@ -20,7 +20,11 @@ import { messagesHaveImages } from '@/shared/lib/vision-models'
 import { persistAttachments } from '@/entities/message/lib/prepare-attachment'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { EMPTY_MESSAGES } from '@/entities/message/model/types'
-import { formatOpenRouterError } from '@/shared/lib/openrouter-errors'
+import { formatLlmError } from '@/shared/lib/llm-errors'
+import {
+  buildChatStreamLlmFields,
+  validateCustomLlmSettings
+} from '@/shared/lib/resolve-chat-stream-llm'
 import type { ChatMessagePayload, ChatStreamController } from '@/shared/types/ipc'
 import { getLingo } from '@/shared/lib/lingo'
 import { beginAgentRun, cancelAgentRun, isAgentRunActive } from './agent-run'
@@ -66,10 +70,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const updateUserMessageContent = useChatsStore((s) => s.updateUserMessageContent)
   const updateMessageContent = useChatsStore((s) => s.updateMessageContent)
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
-  const modelId = useSettingsStore((s) => s.modelId)
-  const modelAutoFallback = useSettingsStore((s) => s.modelAutoFallback)
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
-  const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const stage = useConversationStore((s) => s.stage)
   const setStage = useConversationStore((s) => s.setStage)
   const setConversationError = useConversationStore((s) => s.setError)
@@ -137,7 +138,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       const history = await getHistoryForApi(targetChatId)
       const hasImagesInThread = messagesHaveImages(history)
 
-      setStage(webSearchEnabled && !hasImagesInThread ? 'searching' : 'thinking')
+      const llmSettings = useSettingsStore.getState()
+      setStage(
+        llmSettings.webSearchEnabled &&
+          llmSettings.llmBackend === 'openrouter' &&
+          !hasImagesInThread
+          ? 'searching'
+          : 'thinking'
+      )
       setError(null)
 
       let assistantMessageId: string | null = null
@@ -171,13 +179,22 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       }
 
       try {
+        const customError = validateCustomLlmSettings(llmSettings)
+        if (customError) {
+          setError(customError)
+          setStage('idle')
+          return
+        }
+
         const stream = getLingo().chat.stream(
           {
             messages: history,
-            model: modelId,
             practiceLanguage,
-            webSearch: webSearchEnabled && !hasImagesInThread,
-            modelAutoFallback
+            ...buildChatStreamLlmFields(llmSettings),
+            webSearch:
+              llmSettings.webSearchEnabled &&
+              llmSettings.llmBackend === 'openrouter' &&
+              !hasImagesInThread
           },
           {
             onSearching: () => {
@@ -280,7 +297,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           setError('Speech synthesis returned no audio. The text reply is still in the chat.')
           setStage('idle')
         } else {
-          setError(formatOpenRouterError(msg))
+          setError(formatLlmError(msg))
           setStage('idle')
         }
       } finally {
@@ -292,15 +309,12 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     },
     [
       addMessage,
-      modelId,
-      modelAutoFallback,
       practiceLanguage,
       removeMessagesFrom,
       setBlurAnimateMessageId,
       setError,
       setStage,
       chatComposerMode,
-      webSearchEnabled,
       updateMessageContent,
       processNextInQueue,
       options.onLiveConversationTurnComplete

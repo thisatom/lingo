@@ -3,10 +3,11 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: 'Segoe WPC', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono:
-    ui-monospace, 'Cascadia Code', 'Cascadia Mono', 'SF Mono', SFMono-Regular, Menlo, Consolas,
-    'Liberation Mono', monospace;
+  /* VS Code workbench UI + editor stacks (system fonts, no bundled webfonts). */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial,
+    sans-serif;
+  --font-mono: Consolas, Menlo, Monaco, 'Courier New', monospace;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -277,7 +278,7 @@
 }
 
 .cet-titlebar {
-  font-family: 'Segoe WPC', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-sans);
   transition:
     background-color 0.2s ease,
     color 0.2s ease;

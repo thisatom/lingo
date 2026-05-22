@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from '@/shared/ui/icons'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
+import type { LlmBackend } from '@/shared/types/ipc'
 import { shortOpenRouterModelLabel } from '@/widgets/chat-composer/lib/model-label'
 import {
   sidebarMenuItemClass,
@@ -29,6 +30,7 @@ export type AgentModeOption = {
 
 interface ComposerAgentMenuSelectProps {
   mode: ChatComposerMode
+  llmBackend: LlmBackend
   modelId: string
   modeOptions: readonly AgentModeOption[]
   modelIds: readonly string[]
@@ -41,6 +43,7 @@ interface ComposerAgentMenuSelectProps {
 
 export function ComposerAgentMenuSelect({
   mode,
+  llmBackend,
   modelId,
   modeOptions,
   modelIds,
@@ -102,50 +105,64 @@ export function ComposerAgentMenuSelect({
 
         <DropdownMenuSeparator className="my-1 bg-border/60" />
 
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className={sidebarMenuSubTriggerClass}>
-            <span className="min-w-0 flex-1 truncate">Models</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent
-            sideOffset={4}
-            className={cn('min-w-[14rem]', sidebarMenuSurfaceClass)}
+        {llmBackend === 'custom' ? (
+          <DropdownMenuItem
+            className={cn(sidebarMenuItemClass, 'cursor-default focus:bg-transparent')}
+            onSelect={(e) => e.preventDefault()}
           >
-            <div
-              className={cn(
-                sidebarMenuItemClass,
-                'pointer-events-auto flex cursor-default items-center justify-between gap-2'
-              )}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap leading-normal text-muted-foreground">
+              {modelId.trim() ? `Custom · ${modelId}` : 'Custom model (Settings → API)'}
+            </span>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className={sidebarMenuSubTriggerClass}>
+              <span className="min-w-0 flex-1 truncate">Models</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent
+              sideOffset={4}
+              className={cn('min-w-[14rem]', sidebarMenuSurfaceClass)}
             >
-              <span className="text-[12px] text-foreground">Auto</span>
-              <Switch
-                checked={modelAutoFallback}
-                disabled={disabled}
-                aria-label="Auto: try other free models on error"
-                onCheckedChange={onModelAutoFallbackChange}
-              />
-            </div>
-            <DropdownMenuSeparator className="my-1 bg-border/60" />
-            {modelIds.map((id) => {
-              const isSelected = id === modelId
-              return (
-                <DropdownMenuItem
-                  key={id}
-                  className={sidebarMenuItemClass}
-                  onSelect={() => onModelChange(id)}
-                >
-                  <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap leading-normal">
-                    {shortOpenRouterModelLabel(id)}
-                  </span>
-                  <Check
-                    className={cn('ml-1 size-3 shrink-0', isSelected ? 'opacity-100' : 'opacity-0')}
-                  />
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+              <div
+                className={cn(
+                  sidebarMenuItemClass,
+                  'pointer-events-auto flex cursor-default items-center justify-between gap-2'
+                )}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="text-[12px] text-foreground">Auto</span>
+                <Switch
+                  checked={modelAutoFallback}
+                  disabled={disabled}
+                  aria-label="Auto: try other free models on error"
+                  onCheckedChange={onModelAutoFallbackChange}
+                />
+              </div>
+              <DropdownMenuSeparator className="my-1 bg-border/60" />
+              {modelIds.map((id) => {
+                const isSelected = id === modelId
+                return (
+                  <DropdownMenuItem
+                    key={id}
+                    className={sidebarMenuItemClass}
+                    onSelect={() => onModelChange(id)}
+                  >
+                    <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap leading-normal">
+                      {shortOpenRouterModelLabel(id)}
+                    </span>
+                    <Check
+                      className={cn(
+                        'ml-1 size-3 shrink-0',
+                        isSelected ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

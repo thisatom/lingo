@@ -10,6 +10,7 @@ import { backgroundUpdateCheck } from './app-update'
 import { resolveAppIconPath } from './icon'
 import { resolvePreloadScript } from './paths'
 import { registerWindowShortcuts } from './window-shortcuts'
+import { setupGracefulShutdown } from './shutdown'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -47,6 +48,7 @@ export function createMainWindow(): BrowserWindow {
 
   attachTitlebarToWindow(mainWindow)
   registerWindowShortcuts(mainWindow, createMainWindow)
+  setupGracefulShutdown(mainWindow)
 
   if (process.platform === 'win32') {
     const t = getTitlebarTheme('dark')

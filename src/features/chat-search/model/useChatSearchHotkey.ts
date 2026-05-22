@@ -1,11 +1,10 @@
 import { useEffect } from 'react'
+import { isChatSearchShortcut } from '@/shared/lib/keyboard-shortcut'
 
 export function useChatSearchHotkey(onOpen: () => void): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.altKey || event.shiftKey) return
-      if (!(event.metaKey || event.ctrlKey)) return
-      if (event.key.toLowerCase() !== 'k') return
+      if (!isChatSearchShortcut(event)) return
       event.preventDefault()
       event.stopPropagation()
       onOpen()

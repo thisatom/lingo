@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, X } from '@/shared/ui/icons'
+import { X } from '@/shared/ui/icons'
+import { ArrowUp, Mic, Square } from 'lucide-react'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { useComposerPaste } from '@/features/chat-attachments/model/useComposerPaste'
 import { ComposerAttachments } from '@/features/chat-attachments/ui/ComposerAttachments'
@@ -7,7 +8,8 @@ import { ComposerFileInput } from '@/features/chat-attachments/ui/ComposerFileIn
 import { UserQuestionContextMenu } from './chat-context-menu/UserQuestionContextMenu'
 import { MessageBodyClamp } from './MessageBodyClamp'
 import { UserMessageAttachments } from '@/features/chat-attachments/ui/UserMessageAttachments'
-import { UserMessageEditButton } from './UserMessageEditButton'
+import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
+import { UserMessageActionButton } from './UserMessageActionButton'
 import { MarkdownContent } from '@/shared/ui/markdown-content'
 import { chatSelectableClass, userMessageBubbleClass } from './agent-layout'
 import { cn } from '@/shared/lib/utils'
@@ -28,10 +30,18 @@ interface UserMessageProps {
   chatId: string | null
   disabled?: boolean
   isEditing: boolean
+  showStop?: boolean
+  onStopAgent?: () => void
   onEnterEdit: () => void
   onExitEdit: () => void
-  onSubmitEdit: (text: string, attachments?: MessageAttachment[]) => void
+  onSubmitEdit: (text: string, attachments?: MessageAttachment[]) => void | Promise<void>
   onAttachmentError?: (message: string) => void
+  voiceSupported?: boolean
+  voiceBusy?: boolean
+  isVoiceListening?: boolean
+  onVoicePress?: () => void
+  onVoiceStop?: () => void
+  onRegisterEditSpeech?: (target: EditSpeechTarget | null) => void
 }
 
 export function UserMessage({
@@ -41,14 +51,24 @@ export function UserMessage({
   chatId,
   disabled,
   isEditing,
+  showStop,
+  onStopAgent,
   onEnterEdit,
   onExitEdit,
   onSubmitEdit,
-  onAttachmentError
+  onAttachmentError,
+  voiceSupported,
+  voiceBusy,
+  isVoiceListening,
+  onVoicePress,
+  onVoiceStop,
+  onRegisterEditSpeech
 }: UserMessageProps) {
   const [draft, setDraft] = useState(content)
   const [editAttachments, setEditAttachments] = useState<MessageAttachment[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const draftRef = useRef(draft)
+  draftRef.current = draft
 
   useEffect(() => {
     if (!isEditing) {
@@ -66,6 +86,24 @@ export function UserMessage({
     }
   }, [isEditing, content, messageId, attachments])
 
+  useEffect(() => {
+    if (!isEditing || !onRegisterEditSpeech) return
+
+    onRegisterEditSpeech({
+      messageId,
+      setText: (text) => {
+        setDraft(text)
+        const el = textareaRef.current
+        if (el) {
+          requestAnimationFrame(() => resizeTextarea(el))
+        }
+      },
+      getPrefix: () => draftRef.current
+    })
+
+    return () => onRegisterEditSpeech(null)
+  }, [isEditing, messageId, onRegisterEditSpeech])
+
   useComposerPaste({
     textareaRef,
     enabled: isEditing && !disabled,
@@ -81,9 +119,9 @@ export function UserMessage({
     setEditAttachments((prev) => [...prev, ...items])
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSend) return
-    onSubmitEdit(draft.trim(), editAttachments)
+    await onSubmitEdit(draft.trim(), editAttachments)
     onExitEdit()
   }
 
@@ -112,7 +150,7 @@ export function UserMessage({
             />
           ) : null}
 
-          <div className="grid min-h-8 w-full grid-cols-[24px_24px_1fr_24px] items-center gap-1">
+          <div className="grid min-h-8 w-full grid-cols-[24px_24px_24px_1fr_24px] items-center gap-1">
             <TooltipIconButton
               variant="ghost"
               size="iconSm"
@@ -130,6 +168,49 @@ export function UserMessage({
               onAdd={handleAddAttachments}
               onError={onAttachmentError}
             />
+
+            {voiceSupported && onVoicePress && onVoiceStop ? (
+              isVoiceListening ? (
+                <TooltipIconButton
+                  type="button"
+                  variant="destructive"
+                  size="iconSm"
+                  className="justify-self-center rounded-full"
+                  disabled={disabled || voiceBusy}
+                  tooltip="Stop recording"
+                  aria-label="Stop recording"
+                  onClick={onVoiceStop}
+                >
+                  <Square className="size-3.5 fill-current" strokeWidth={0} />
+                </TooltipIconButton>
+              ) : (
+                <TooltipIconButton
+                  type="button"
+                  variant="ghost"
+                  size="iconSm"
+                  className="justify-self-center rounded-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  disabled={disabled || voiceBusy}
+                  tooltip="Speak"
+                  aria-label="Speak"
+                  onClick={onVoicePress}
+                >
+                  <Mic className="size-3.5" strokeWidth={2} />
+                </TooltipIconButton>
+              )
+            ) : (
+              <TooltipIconButton
+                type="button"
+                variant="ghost"
+                size="iconSm"
+                className="justify-self-center rounded-full text-muted-foreground"
+                disabled
+                tabIndex={-1}
+                tooltip="Speech unavailable"
+                aria-label="Speech unavailable"
+              >
+                <Mic className="size-3.5" strokeWidth={2} />
+              </TooltipIconButton>
+            )}
 
             <textarea
               ref={textareaRef}
@@ -172,7 +253,7 @@ export function UserMessage({
               tooltip="Send"
               onClick={handleSubmit}
             >
-              <ArrowUp className="size-3.5" />
+              <ArrowUp className="size-3.5" strokeWidth={2} />
             </TooltipIconButton>
           </div>
         </div>
@@ -199,7 +280,11 @@ export function UserMessage({
             <MarkdownContent content={content} variant="agent" className={chatSelectableClass} />
           ) : null}
         </MessageBodyClamp>
-        <UserMessageEditButton disabled={disabled} onEdit={onEnterEdit} />
+        <UserMessageActionButton
+          mode={showStop ? 'stop' : 'edit'}
+          disabled={disabled && !showStop}
+          onClick={showStop ? () => onStopAgent?.() : onEnterEdit}
+        />
       </UserQuestionContextMenu>
     </div>
   )

@@ -1,4 +1,5 @@
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { cn } from '@/shared/lib/utils'
 import type { ConversationTurn as Turn } from '@/widgets/conversation-panel/lib/group-turns'
 import { AgentMessage } from './AgentMessage'
@@ -11,9 +12,21 @@ interface ConversationTurnProps {
   activeChatId: string | null
   editingUserMessageId: string | null
   actionsDisabled?: boolean
+  showStopOnUserMessage?: boolean
+  onStopAgent?: () => void
+  voiceSupported?: boolean
+  voiceBusy?: boolean
+  isVoiceListening?: boolean
+  onVoicePress?: () => void
+  onVoiceStop?: () => void
+  onRegisterEditSpeech?: (target: EditSpeechTarget | null) => void
   onEnterEdit: (messageId: string) => void
   onExitEdit: () => void
-  onSubmitEdit: (messageId: string, text: string, attachments?: MessageAttachment[]) => void
+  onSubmitEdit: (
+    messageId: string,
+    text: string,
+    attachments?: MessageAttachment[]
+  ) => void | Promise<void>
   onAttachmentError?: (message: string) => void
 }
 
@@ -23,6 +36,14 @@ export function ConversationTurn({
   activeChatId,
   editingUserMessageId,
   actionsDisabled,
+  showStopOnUserMessage,
+  onStopAgent,
+  voiceSupported,
+  voiceBusy,
+  isVoiceListening,
+  onVoicePress,
+  onVoiceStop,
+  onRegisterEditSpeech,
   onEnterEdit,
   onExitEdit,
   onSubmitEdit,
@@ -48,11 +69,21 @@ export function ConversationTurn({
           content={turn.user.content}
           attachments={turn.user.attachments}
           chatId={activeChatId}
-          disabled={actionsDisabled}
+          disabled={actionsDisabled && !showStopOnUserMessage}
           isEditing={isEditing}
+          showStop={showStopOnUserMessage}
+          onStopAgent={onStopAgent}
+          voiceSupported={voiceSupported}
+          voiceBusy={voiceBusy}
+          isVoiceListening={isVoiceListening}
+          onVoicePress={onVoicePress}
+          onVoiceStop={onVoiceStop}
+          onRegisterEditSpeech={isEditing ? onRegisterEditSpeech : undefined}
           onEnterEdit={() => onEnterEdit(turn.user.id)}
           onExitEdit={onExitEdit}
-          onSubmitEdit={(text, attachments) => onSubmitEdit(turn.user.id, text, attachments)}
+          onSubmitEdit={(text, attachments) =>
+            onSubmitEdit(turn.user.id, text, attachments)
+          }
           onAttachmentError={onAttachmentError}
         />
       </div>

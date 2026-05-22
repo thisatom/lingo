@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AgentChatScrollArea } from './AgentChatScrollArea'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
+import { registerChatScrollFlush } from '@/app/lib/chat-scroll-registry'
 import { CHAT_SCROLL_MIN_PX } from '@/entities/chat/lib/chat-scroll-persist'
 import { useChatsStore } from '@/entities/chat/model/store'
 import type { PipelineStage } from '@/entities/conversation/model/store'
@@ -16,12 +17,17 @@ import {
   rememberChatScrollTop
 } from '@/widgets/conversation-panel/lib/chat-scroll-memory'
 import {
+  buildScrollRestoreSessionKey,
+  shouldSkipScrollRestore
+} from '@/widgets/conversation-panel/lib/chat-scroll-restore'
+import {
   groupMessagesIntoTurns,
   messageHasVisibleContent
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { cn } from '@/shared/lib/utils'
 import { AgentStatus } from './AgentStatus'
 import { ChatEmptyPrompt } from './ChatEmptyPrompt'
+import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { ConversationTurn } from './ConversationTurn'
 
 const ACTIVE_STAGES: PipelineStage[] = [
@@ -39,6 +45,14 @@ interface ConversationPanelProps {
   stage: PipelineStage
   activeChatId: string | null
   actionsDisabled?: boolean
+  agentBusy?: boolean
+  onStopAgent?: () => void
+  voiceSupported?: boolean
+  voiceBusy?: boolean
+  isVoiceListening?: boolean
+  onVoicePress?: () => void
+  onVoiceStop?: () => void
+  onRegisterEditSpeech?: (target: EditSpeechTarget | null) => void
   onSubmitEditedUserMessage: (
     messageId: string,
     text: string,
@@ -67,6 +81,14 @@ export function ConversationPanel({
   stage,
   activeChatId,
   actionsDisabled,
+  agentBusy = false,
+  onStopAgent,
+  voiceSupported,
+  voiceBusy,
+  isVoiceListening,
+  onVoicePress,
+  onVoiceStop,
+  onRegisterEditSpeech,
   onSubmitEditedUserMessage,
   onAtBottomChange,
   onShowScrollToLatestChange,
@@ -81,7 +103,9 @@ export function ConversationPanel({
   const skipSaveRef = useRef(false)
   const scrollSaveEnabledRef = useRef(false)
   const isRestoringScrollRef = useRef(false)
-  const scrollRestoreAttemptRef = useRef<string | null>(null)
+  const scrollRestoreCompletedRef = useRef<string | null>(null)
+  const restoreTargetRef = useRef<{ chatId: string; scrollTop: number | null } | null>(null)
+  const prevRestoreChatIdRef = useRef<string | null>(activeChatId)
   const scrollMemoryRafRef = useRef<number | null>(null)
   const persistIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPersistedScrollRef = useRef<{ chatId: string; scrollTop: number } | null>(null)
@@ -140,9 +164,11 @@ export function ConversationPanel({
       const scrollTop = Math.round(viewport.scrollTop)
 
       if (scrollTop < CHAT_SCROLL_MIN_PX) {
-        rememberChatScrollTop(chatId, 0)
-        lastPersistedScrollRef.current = null
-        clearChatScrollPosition(chatId)
+        if (!force) {
+          rememberChatScrollTop(chatId, 0)
+          lastPersistedScrollRef.current = null
+          clearChatScrollPosition(chatId)
+        }
         return
       }
 
@@ -234,13 +260,21 @@ export function ConversationPanel({
   }, [])
 
   useEffect(() => {
+    const chatChanged = prevRestoreChatIdRef.current !== activeChatId
+    prevRestoreChatIdRef.current = activeChatId
+
     setEditingUserMessageId(null)
     skipAutoScrollOnMountRef.current = true
     scrollSaveEnabledRef.current = false
-    scrollRestoreAttemptRef.current = null
+
+    if (chatChanged) {
+      scrollRestoreCompletedRef.current = null
+      restoreTargetRef.current = null
+    }
 
     if (!activeChatId) {
       isRestoringScrollRef.current = false
+      restoreTargetRef.current = null
       return
     }
 
@@ -249,7 +283,14 @@ export function ConversationPanel({
       return
     }
 
-    const saved = resolveSavedScrollTop(activeChatId, storedScrollTop)
+    if (chatChanged || restoreTargetRef.current?.chatId !== activeChatId) {
+      restoreTargetRef.current = {
+        chatId: activeChatId,
+        scrollTop: resolveSavedScrollTop(activeChatId, storedScrollTop)
+      }
+    }
+
+    const saved = restoreTargetRef.current.scrollTop
     isRestoringScrollRef.current = saved != null
     atBottomRef.current = saved == null
     onAtBottomChange?.(saved == null)
@@ -260,20 +301,11 @@ export function ConversationPanel({
   }, [activeChatId, chatsStoreHydrated, enableScrollSave, onAtBottomChange, storedScrollTop])
 
   useEffect(() => {
-    const onPageHide = () => flushScrollPosition(true)
+    return registerChatScrollFlush(() => flushScrollPosition(true))
+  }, [flushScrollPosition])
 
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') flushScrollPosition(true)
-    }
-
-    window.addEventListener('pagehide', onPageHide)
-    window.addEventListener('beforeunload', onPageHide)
-    document.addEventListener('visibilitychange', onVisibilityChange)
-
+  useEffect(() => {
     return () => {
-      window.removeEventListener('pagehide', onPageHide)
-      window.removeEventListener('beforeunload', onPageHide)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
       if (scrollMemoryRafRef.current != null) {
         cancelAnimationFrame(scrollMemoryRafRef.current)
       }
@@ -307,14 +339,28 @@ export function ConversationPanel({
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current
-    if (!viewport || !activeChatId || !chatsStoreHydrated || turns.length === 0) return
+    if (!viewport || !activeChatId || !chatsStoreHydrated) return
 
-    const savedScrollTop = resolveSavedScrollTop(activeChatId, storedScrollTop)
-    const restoreKey = `${activeChatId}:${savedScrollTop ?? 'bottom'}:${turns.length}`
-    if (scrollRestoreAttemptRef.current === restoreKey) return
-    scrollRestoreAttemptRef.current = restoreKey
+    if (!hasVisibleMessages) {
+      const placeholderKey = `${activeChatId}:${messages.length > 0 ? 'placeholder' : 'empty'}`
+      if (scrollRestoreCompletedRef.current === placeholderKey) return
+      scrollRestoreCompletedRef.current = placeholderKey
+      scrollToLatest('instant')
+      isRestoringScrollRef.current = false
+      skipAutoScrollOnMountRef.current = false
+      enableScrollSave()
+      return
+    }
+
+    const target = restoreTargetRef.current
+    if (!target || target.chatId !== activeChatId) return
+
+    const savedScrollTop = target.scrollTop
+    const sessionKey = buildScrollRestoreSessionKey(activeChatId, savedScrollTop)
+    if (shouldSkipScrollRestore(scrollRestoreCompletedRef.current, sessionKey)) return
 
     if (savedScrollTop == null) {
+      scrollRestoreCompletedRef.current = sessionKey
       scrollToLatest('instant')
       isRestoringScrollRef.current = false
       skipAutoScrollOnMountRef.current = false
@@ -332,6 +378,7 @@ export function ConversationPanel({
     const finishRestore = () => {
       if (done) return
       done = true
+      scrollRestoreCompletedRef.current = sessionKey
       isRestoringScrollRef.current = false
       atBottomRef.current = false
       onAtBottomChange?.(false)
@@ -381,8 +428,8 @@ export function ConversationPanel({
     enableScrollSave,
     onAtBottomChange,
     scrollToLatest,
-    storedScrollTop,
-    turns.length
+    hasVisibleMessages,
+    messages.length
   ])
 
   useLayoutEffect(() => {
@@ -440,7 +487,11 @@ export function ConversationPanel({
             className={cn('relative', turns.length > 0 && 'space-y-5')}
             style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
           >
-            {turns.map((turn, turnIndex) => (
+            {turns.map((turn, turnIndex) => {
+              const isLatestTurn = turnIndex === turns.length - 1
+              const showStopOnUserMessage = agentBusy && isLatestTurn
+
+              return (
               <ConversationTurn
                 key={turn.id}
                 turn={turn}
@@ -448,14 +499,22 @@ export function ConversationPanel({
                 activeChatId={activeChatId}
                 editingUserMessageId={editingUserMessageId}
                 actionsDisabled={actionsDisabled}
+                showStopOnUserMessage={showStopOnUserMessage}
+                onStopAgent={onStopAgent}
+                voiceSupported={voiceSupported}
+                voiceBusy={voiceBusy}
+                isVoiceListening={isVoiceListening}
+                onVoicePress={onVoicePress}
+                onVoiceStop={onVoiceStop}
+                onRegisterEditSpeech={onRegisterEditSpeech}
                 onEnterEdit={setEditingUserMessageId}
                 onExitEdit={() => setEditingUserMessageId(null)}
-                onSubmitEdit={(messageId, text, attachments) => {
-                  void onSubmitEditedUserMessage(messageId, text, attachments)
-                }}
+                onSubmitEdit={(messageId, text, attachments) =>
+                  onSubmitEditedUserMessage(messageId, text, attachments)
+                }
                 onAttachmentError={onAttachmentError}
               />
-            ))}
+            )})}
 
             {showStatus ? <AgentStatus stage={stage} /> : null}
 

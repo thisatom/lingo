@@ -639,12 +639,22 @@ export const useChatsStore = create<ChatsState>()(
 
         return { ...state, chatScrollByChatId }
       },
-      merge: (persisted, current) => ({
-        ...current,
-        ...normalizePersistedState(
+      merge: (persisted, current) => {
+        const saved = normalizePersistedState(
           persisted as Partial<PersistedChatsState> & { composerAttachmentsByChatId?: unknown }
         )
-      }),
+        const savedScroll = normalizeChatScrollByChatId(saved.chatScrollByChatId)
+        const currentScroll = normalizeChatScrollByChatId(current.chatScrollByChatId)
+        const chatScrollByChatId = { ...savedScroll }
+        for (const [chatId, top] of Object.entries(currentScroll)) {
+          if (isValidChatScrollTop(top)) chatScrollByChatId[chatId] = top
+        }
+        return {
+          ...current,
+          ...saved,
+          chatScrollByChatId
+        }
+      },
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.composerDraftByChatId = state.composerDraftByChatId ?? {}

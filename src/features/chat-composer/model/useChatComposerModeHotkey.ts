@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
+import {
+  isComposerModeConversationShortcut,
+  isComposerModeTextShortcut
+} from '@/shared/lib/keyboard-shortcut'
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -11,13 +15,11 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function useChatComposerModeHotkey(): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || !event.shiftKey || event.altKey || event.metaKey) return
       if (isTypingTarget(event.target)) return
 
-      const key = event.key.toLowerCase()
       let mode: ChatComposerMode | null = null
-      if (key === 't') mode = 'text'
-      if (key === 'v') mode = 'conversation'
+      if (isComposerModeTextShortcut(event)) mode = 'text'
+      if (isComposerModeConversationShortcut(event)) mode = 'conversation'
       if (!mode) return
 
       event.preventDefault()

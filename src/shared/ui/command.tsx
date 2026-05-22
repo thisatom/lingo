@@ -68,7 +68,7 @@ function CommandInput({
     <div
       data-slot="command-input-wrapper"
       className={cn(
-        'flex h-7 items-center gap-2 border-b border-menu-border px-2.5',
+        'flex h-[30px] min-h-[30px] items-center gap-2 border-b border-menu-border px-2.5',
         wrapperClassName
       )}
     >
@@ -76,7 +76,7 @@ function CommandInput({
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          'flex h-7 w-full bg-transparent py-0 text-sm text-foreground outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-[30px] min-h-[30px] w-full bg-transparent py-0 text-sm leading-none text-foreground outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
         {...props}

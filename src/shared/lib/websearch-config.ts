@@ -28,10 +28,16 @@ export function isNodeRuntime(): boolean {
   return typeof process !== 'undefined' && !!process.versions?.node
 }
 
+function isElectronRenderer(): boolean {
+  if (typeof process === 'undefined') return false
+  const proc = process as typeof process & { type?: string }
+  return proc.type === 'renderer'
+}
+
 /** Electron main / Node CLI — not the browser or Electron renderer. */
 export function canSpawnWebsearchMcp(): boolean {
   if (!isNodeRuntime()) return false
-  if (typeof process !== 'undefined' && process.type === 'renderer') return false
+  if (isElectronRenderer()) return false
   if (typeof window !== 'undefined' && typeof document !== 'undefined') return false
   return true
 }

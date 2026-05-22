@@ -1,4 +1,4 @@
-import { ChevronDown } from '@/shared/ui/icons'
+import { ChevronDown } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 
@@ -23,7 +23,7 @@ export function ScrollToLatestButton({ show, onClick, className }: ScrollToLates
         className
       )}
     >
-      <ChevronDown className="size-3.5 translate-y-px" />
+      <ChevronDown className="size-3.5 translate-y-px" strokeWidth={2} />
     </Button>
   )
 }

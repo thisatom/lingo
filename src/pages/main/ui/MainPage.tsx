@@ -19,6 +19,7 @@ import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestB
 import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
 import { ChatHeaderTitle } from '@/widgets/chat-header/ui/ChatHeaderTitle'
 import { ConversationPanel } from '@/widgets/conversation-panel/ui/ConversationPanel'
+import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { VoiceCaptureBar } from '@/features/audio-devices/ui/VoiceCaptureBar'
 import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
@@ -73,12 +74,15 @@ export function MainPage() {
   const speechError = useConversationStore((s) => s.speechError)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
+  const llmBackend = useSettingsStore((s) => s.llmBackend)
   const modelId = useSettingsStore((s) => s.modelId)
+  const customModelId = useSettingsStore((s) => s.customModelId)
+  const activeModelId = llmBackend === 'custom' ? customModelId : modelId
   const microphoneDeviceId = useSettingsStore((s) => s.microphoneDeviceId)
   const microphoneLabel = useSettingsStore((s) => s.microphoneLabel)
   const { usage: contextUsage } = useChatContextUsage(
     messages,
-    modelId
+    activeModelId
   )
 
   useChatComposerModeHotkey()
@@ -114,13 +118,23 @@ export function MainPage() {
 
   const voiceMessageIdRef = useRef('')
   const isLiveConversationActiveRef = useRef(false)
+  const editSpeechTargetRef = useRef<EditSpeechTarget | null>(null)
 
   const startVoiceCaptureRef = useRef<(() => Promise<void>) | null>(null)
+
+  const removeMessagesAfter = useChatsStore((s) => s.removeMessagesAfter)
 
   const voiceHandlers = useMemo(
     () => ({
       mode: chatComposerMode,
-      onTextDraft: setDraft,
+      isEditSpeech: () => editSpeechTargetRef.current != null,
+      onTextDraft: (text: string) => {
+        if (editSpeechTargetRef.current) {
+          editSpeechTargetRef.current.setText(text)
+        } else {
+          setDraft(text)
+        }
+      },
       onConversationStart: () => {
         const { messageId } = beginVoiceUserMessage()
         voiceMessageIdRef.current = messageId
@@ -166,14 +180,29 @@ export function MainPage() {
   const voice = useVoiceInput(voiceHandlers)
 
   const startVoiceCapture = useCallback(async () => {
-    if (chatComposerMode === 'text') {
+    const editTarget = editSpeechTargetRef.current
+    if (editTarget) {
+      stopAgent()
+      if (activeChatId) {
+        removeMessagesAfter(editTarget.messageId, activeChatId)
+      }
+      voice.setDraftPrefix(editTarget.getPrefix())
+    } else if (chatComposerMode === 'text') {
       voice.setDraftPrefix(draft)
     }
     const started = await voice.start()
     if (!started) {
       setSpeechError('Could not start microphone. Check permissions in Settings → Devices.')
     }
-  }, [chatComposerMode, draft, setSpeechError, voice])
+  }, [
+    activeChatId,
+    chatComposerMode,
+    draft,
+    removeMessagesAfter,
+    setSpeechError,
+    stopAgent,
+    voice
+  ])
 
   startVoiceCaptureRef.current = startVoiceCapture
 
@@ -210,7 +239,14 @@ export function MainPage() {
     if (!voice.isBusy) return
     const text = (await voice.stop())?.trim() ?? ''
 
-    if (chatComposerMode === 'text' && text) {
+    if (editSpeechTargetRef.current) {
+      setSpeechError(null)
+      return
+    }
+
+    if (!text) return
+
+    if (chatComposerMode === 'text') {
       if (activeChatId) setComposerDraft(activeChatId, '')
       setSpeechError(null)
       await sendUserMessage(text)
@@ -243,7 +279,7 @@ export function MainPage() {
     if (!status?.isSet || !voice.supported) return
 
     if (chatComposerMode === 'text') {
-      if (actionsDisabled) return
+      if (actionsDisabled && !editSpeechTargetRef.current) return
       void startVoiceCapture()
       return
     }
@@ -330,7 +366,7 @@ export function MainPage() {
           title={activeChat?.title ?? 'New chat'}
           chat={activeChat}
           messageCount={messages.length}
-          modelId={modelId}
+          modelId={activeModelId}
           contextUsage={contextUsage}
           contextPercent={contextUsage?.percent ?? 0}
         />
@@ -343,6 +379,16 @@ export function MainPage() {
           stage={stage}
           activeChatId={activeChat?.id ?? null}
           actionsDisabled={actionsDisabled}
+          agentBusy={agentBusy}
+          onStopAgent={handleStopAgent}
+          voiceSupported={voice.supported}
+          voiceBusy={voiceBusy}
+          isVoiceListening={voice.isRecording}
+          onVoicePress={onVoicePress}
+          onVoiceStop={onVoiceStop}
+          onRegisterEditSpeech={(target) => {
+            editSpeechTargetRef.current = target
+          }}
           onSubmitEditedUserMessage={submitEditedUserMessage}
           onAttachmentError={handleAttachmentError}
           onAtBottomChange={setChatAtBottom}

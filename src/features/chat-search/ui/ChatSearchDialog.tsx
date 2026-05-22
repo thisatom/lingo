@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
-import { formatChatDateLabel } from '@/shared/lib/chat-sidebar'
+import { formatChatDateLabel, formatChatTimeLabel } from '@/shared/lib/chat-sidebar'
 import {
   buildChatCommandSearchGroups,
   buildChatCommandSearchValue
@@ -27,7 +27,7 @@ function ChatCommandRow({ chat }: { chat: { id: string; title: string; updatedAt
     <div className="flex w-full min-w-0 items-center justify-between gap-3">
       <span className="min-w-0 truncate">{chat.title}</span>
       <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-        {formatChatDateLabel(chat.updatedAt)}
+        {formatChatTimeLabel(chat.updatedAt)}
       </span>
     </div>
   )
@@ -59,7 +59,11 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
       description="Find and open a chat by title or date"
       className="max-w-lg"
     >
-      <CommandInput placeholder="Search by title or date…" />
+      <CommandInput
+        placeholder="Search by title or date…"
+        wrapperClassName="h-[30px] min-h-[30px]"
+        className="h-[30px] min-h-[30px]"
+      />
       <CommandList className="max-h-[min(50vh,20rem)]">
         <CommandEmpty>No chats found</CommandEmpty>
 

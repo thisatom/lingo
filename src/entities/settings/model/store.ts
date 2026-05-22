@@ -4,7 +4,21 @@ import {
   isMicNoiseSuppression,
   type MicNoiseSuppression
 } from '@/features/speech-to-text/lib/mic-noise-suppression'
+import {
+  customLlmConfig,
+  isValidCustomApiBaseUrl,
+  normalizeCustomApiBaseUrl,
+  normalizeCustomModelId
+} from '@/shared/config/custom-llm'
+import {
+  defaultCustomLlmProfileJson,
+  parseCustomLlmProfileSource,
+  profileFromLegacyFields,
+  stringifyCustomLlmProfile,
+  type ParsedCustomLlmProfile
+} from '@/shared/lib/custom-llm-profile'
 import { normalizeOpenRouterModelId, openRouterConfig } from '@/shared/config/openrouter'
+import type { LlmBackend } from '@/shared/types/ipc'
 import {
   filterOpenRouterFreeModels,
   isOpenRouterFreeModel
@@ -19,8 +33,17 @@ export type { AppTheme, MicNoiseSuppression, TtsSpeechRate }
 
 export type ChatComposerMode = 'text' | 'conversation'
 
+export function isLlmBackend(value: unknown): value is LlmBackend {
+  return value === 'openrouter' || value === 'custom'
+}
+
 interface SettingsState {
   practiceLanguage: string
+  llmBackend: LlmBackend
+  customApiBaseUrl: string
+  customModelId: string
+  /** JSON profile editor source (baseURL, model, completion). */
+  customLlmProfileJson: string
   modelId: string
   /** User-saved OpenRouter model ids (persisted). */
   customModels: string[]
@@ -49,6 +72,11 @@ interface SettingsState {
   /** First-run setup wizard completed. */
   onboardingCompleted: boolean
   setPracticeLanguage: (lang: string) => void
+  setLlmBackend: (backend: LlmBackend) => void
+  setCustomApiBaseUrl: (baseUrl: string) => void
+  setCustomModelId: (modelId: string) => void
+  setCustomLlmProfileJson: (json: string) => void
+  applyParsedCustomLlmProfile: (parsed: ParsedCustomLlmProfile) => void
   setModelId: (modelId: string) => void
   addCustomModel: (modelId: string) => void
   removeCustomModel: (modelId: string) => void
@@ -73,6 +101,10 @@ interface SettingsState {
 type PersistedSettings = Pick<
   SettingsState,
   | 'practiceLanguage'
+  | 'llmBackend'
+  | 'customApiBaseUrl'
+  | 'customModelId'
+  | 'customLlmProfileJson'
   | 'modelId'
   | 'customModels'
   | 'displayName'
@@ -97,6 +129,11 @@ type PersistedSettings = Pick<
 const DEFAULT_SETTINGS: Omit<
   SettingsState,
   | 'setPracticeLanguage'
+  | 'setLlmBackend'
+  | 'setCustomApiBaseUrl'
+  | 'setCustomModelId'
+  | 'setCustomLlmProfileJson'
+  | 'applyParsedCustomLlmProfile'
   | 'setModelId'
   | 'addCustomModel'
   | 'removeCustomModel'
@@ -118,6 +155,10 @@ const DEFAULT_SETTINGS: Omit<
   | 'resetSettings'
 > = {
   practiceLanguage: 'en',
+  llmBackend: 'openrouter',
+  customApiBaseUrl: customLlmConfig.defaultBaseUrl,
+  customModelId: customLlmConfig.defaultModel,
+  customLlmProfileJson: defaultCustomLlmProfileJson(),
   modelId: openRouterConfig.defaultModel,
   customModels: [],
   displayName: 'User',
@@ -144,6 +185,33 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       ...DEFAULT_SETTINGS,
       setPracticeLanguage: (practiceLanguage) => set({ practiceLanguage }),
+      setLlmBackend: (llmBackend) =>
+        set({ llmBackend: isLlmBackend(llmBackend) ? llmBackend : 'openrouter' }),
+      setCustomApiBaseUrl: (customApiBaseUrl) => {
+        const baseUrl = normalizeCustomApiBaseUrl(customApiBaseUrl)
+        const model = useSettingsStore.getState().customModelId
+        set({
+          customApiBaseUrl: baseUrl,
+          customLlmProfileJson: stringifyCustomLlmProfile(
+            profileFromLegacyFields(baseUrl, model)
+          )
+        })
+      },
+      setCustomModelId: (customModelId) => {
+        const model = normalizeCustomModelId(customModelId)
+        const baseUrl = useSettingsStore.getState().customApiBaseUrl
+        set({
+          customModelId: model,
+          customLlmProfileJson: stringifyCustomLlmProfile(profileFromLegacyFields(baseUrl, model))
+        })
+      },
+      setCustomLlmProfileJson: (customLlmProfileJson) => set({ customLlmProfileJson }),
+      applyParsedCustomLlmProfile: (parsed) =>
+        set({
+          customApiBaseUrl: parsed.baseUrl,
+          customModelId: parsed.model,
+          customLlmProfileJson: stringifyCustomLlmProfile(parsed.profile)
+        }),
       setModelId: (modelId) => {
         const id = normalizeOpenRouterModelId(modelId)
         if (!id || !isOpenRouterFreeModel(id)) return
@@ -198,9 +266,13 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'lingo-settings',
-      version: 14,
+      version: 16,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
+        llmBackend: state.llmBackend,
+        customApiBaseUrl: state.customApiBaseUrl,
+        customModelId: state.customModelId,
+        customLlmProfileJson: state.customLlmProfileJson,
         modelId: state.modelId,
         customModels: state.customModels ?? [],
         displayName: state.displayName,
@@ -298,6 +370,36 @@ export const useSettingsStore = create<SettingsState>()(
             )
           }
         }
+        if (version < 15) {
+          state = {
+            ...state,
+            llmBackend: 'openrouter',
+            customApiBaseUrl: customLlmConfig.defaultBaseUrl,
+            customModelId: customLlmConfig.defaultModel
+          }
+        }
+        if (version < 16) {
+          const baseUrl =
+            typeof state.customApiBaseUrl === 'string'
+              ? state.customApiBaseUrl
+              : customLlmConfig.defaultBaseUrl
+          const model =
+            typeof state.customModelId === 'string'
+              ? state.customModelId
+              : customLlmConfig.defaultModel
+          const legacyProfile = profileFromLegacyFields(baseUrl, model)
+          const existingJson =
+            typeof state.customLlmProfileJson === 'string' ? state.customLlmProfileJson : ''
+          const parsed = existingJson.trim()
+            ? parseCustomLlmProfileSource(existingJson)
+            : null
+          state = {
+            ...state,
+            customLlmProfileJson: parsed?.ok
+              ? stringifyCustomLlmProfile(parsed.data.profile)
+              : stringifyCustomLlmProfile(legacyProfile)
+          }
+        }
         return state
       },
       merge: (persisted, current) => {
@@ -318,6 +420,20 @@ export const useSettingsStore = create<SettingsState>()(
           customModels: filterOpenRouterFreeModels(
             Array.isArray(saved.customModels) ? saved.customModels : current.customModels
           ),
+          llmBackend: isLlmBackend(saved.llmBackend) ? saved.llmBackend : current.llmBackend,
+          customApiBaseUrl:
+            typeof saved.customApiBaseUrl === 'string' &&
+            isValidCustomApiBaseUrl(saved.customApiBaseUrl)
+              ? normalizeCustomApiBaseUrl(saved.customApiBaseUrl)
+              : current.customApiBaseUrl,
+          customModelId:
+            typeof saved.customModelId === 'string'
+              ? normalizeCustomModelId(saved.customModelId)
+              : current.customModelId,
+          customLlmProfileJson:
+            typeof saved.customLlmProfileJson === 'string' && saved.customLlmProfileJson.trim()
+              ? saved.customLlmProfileJson
+              : current.customLlmProfileJson,
           modelId:
             typeof saved.modelId === 'string' && isOpenRouterFreeModel(saved.modelId)
               ? normalizeOpenRouterModelId(saved.modelId)

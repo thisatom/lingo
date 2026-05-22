@@ -1,10 +1,20 @@
 export type SecretProviderId =
   | 'openrouter'
+  | 'custom-llm'
   | 'openai'
   | 'anthropic'
   | 'google'
   | 'groq'
   | 'azure-speech'
+
+export type LlmBackend = 'openrouter' | 'custom'
+
+export interface CustomLlmConfig {
+  baseUrl: string
+  model: string
+  /** Extra fields merged into chat/completions JSON (thinking, reasoning_effort, …). */
+  completionExtras?: Record<string, unknown>
+}
 
 export interface SecretStatus {
   provider: SecretProviderId
@@ -35,6 +45,10 @@ export interface ChatStreamRequest {
   messages: ChatMessagePayload[]
   model?: string
   practiceLanguage?: string
+  /** Defaults to openrouter when omitted. */
+  llmBackend?: LlmBackend
+  /** Required when `llmBackend` is `custom`. */
+  customLlm?: CustomLlmConfig
   /** Defaults to true — enables OpenRouter `openrouter:web_search` server tool. */
   webSearch?: boolean
   /** Try other free models when the selected one errors (no repeat attempts). */
@@ -165,6 +179,10 @@ export interface LingoApi {
     openReleasesPage: () => Promise<void>
     consumePendingNotice: () => Promise<PendingUpdateNotice | null>
     onUpdateAvailable: (handler: (info: AppUpdateInfo) => void) => () => void
+  }
+  app?: {
+    onPrepareShutdown: (handler: () => void | Promise<void>) => () => void
+    notifyShutdownComplete: () => void
   }
 }
 

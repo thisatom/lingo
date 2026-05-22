@@ -3,6 +3,7 @@ import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 
 const MIN_SPLASH_MS = 450
+const HYDRATION_TIMEOUT_MS = 12_000
 
 function storesHydrated(): boolean {
   return useChatsStore.persist.hasHydrated() && useSettingsStore.persist.hasHydrated()
@@ -42,8 +43,15 @@ export function useAppReady(): boolean {
     const unsubChats = useChatsStore.persist.onFinishHydration(tryReady)
     const unsubSettings = useSettingsStore.persist.onFinishHydration(tryReady)
 
+    const hydrationTimeout = window.setTimeout(() => {
+      if (cancelled || storesHydrated()) return
+      console.warn('[lingo] Persist hydration timed out; continuing startup')
+      setReady(true)
+    }, HYDRATION_TIMEOUT_MS)
+
     return () => {
       cancelled = true
+      window.clearTimeout(hydrationTimeout)
       unsubChats()
       unsubSettings()
     }

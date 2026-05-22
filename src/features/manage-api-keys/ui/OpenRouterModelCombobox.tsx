@@ -6,7 +6,7 @@ import {
   fetchOpenRouterModelCatalog,
   isOpenRouterModelIdShape
 } from '@/shared/lib/fetch-openrouter-models'
-import { getLingo } from '@/shared/lib/lingo'
+import { readSecretKey } from '@/shared/lib/lingo'
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import {
   settingsCommandClass,
@@ -57,7 +57,7 @@ export function OpenRouterModelCombobox({ id, value, onChange, className }: Open
 
     void (async () => {
       try {
-        const apiKey = await getLingo().secrets.get('openrouter')
+        const apiKey = await readSecretKey('openrouter')
         if (!apiKey) {
           if (!cancelled) {
             setCatalog([])

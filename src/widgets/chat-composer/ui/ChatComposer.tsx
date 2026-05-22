@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { ArrowUp, Globe, Mic, Square } from '@/shared/ui/icons'
+import { Globe, Mic } from '@/shared/ui/icons'
+import { ArrowUp, Square } from 'lucide-react'
 import {
   EMPTY_COMPOSER_ATTACHMENTS,
   type MessageAttachment
@@ -102,7 +103,9 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
   const setChatComposerMode = useSettingsStore((s) => s.setChatComposerMode)
+  const llmBackend = useSettingsStore((s) => s.llmBackend)
   const modelId = useSettingsStore((s) => s.modelId)
+  const customModelId = useSettingsStore((s) => s.customModelId)
   const customModels = useSettingsStore((s) => s.customModels ?? [])
   const setModelId = useSettingsStore((s) => s.setModelId)
   const modelAutoFallback = useSettingsStore((s) => s.modelAutoFallback)
@@ -110,9 +113,14 @@ export function ChatComposer({
   const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const setWebSearchEnabled = useSettingsStore((s) => s.setWebSearchEnabled)
 
+  const activeModelId = llmBackend === 'custom' ? customModelId : modelId
+
   const modelOptionIds = useMemo(
-    () => mergeOpenRouterModelIds(customModels, modelId),
-    [customModels, modelId]
+    () =>
+      llmBackend === 'custom'
+        ? [customModelId].filter(Boolean)
+        : mergeOpenRouterModelIds(customModels, modelId),
+    [llmBackend, customModels, customModelId, modelId]
   )
 
   const modeSelectOptions = useMemo(
@@ -217,7 +225,7 @@ export function ChatComposer({
                 aria-label="Stop recording"
                 onClick={onVoiceStop}
               >
-                <Square className="size-3.5" />
+                <Square className="size-3.5 fill-current" strokeWidth={0} />
               </TooltipIconButton>
             ) : (
               <VoiceRecordButton
@@ -283,7 +291,8 @@ export function ChatComposer({
 
           <ComposerAgentMenuSelect
             mode={chatComposerMode}
-            modelId={modelId}
+            llmBackend={llmBackend}
+            modelId={activeModelId}
             modeOptions={modeSelectOptions}
             modelIds={modelOptionIds}
             modelAutoFallback={modelAutoFallback}
@@ -302,7 +311,7 @@ export function ChatComposer({
               tooltip="Stop"
               onClick={onStop}
             >
-              <Square className="size-3.5" />
+              <Square className="size-3.5 fill-current" strokeWidth={0} />
             </TooltipIconButton>
           ) : (
             <TooltipIconButton
@@ -317,7 +326,7 @@ export function ChatComposer({
               tooltip={sendTooltip}
               onClick={onSend}
             >
-              <ArrowUp className="size-3.5" />
+              <ArrowUp className="size-3.5" strokeWidth={2} />
             </TooltipIconButton>
           )}
         </div>

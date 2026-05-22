@@ -55,6 +55,15 @@ export function formatChatDateLabel(timestamp: number): string {
   return dateLabelFormatter.format(new Date(timestamp))
 }
 
+const chatTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit'
+})
+
+export function formatChatTimeLabel(timestamp: number): string {
+  return chatTimeFormatter.format(new Date(timestamp))
+}
+
 function compareChats(a: Chat, b: Chat, sort: SidebarChatSort): number {
   switch (sort) {
     case 'name-asc':

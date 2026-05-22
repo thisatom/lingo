@@ -8,6 +8,8 @@ export type VoiceInputPhase = 'idle' | 'recording' | 'transcribing'
 
 export interface LiveVoiceHandlers {
   mode: ChatComposerMode
+  /** When true, transcript updates the open edit field — never a new chat message. */
+  isEditSpeech?: () => boolean
   onTextDraft: (text: string) => void
   onConversationLive: (text: string) => void
   onConversationStart: () => string
@@ -25,7 +27,9 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
 
   const onLiveTranscript = useCallback(
     (spoken: string) => {
-      if (handlers.mode === 'text') {
+      const useTextDraft = handlers.mode === 'text' || handlers.isEditSpeech?.()
+
+      if (useTextDraft) {
         const prefix = draftPrefixRef.current
         const next = prefix
           ? spoken
@@ -62,7 +66,7 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
   const stop = useCallback(async (): Promise<string | null> => {
     if (useBrowser) {
       const text = (await browser.stop())?.trim() ?? ''
-      if (handlers.mode === 'text') {
+      if (handlers.mode === 'text' || handlers.isEditSpeech?.()) {
         draftPrefixRef.current = ''
         return text || null
       }
@@ -76,7 +80,7 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
       const text = (await recorded.stop())?.trim() ?? null
       if (!text) return null
 
-      if (handlers.mode === 'text') {
+      if (handlers.mode === 'text' || handlers.isEditSpeech?.()) {
         const prefix = draftPrefixRef.current
         draftPrefixRef.current = ''
         handlers.onTextDraft(prefix ? `${prefix} ${text}`.trim() : text)
@@ -96,7 +100,7 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
   }, [browser, handlers, recorded, useBrowser, useLocal])
 
   const cancel = useCallback(async () => {
-    if (handlers.mode === 'text') {
+    if (handlers.mode === 'text' || handlers.isEditSpeech?.()) {
       if (draftPrefixRef.current) handlers.onTextDraft(draftPrefixRef.current)
       draftPrefixRef.current = ''
     } else {
