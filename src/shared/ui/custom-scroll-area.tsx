@@ -11,7 +11,10 @@ import { cn } from '@/shared/lib/utils'
 
 const THUMB_MIN_HEIGHT_PX = 32
 const HIDE_DELAY_MS = 500
-const AT_BOTTOM_THRESHOLD_PX = 80
+import { CHAT_SCROLL_BOTTOM_THRESHOLD_PX } from '@/shared/lib/chat-scroll-threshold'
+import { isViewportAtBottom } from '@/shared/lib/chat-scroll-viewport'
+
+const AT_BOTTOM_THRESHOLD_PX = CHAT_SCROLL_BOTTOM_THRESHOLD_PX
 const EDGE_FADE_THRESHOLD_PX = 6
 const EDGE_FADE_HEIGHT_PX = 28
 
@@ -90,17 +93,12 @@ function measureThumb(viewport: HTMLDivElement): ThumbMetrics {
   return { thumbHeight, thumbTop, canScroll: true }
 }
 
-function isViewportAtBottom(viewport: HTMLDivElement): boolean {
-  return (
-    viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
-    AT_BOTTOM_THRESHOLD_PX
-  )
-}
-
 export interface CustomScrollAreaProps {
   children: ReactNode
   className?: string
   variant?: ScrollVariant
+  /** When set (e.g. active chat id), scrollbar/at-bottom UI resyncs for the new session. */
+  scrollSessionKey?: string | null
   onAtBottomChange?: (atBottom: boolean) => void
   onShowScrollToLatestChange?: (show: boolean) => void
   onViewportRef?: (viewport: HTMLDivElement | null) => void
@@ -111,6 +109,7 @@ export function CustomScrollArea({
   children,
   className,
   variant = 'chat',
+  scrollSessionKey = null,
   onAtBottomChange,
   onShowScrollToLatestChange,
   onViewportRef,
@@ -217,21 +216,27 @@ export function CustomScrollArea({
     }
   }, [])
 
+  const readAtBottom = useCallback(
+    (viewport: HTMLDivElement) =>
+      isChat ? isViewportAtBottom(viewport, AT_BOTTOM_THRESHOLD_PX) : false,
+    [isChat]
+  )
+
   const reportAtBottom = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport || !onAtBottomChange) return
 
-    const next = isViewportAtBottom(viewport)
+    const next = isChat ? readAtBottom(viewport) : false
     if (next === atBottomRef.current) return
     atBottomRef.current = next
     onAtBottomChange(next)
-  }, [onAtBottomChange])
+  }, [isChat, onAtBottomChange, readAtBottom])
 
   const updateScrollToLatestVisibility = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport || !onShowScrollToLatestChange) return
 
-    if (isViewportAtBottom(viewport)) {
+    if (isChat && readAtBottom(viewport)) {
       clearScrollIdleTimer()
       if (!showScrollToLatestRef.current) return
       showScrollToLatestRef.current = false
@@ -243,7 +248,34 @@ export function CustomScrollArea({
       showScrollToLatestRef.current = true
       onShowScrollToLatestChange(true)
     }
-  }, [clearScrollIdleTimer, onShowScrollToLatestChange])
+  }, [clearScrollIdleTimer, isChat, onShowScrollToLatestChange, readAtBottom])
+
+  useLayoutEffect(() => {
+    if (!isChat || scrollSessionKey == null) return
+
+    showScrollToLatestRef.current = false
+    onShowScrollToLatestChange?.(false)
+
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    const nextAtBottom = readAtBottom(viewport)
+    if (atBottomRef.current !== nextAtBottom) {
+      atBottomRef.current = nextAtBottom
+      onAtBottomChange?.(nextAtBottom)
+    }
+
+    syncMetrics()
+    updateScrollToLatestVisibility()
+  }, [
+    isChat,
+    scrollSessionKey,
+    onAtBottomChange,
+    onShowScrollToLatestChange,
+    readAtBottom,
+    syncMetrics,
+    updateScrollToLatestVisibility
+  ])
 
   useEffect(() => {
     const viewport = viewportRef.current

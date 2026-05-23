@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getLingo, isLingoAvailable, readSecretKey } from '@/shared/lib/lingo'
+import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
 import type { SecretProviderId, SecretStatus } from '@/shared/types/ipc'
 
 export function useSecretKey(provider: SecretProviderId) {
@@ -46,8 +46,6 @@ export function useSecretKey(provider: SecretProviderId) {
     return next
   }, [provider])
 
-  const readKey = useCallback(async () => readSecretKey(provider), [provider])
-
-  return { status, loading, apiError, refresh, save, clear, readKey }
+  return { status, loading, apiError, refresh, save, clear }
 }
 

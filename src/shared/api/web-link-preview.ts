@@ -1,5 +1,6 @@
 import type { LinkPreviewResponse } from '@/shared/types/ipc'
 import { linkHostname } from '@/shared/lib/link-display'
+import { assertOutboundHttpUrl, OutboundUrlBlockedError } from '@/shared/lib/outbound-url-policy'
 import {
   readMetaContent,
   readTitleFromHtml,
@@ -12,14 +13,16 @@ const FETCH_TIMEOUT_MS = 8_000
 
 export async function fetchWebLinkPreview(url: string): Promise<LinkPreviewResponse> {
   const trimmed = url.trim()
-  let parsed: URL
+  let canonical: string
   try {
-    parsed = new URL(trimmed)
-  } catch {
+    canonical = assertOutboundHttpUrl(trimmed).href
+  } catch (error) {
+    if (error instanceof OutboundUrlBlockedError) {
+      return { url: trimmed, title: 'Link blocked', siteName: linkHostname(trimmed) }
+    }
     return { url: trimmed }
   }
 
-  const canonical = parsed.href
   const cached = previewCache.get(canonical)
   if (cached) return cached
 

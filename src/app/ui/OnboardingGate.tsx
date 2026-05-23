@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { OnboardingDialog } from '@/features/onboarding/ui/OnboardingDialog'
 import { useSettingsStore } from '@/entities/settings/model/store'
-
-/** Shows first-run setup after persisted settings are loaded. */
+/** First-run / reset onboarding inside the main window (desktop + web). */
 export function OnboardingGate() {
   const onboardingCompleted = useSettingsStore((s) => s.onboardingCompleted)
   const [hydrated, setHydrated] = useState(() => useSettingsStore.persist.hasHydrated())

@@ -38,6 +38,7 @@ const CustomLlmProfileEditor = lazy(() =>
   import('./CustomLlmProfileEditor').then((m) => ({ default: m.CustomLlmProfileEditor }))
 )
 import { SecretKeyRow } from './SecretKeyRow'
+import { WebDevSecretsNotice } from './WebDevSecretsNotice'
 
 const LLM_BACKEND_OPTIONS: { value: LlmBackend; label: string }[] = [
   { value: 'openrouter', label: 'OpenRouter' },
@@ -89,6 +90,7 @@ export function ApiSettingsForm() {
   return (
     <section>
       <h2 className={settingsSectionTitleClass}>API</h2>
+      <WebDevSecretsNotice />
 
       <p className={settingsSubsectionTitleClass}>Chat backend</p>
       <div className={settingsCardClass}>

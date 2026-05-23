@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useConversationStore } from '@/entities/conversation/model/store'
+import { setActiveChatPipelineStage } from '@/features/ai-chat/lib/pipeline-stage'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import {
   mapSpeechError,
@@ -41,7 +42,6 @@ function useRecordedStt(): boolean {
 export function useVoiceCapture() {
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
   const microphoneDeviceId = useSettingsStore((s) => s.microphoneDeviceId)
-  const setStage = useConversationStore((s) => s.setStage)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
 
   const useWhisper = useRecordedStt()
@@ -82,11 +82,11 @@ export function useVoiceCapture() {
   const finishTranscript = useCallback(
     (text: string, onTranscript: (value: string) => void) => {
       setInterimTranscript('')
-      setStage('idle')
+      setActiveChatPipelineStage('idle')
       cleanup()
       onTranscript(text.trim())
     },
-    [cleanup, setStage]
+    [cleanup]
   )
 
   const transcribeRecording = useCallback(
@@ -95,14 +95,14 @@ export function useVoiceCapture() {
       recorderRef.current = null
 
       if (!recorder) {
-        setStage('idle')
+        setActiveChatPipelineStage('idle')
         stoppingRef.current = false
         cleanup()
         reportSpeechError('RECORDING_EMPTY')
         return
       }
 
-      setStage('transcribing')
+      setActiveChatPipelineStage('transcribing')
 
       let audio: { audioBase64: string; format: string } | null = null
       try {
@@ -117,7 +117,7 @@ export function useVoiceCapture() {
       stoppingRef.current = false
 
       if (!audio) {
-        setStage('idle')
+        setActiveChatPipelineStage('idle')
         reportSpeechError('RECORDING_TOO_SHORT')
         return
       }
@@ -130,7 +130,7 @@ export function useVoiceCapture() {
         })
         if (!text.trim()) {
           reportSpeechError('no-speech')
-          setStage('idle')
+          setActiveChatPipelineStage('idle')
           return
         }
         finishTranscript(text, onTranscript)
@@ -145,11 +145,11 @@ export function useVoiceCapture() {
         } else {
           reportSpeechError(msg)
         }
-        setStage('idle')
+        setActiveChatPipelineStage('idle')
         cleanup()
       }
     },
-    [cleanup, finishTranscript, practiceLanguage, reportSpeechError, setStage]
+    [cleanup, finishTranscript, practiceLanguage, reportSpeechError]
   )
 
   const stopListening = useCallback(() => {
@@ -165,12 +165,12 @@ export function useVoiceCapture() {
     stoppingRef.current = false
 
     if (webSessionRef.current) {
-      setStage('transcribing')
+      setActiveChatPipelineStage('transcribing')
       webSessionRef.current.stop()
       webSessionRef.current = null
       setIsListening(false)
     }
-  }, [isListening, transcribeRecording, setStage, useWhisper])
+  }, [isListening, transcribeRecording, useWhisper])
 
   const startListeningSession = useCallback(
     async (onTranscript: (text: string) => void): Promise<boolean> => {
@@ -205,7 +205,7 @@ export function useVoiceCapture() {
         }
         recorderRef.current = recorder
         setIsListening(true)
-        setStage('listening')
+        setActiveChatPipelineStage('listening')
         return true
       }
 
@@ -216,7 +216,7 @@ export function useVoiceCapture() {
           const trimmed = text.trim()
           if (!trimmed) {
             reportSpeechError('no-speech')
-            setStage('idle')
+            setActiveChatPipelineStage('idle')
             cleanup()
             return
           }
@@ -224,7 +224,7 @@ export function useVoiceCapture() {
         },
         onError: (code) => {
           cleanup()
-          setStage('idle')
+          setActiveChatPipelineStage('idle')
           reportSpeechError(code)
         }
       })
@@ -237,7 +237,7 @@ export function useVoiceCapture() {
 
       webSessionRef.current = session
       setIsListening(true)
-      setStage('listening')
+      setActiveChatPipelineStage('listening')
       return true
     },
     [
@@ -247,7 +247,6 @@ export function useVoiceCapture() {
       practiceLanguage,
       reportSpeechError,
       setSpeechError,
-      setStage,
       supported,
       useWhisper
     ]

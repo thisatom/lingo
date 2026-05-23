@@ -1,6 +1,6 @@
 import type { MessageAttachment } from './attachment'
 
-export type MessageRole = 'user' | 'assistant'
+export type MessageRole = 'user' | 'assistant' | 'thinking'
 
 export interface Message {
   id: string

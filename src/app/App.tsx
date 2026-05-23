@@ -1,4 +1,5 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Toaster } from '@/shared/ui/sonner'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { AppShutdownSaver } from '@/app/ui/AppShutdownSaver'
 import { AppUpdateGate } from '@/app/ui/AppUpdateGate'
@@ -12,6 +13,7 @@ export function App() {
       <AppShutdownSaver />
       <OnboardingGate />
       <AppUpdateGate />
+      <Toaster position="bottom-right" closeButton />
       <HashRouter>
         <Routes>
           <Route element={<AppLayout />}>

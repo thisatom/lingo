@@ -1,10 +1,46 @@
 import { describe, expect, it } from 'vitest'
 import type { Message } from '@/entities/message/model/types'
-import { trimMessagesToTokenBudget } from './chat-context-usage'
+import {
+  estimateChatContextTokens,
+  getChatContextUsageDetails,
+  trimMessagesToTokenBudget
+} from './chat-context-usage'
 
-function msg(role: 'user' | 'assistant', content: string, id: string): Message {
+function msg(role: Message['role'], content: string, id: string): Message {
   return { id, role, content, createdAt: 0 }
 }
+
+describe('getChatContextUsageDetails', () => {
+  it('excludes thinking messages from token estimate', () => {
+    const withThinking = [
+      msg('user', 'hi', '1'),
+      msg('thinking', 'y'.repeat(20_000), '2'),
+      msg('assistant', 'ok', '3')
+    ]
+    const withoutThinking = [
+      msg('user', 'hi', '1'),
+      msg('assistant', 'ok', '3')
+    ]
+    const a = getChatContextUsageDetails(withThinking, 'openai/gpt-4o-mini', 1024)
+    const b = getChatContextUsageDetails(withoutThinking, 'openai/gpt-4o-mini', 1024)
+    expect(a.messageTokens).toBe(b.messageTokens)
+    expect(a.messageCount).toBe(2)
+  })
+})
+
+describe('estimateChatContextTokens', () => {
+  it('excludes thinking messages like the usage meter', () => {
+    const withThinking = [
+      msg('user', 'hi', '1'),
+      msg('thinking', 'y'.repeat(20_000), '2'),
+      msg('assistant', 'ok', '3')
+    ]
+    const withoutThinking = [msg('user', 'hi', '1'), msg('assistant', 'ok', '3')]
+    expect(estimateChatContextTokens(withThinking)).toBe(
+      estimateChatContextTokens(withoutThinking)
+    )
+  })
+})
 
 describe('trimMessagesToTokenBudget', () => {
   it('drops oldest messages when over budget', () => {
@@ -14,7 +50,7 @@ describe('trimMessagesToTokenBudget', () => {
       msg('assistant', long, '2'),
       msg('user', 'latest question', '3')
     ]
-    const trimmed = trimMessagesToTokenBudget(messages, 'unknown/small-model', 1024, 0.85)
+    const trimmed = trimMessagesToTokenBudget(messages, 'test/tiny-context', 1024)
     expect(trimmed.length).toBeLessThan(messages.length)
     expect(trimmed[trimmed.length - 1]?.content).toBe('latest question')
   })

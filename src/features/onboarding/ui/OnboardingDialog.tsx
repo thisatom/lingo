@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { completeOnboarding } from '@/features/onboarding/lib/complete-onboarding'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { OpenRouterModelCombobox } from '@/features/manage-api-keys/ui/OpenRouterModelCombobox'
 import { PRACTICE_LANGUAGE_OPTIONS } from '@/shared/config/practice-languages'
-import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
 import {
   settingsInputClass,
   settingsSelectContentClass,
@@ -61,12 +61,6 @@ function Field({
 }
 
 export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
-  const setOnboardingCompleted = useSettingsStore((s) => s.setOnboardingCompleted)
-  const setDisplayName = useSettingsStore((s) => s.setDisplayName)
-  const setAppTheme = useSettingsStore((s) => s.setAppTheme)
-  const setPracticeLanguage = useSettingsStore((s) => s.setPracticeLanguage)
-  const setModelId = useSettingsStore((s) => s.setModelId)
-  const setAddressUserByName = useSettingsStore((s) => s.setAddressUserByName)
 
   const [displayName, setDisplayNameLocal] = useState(
     () => useSettingsStore.getState().displayName
@@ -104,42 +98,26 @@ export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
     syncNativeTheme(resolved)
   }, [appTheme, open])
 
-  const persistSettings = () => {
-    const name = displayName.trim() || 'User'
-    setDisplayName(name)
-    setAppTheme(appTheme)
-    setPracticeLanguage(practiceLanguage)
-    setModelId(modelId)
-    setAddressUserByName(addressByName)
-  }
-
   const finish = async (skipApiKey = false) => {
-    const name = displayName.trim()
-    if (!name) {
-      setError('Enter your name to continue.')
-      return
-    }
-
     setBusy(true)
     setError(null)
 
     try {
-      persistSettings()
-
-      if (!skipApiKey && apiKey.trim().length > 0) {
-        if (!isLingoAvailable()) {
-          setError('Desktop API unavailable. Run the app with npm run dev.')
-          return
-        }
-        await getLingo().secrets.set('openrouter', apiKey.trim())
-        const result = await getLingo().secrets.validateOpenRouter()
-        if (!result.ok) {
-          setError(result.error ?? 'OpenRouter key validation failed.')
-          return
-        }
+      const result = await completeOnboarding(
+        {
+          displayName,
+          appTheme,
+          practiceLanguage,
+          modelId,
+          addressUserByName: addressByName,
+          apiKey
+        },
+        { skipApiKey }
+      )
+      if (!result.ok) {
+        setError(result.error)
+        return
       }
-
-      setOnboardingCompleted(true)
       onCompleted()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save setup.')

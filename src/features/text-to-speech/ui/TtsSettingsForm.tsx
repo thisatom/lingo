@@ -32,7 +32,9 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/shared/ui/select'
+import { Slider } from '@/shared/ui/slider'
 import { Switch } from '@/shared/ui/switch'
+import { TTS_VOLUME_MAX, TTS_VOLUME_MIN } from '@/shared/lib/tts-volume'
 
 export function TtsSettingsForm() {
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
@@ -42,6 +44,8 @@ export function TtsSettingsForm() {
   const setTtsSpeechRate = useSettingsStore((s) => s.setTtsSpeechRate)
   const ttsVoiceId = useSettingsStore((s) => s.ttsVoiceId)
   const setTtsVoiceId = useSettingsStore((s) => s.setTtsVoiceId)
+  const ttsVolume = useSettingsStore((s) => s.ttsVolume)
+  const setTtsVolume = useSettingsStore((s) => s.setTtsVolume)
 
   const [previewState, setPreviewState] = useState<'idle' | 'loading' | 'playing'>('idle')
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -142,6 +146,30 @@ export function TtsSettingsForm() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Volume</p>
+            <p className={settingsRowDescriptionClass}>
+              Loudness of assistant replies and the voice preview.
+            </p>
+          </div>
+          <div className="flex w-[220px] min-w-0 shrink-0 items-center gap-3">
+            <Slider
+              min={TTS_VOLUME_MIN}
+              max={TTS_VOLUME_MAX}
+              step={1}
+              value={[ttsVolume]}
+              onValueChange={(value) => setTtsVolume(value[0] ?? ttsVolume)}
+              disabled={!ttsEnabled}
+              aria-label="Playback volume"
+              className="min-w-0 flex-1"
+            />
+            <span className="w-9 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+              {ttsVolume}%
+            </span>
+          </div>
         </div>
 
         <div className={settingsRowClass}>

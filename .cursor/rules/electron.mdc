@@ -30,7 +30,7 @@ alwaysApply: false
 
 ## Безопасность
 
-- `contextIsolation: true`, `nodeIntegration: false` в renderer
+- `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` в renderer
 - **OpenRouter** и прочие ключи — **keytar** в main, запросы к AI из main или proxy
 - IPC `lingo:secrets:*` — см. `docs/API_KEYS.md`
 - Renderer: только маска ключа и `configured`, не полное значение

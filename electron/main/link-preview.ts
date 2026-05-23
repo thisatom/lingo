@@ -5,6 +5,11 @@ import {
   readTitleFromHtml,
   resolvePreviewAssetUrl
 } from '../../src/shared/lib/link-preview-parse'
+import {
+  assertOutboundHttpUrl,
+  fetchWithOutboundPolicy,
+  OutboundUrlBlockedError
+} from '../../src/shared/lib/outbound-url-policy'
 
 const MAX_HTML_BYTES = 256_000
 const FETCH_TIMEOUT_MS = 8_000
@@ -67,18 +72,16 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreviewResponse
   const trimmed = url.trim()
   if (!trimmed) throw new Error('Empty URL')
 
-  let parsed: URL
+  let canonical: string
   try {
-    parsed = new URL(trimmed)
-  } catch {
-    throw new Error('Invalid URL')
+    canonical = assertOutboundHttpUrl(trimmed).href
+  } catch (error) {
+    if (error instanceof OutboundUrlBlockedError) {
+      throw new Error(error.message)
+    }
+    throw error
   }
 
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('Only HTTP(S) links are supported')
-  }
-
-  const canonical = parsed.href
   const cached = previewCache.get(canonical)
   if (cached) return cached
 
@@ -86,9 +89,8 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreviewResponse
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
   try {
-    const response = await fetch(canonical, {
+    const response = await fetchWithOutboundPolicy(canonical, {
       signal: controller.signal,
-      redirect: 'follow',
       headers: {
         Accept: 'text/html,application/xhtml+xml',
         'User-Agent': 'Lingo/1.0 (link preview)'

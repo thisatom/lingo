@@ -7,8 +7,14 @@ import type {
 import { resolveChatCompletionsUrl } from '@/shared/config/custom-llm'
 import { customLlmConfig } from '@/shared/config/custom-llm'
 import { openRouterConfig } from '@/shared/config/openrouter'
+import { normalizeAlternatingChatPayloads } from '@/shared/lib/chat-api-alternation'
 import { mergeCustomCompletionBody } from '@/shared/lib/custom-llm-profile'
+import { assertOutboundHttpUrl } from '@/shared/lib/outbound-url-policy'
 import { openaiCompatibleHeaders } from '@/shared/lib/openai-compatible-headers'
+import {
+  buildCompletionRetryUserMessage,
+  shouldRetryIncompleteCompletion
+} from '@/shared/lib/completion-quality'
 import {
   getLastUserMessageContent,
   isSubstantiveReply,
@@ -27,10 +33,12 @@ import { extractAssistantText } from '@/shared/lib/openrouter-model'
 import {
   isLocalWebSearchRegistered
 } from '@/shared/lib/local-web-search-runtime'
+import { getWebSearchProvider } from '@/shared/lib/web-search-provider'
 import {
+  fetchLocalWebSearchResults,
   isWebSearchApiError,
   isWebSearchResultFailure,
-  substituteMessagesWithLocalWebSearch
+  substituteMessagesWithLocalWebSearchResults
 } from '@/shared/lib/web-search-messages'
 import {
   isVisionApiError,
@@ -62,7 +70,9 @@ function isCustomBackend(request: OpenRouterStreamRequest): boolean {
 
 function chatCompletionsUrl(request: OpenRouterStreamRequest): string {
   if (isCustomBackend(request) && request.customLlm?.baseUrl) {
-    return resolveChatCompletionsUrl(request.customLlm.baseUrl)
+    const target = resolveChatCompletionsUrl(request.customLlm.baseUrl)
+    assertOutboundHttpUrl(target, { allowPrivateNetwork: true })
+    return target
   }
   return `${openRouterConfig.baseURL}/chat/completions`
 }
@@ -151,7 +161,11 @@ Rules:
 
   return `You are Lingo, a friendly language practice partner. The user practices conversational ${lang}.
 ${today}
-Respond in ${lang}. Keep replies concise (2–4 sentences), gently correct mistakes, ask a follow-up when appropriate.${ocrNote}`
+Respond in ${lang}. Match the user's intent: short drills can be brief; explanations and stories should be as long as needed.
+Rules:
+- Finish every reply completely; never stop mid-sentence.
+- Stay consistent with the conversation above; if something is unclear, ask one short clarifying question.
+- Gently correct mistakes when relevant; ask a follow-up when it helps practice.${ocrNote}`
 }
 
 function payloadHasContent(content: ChatMessagePayload['content']): boolean {
@@ -176,13 +190,14 @@ function filterHistoryForApi(
   messages: ChatMessagePayload[],
   researchMode: boolean
 ): ChatMessagePayload[] {
-  return messages.filter((m) => {
+  const filtered = messages.filter((m) => {
     if (m.role === 'system') return false
     if (researchMode && m.role === 'assistant' && assistantTextLength(m.content) < 48) {
       return false
     }
     return payloadHasContent(m.content)
   })
+  return normalizeAlternatingChatPayloads(filtered)
 }
 
 function buildMessages(
@@ -292,9 +307,30 @@ async function fetchCompletionResilient(
   }
 }
 
+type ReasoningDetail = {
+  type?: string
+  text?: string
+  summary?: string
+}
+
+type StreamDelta = {
+  content?: string | Array<{ type?: string; text?: string }>
+  reasoning?: string
+  reasoning_content?: string
+  reasoning_details?: ReasoningDetail[]
+}
+
+type StreamMessage = {
+  content?: string | Array<{ type?: string; text?: string }>
+  reasoning?: string
+  reasoning_content?: string
+  reasoning_details?: ReasoningDetail[]
+}
+
 type SseChunk = {
   choices?: Array<{
-    delta?: { content?: string | Array<{ type?: string; text?: string }> }
+    delta?: StreamDelta
+    message?: StreamMessage
     finish_reason?: string | null
   }>
   error?: { message?: string }
@@ -302,6 +338,52 @@ type SseChunk = {
 
 function extractStreamDelta(chunk: SseChunk): string {
   return extractAssistantText(chunk.choices?.[0]?.delta ?? {})
+}
+
+function reasoningFromContentParts(
+  content: string | Array<{ type?: string; text?: string }> | undefined
+): string {
+  if (!content || typeof content === 'string') return ''
+  return content
+    .filter((part) => part.type === 'reasoning' || part.type === 'thinking')
+    .map((part) => part.text ?? '')
+    .join('')
+}
+
+function reasoningFromDetails(details: ReasoningDetail[] | undefined): string {
+  if (!details?.length) return ''
+  return details
+    .map((part) => part.text?.trim() || part.summary?.trim() || '')
+    .filter(Boolean)
+    .join('')
+}
+
+function extractStreamReasoning(chunk: SseChunk): string {
+  const choice = chunk.choices?.[0]
+  const delta = choice?.delta
+  const message = choice?.message
+
+  if (delta) {
+    if (typeof delta.reasoning === 'string' && delta.reasoning) return delta.reasoning
+    if (typeof delta.reasoning_content === 'string' && delta.reasoning_content) {
+      return delta.reasoning_content
+    }
+    const fromDetails = reasoningFromDetails(delta.reasoning_details)
+    if (fromDetails) return fromDetails
+    const fromParts = reasoningFromContentParts(delta.content)
+    if (fromParts) return fromParts
+  }
+
+  if (message) {
+    if (typeof message.reasoning === 'string' && message.reasoning) return message.reasoning
+    if (typeof message.reasoning_content === 'string' && message.reasoning_content) {
+      return message.reasoning_content
+    }
+    const fromParts = reasoningFromContentParts(message.content)
+    if (fromParts) return fromParts
+  }
+
+  return ''
 }
 
 async function fetchCompletionStreaming(
@@ -314,7 +396,6 @@ async function fetchCompletionStreaming(
 ): Promise<CompletionResult> {
   const merged = withCustomCompletionExtras(request, { ...body, stream: true })
   if (merged.stream === false) {
-    send({ type: 'status', label: 'Waiting for model response…' })
     const result = await fetchCompletion(request, apiKey, body, signal, fetchImpl)
     send({ type: 'text-delta', delta: result.text, text: result.text })
     return result
@@ -344,6 +425,7 @@ async function fetchCompletionStreaming(
   const decoder = new TextDecoder()
   let buffer = ''
   let text = ''
+  let thinkingText = ''
   let finishReason: string | null = null
 
   while (true) {
@@ -373,6 +455,12 @@ async function fetchCompletionStreaming(
         throw new Error(isCustomBackend(request) ? message : formatOpenRouterError(message))
       }
 
+      const reasoning = extractStreamReasoning(chunk)
+      if (reasoning) {
+        thinkingText += reasoning
+        send({ type: 'thinking-delta', delta: reasoning, text: thinkingText })
+      }
+
       const delta = extractStreamDelta(chunk)
       if (delta) {
         text += delta
@@ -384,11 +472,62 @@ async function fetchCompletionStreaming(
     }
   }
 
-  if (!text.trim()) {
+  if (!text.trim() && !thinkingText.trim()) {
     throw new Error('Model returned an empty response')
   }
 
   return { text, finishReason }
+}
+
+type ChatCompletionMessage = {
+  role: string
+  content: string | ChatMessagePayload['content']
+}
+
+async function streamCompletionWithIncompleteRetry(
+  request: OpenRouterStreamRequest,
+  apiKey: string,
+  body: Record<string, unknown>,
+  send: SendEvent,
+  lastUserMessage: string,
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch,
+  options: { requireSubstantive: boolean }
+): Promise<CompletionResult> {
+  let result = await fetchCompletionResilientStreaming(
+    request,
+    apiKey,
+    body,
+    send,
+    signal,
+    fetchImpl
+  )
+
+  if (
+    !shouldRetryIncompleteCompletion({
+      answer: result.text,
+      finishReason: result.finishReason,
+      userMessage: lastUserMessage,
+      requireSubstantive: options.requireSubstantive
+    })
+  ) {
+    return result
+  }
+
+  const retryMessages: ChatCompletionMessage[] = [
+    ...(body.messages as ChatCompletionMessage[]),
+    { role: 'assistant', content: result.text },
+    { role: 'user', content: buildCompletionRetryUserMessage(lastUserMessage) }
+  ]
+
+  return fetchCompletionResilientStreaming(
+    request,
+    apiKey,
+    { ...body, messages: retryMessages, max_tokens: maxTokensRetryBudget(request) },
+    send,
+    signal,
+    fetchImpl
+  )
 }
 
 async function fetchCompletionResilientStreaming(
@@ -487,9 +626,22 @@ async function completeWithLocalWebSearch(
   signal: AbortSignal | undefined,
   fetchImpl: OpenRouterFetch
 ): Promise<void> {
-  send({ type: 'status', label: 'Fetching web results…' })
-  const augmented = await substituteMessagesWithLocalWebSearch(apiMessages, lastUserMessage)
-  send({ type: 'status', label: 'Writing answer…' })
+  const results = await fetchLocalWebSearchResults(lastUserMessage)
+  const targets = results
+    .filter((result) => result.url || result.title)
+    .map((result) => ({
+      title: result.title.trim() || result.url,
+      url: result.url
+    }))
+  if (targets.length > 0) {
+    send({ type: 'search-targets', targets })
+  }
+
+  const augmented = substituteMessagesWithLocalWebSearchResults(
+    apiMessages,
+    lastUserMessage,
+    results
+  )
   const body = withCustomCompletionExtras(request, {
     model: userModelId.trim(),
     messages: buildMessages(augmented, practiceLanguage, 'research'),
@@ -497,13 +649,15 @@ async function completeWithLocalWebSearch(
     temperature: 0.3
   })
 
-  const { text } = await fetchCompletionResilientStreaming(
+  const { text } = await streamCompletionWithIncompleteRetry(
     request,
     apiKey,
     body,
     send,
+    lastUserMessage,
     signal,
-    fetchImpl
+    fetchImpl,
+    { requireSubstantive: true }
   )
   send({ type: 'done', text })
 }
@@ -530,7 +684,11 @@ async function tryNativeWebSearch(
   })
 
   attachWebCapabilities(body, userModelId)
-  send({ type: 'status', label: 'Searching via model…' })
+  const provider = getWebSearchProvider(userModelId, { local: false })
+  send({
+    type: 'search-targets',
+    targets: [{ title: provider.label, url: provider.href }]
+  })
   await completeWithWebSearch(request, apiKey, body, send, lastUserMessage, signal, fetchImpl)
 }
 
@@ -554,7 +712,6 @@ async function completeTextChat(
 
   if (webSearchEnabled) {
     send({ type: 'searching' })
-    send({ type: 'status', label: 'Searching the web…' })
 
     if (isLocalWebSearchRegistered()) {
       await completeWithLocalWebSearch(
@@ -617,14 +774,15 @@ async function completeTextChat(
     temperature: researchMode ? 0.3 : 0.7
   })
 
-  send({ type: 'status', label: 'Generating answer…' })
-  const { text } = await fetchCompletionResilientStreaming(
+  const { text } = await streamCompletionWithIncompleteRetry(
     request,
     apiKey,
     body,
     send,
+    lastUserMessage,
     signal,
-    fetchImpl
+    fetchImpl,
+    { requireSubstantive: researchMode }
   )
   send({ type: 'done', text })
 }
@@ -656,7 +814,6 @@ export async function streamOpenRouterChat(
     let hasImages = messagesHaveImages(apiMessages)
 
     if (hasImages && !isVisionCapableModel(tryModelId)) {
-      send({ type: 'status', label: 'Reading attached images…' })
       apiMessages = await substituteMessagesWithOcr(apiMessages)
       hasImages = false
     }
@@ -670,27 +827,28 @@ export async function streamOpenRouterChat(
       })
 
       try {
-        const { text } = await fetchCompletionResilientStreaming(
+        const lastUserMessage = getLastUserMessageContent(apiMessages)
+        const { text } = await streamCompletionWithIncompleteRetry(
           request,
           apiKey,
           body,
           send,
+          lastUserMessage,
           signal,
-          fetchImpl
+          fetchImpl,
+          { requireSubstantive: true }
         )
         send({ type: 'done', text })
         return
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (!isVisionApiError(message)) throw error
-        send({ type: 'status', label: 'Reading attached images…' })
         apiMessages = await substituteMessagesWithOcr(apiMessages)
         hasImages = false
       }
     }
 
     if (hasImages) {
-      send({ type: 'status', label: 'Reading attached images…' })
       apiMessages = await substituteMessagesWithOcr(apiMessages)
     }
 

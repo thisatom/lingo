@@ -27,6 +27,9 @@ import { TTS_VOICE_AUTO, isKnownTtsVoiceId, normalizeTtsVoiceId } from '@/shared
 import { isSidebarChatSort, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
 import { LLM_MAX_TOKENS_DEFAULT, normalizeLlmMaxTokens } from '@/shared/lib/llm-max-tokens'
 import { isTtsSpeechRate, type TtsSpeechRate } from '@/shared/lib/tts-rate'
+import { normalizeTtsVolume, TTS_VOLUME_DEFAULT } from '@/shared/lib/tts-volume'
+import { hasPersistedChatsInStorage } from '@/shared/lib/has-persisted-chats'
+import { resolveOnboardingCompleted } from '@/shared/lib/onboarding-status'
 import { isAppTheme } from '@/shared/lib/theme'
 import type { AppTheme } from '@/shared/types/app-theme'
 
@@ -64,6 +67,8 @@ interface SettingsState {
   ttsSpeechRate: TtsSpeechRate
   /** Edge voice id; empty = automatic from practice language. */
   ttsVoiceId: string
+  /** Playback volume for assistant TTS (0–100). */
+  ttsVolume: number
   chatComposerMode: ChatComposerMode
   webSearchEnabled: boolean
   /** On API error, try other free OpenRouter models (each at most once). */
@@ -92,6 +97,7 @@ interface SettingsState {
   setTtsEnabled: (enabled: boolean) => void
   setTtsSpeechRate: (rate: TtsSpeechRate) => void
   setTtsVoiceId: (voiceId: string) => void
+  setTtsVolume: (volume: number) => void
   setChatComposerMode: (mode: ChatComposerMode) => void
   setWebSearchEnabled: (enabled: boolean) => void
   setModelAutoFallback: (enabled: boolean) => void
@@ -122,6 +128,7 @@ type PersistedSettings = Pick<
   | 'ttsEnabled'
   | 'ttsSpeechRate'
   | 'ttsVoiceId'
+  | 'ttsVolume'
   | 'chatComposerMode'
   | 'webSearchEnabled'
   | 'modelAutoFallback'
@@ -151,6 +158,7 @@ const DEFAULT_SETTINGS: Omit<
   | 'setTtsEnabled'
   | 'setTtsSpeechRate'
   | 'setTtsVoiceId'
+  | 'setTtsVolume'
   | 'setChatComposerMode'
   | 'setWebSearchEnabled'
   | 'setModelAutoFallback'
@@ -178,6 +186,7 @@ const DEFAULT_SETTINGS: Omit<
   ttsEnabled: true,
   ttsSpeechRate: 'normal',
   ttsVoiceId: TTS_VOICE_AUTO,
+  ttsVolume: TTS_VOLUME_DEFAULT,
   chatComposerMode: 'text',
   webSearchEnabled: true,
   modelAutoFallback: true,
@@ -263,6 +272,7 @@ export const useSettingsStore = create<SettingsState>()(
             ? normalizeTtsVoiceId(ttsVoiceId)
             : TTS_VOICE_AUTO
         }),
+      setTtsVolume: (ttsVolume) => set({ ttsVolume: normalizeTtsVolume(ttsVolume) }),
       setChatComposerMode: (chatComposerMode) => set({ chatComposerMode }),
       setWebSearchEnabled: (webSearchEnabled) => set({ webSearchEnabled }),
       setModelAutoFallback: (modelAutoFallback) => set({ modelAutoFallback }),
@@ -274,7 +284,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'lingo-settings',
-      version: 17,
+      version: 20,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
         llmBackend: state.llmBackend,
@@ -294,6 +304,7 @@ export const useSettingsStore = create<SettingsState>()(
         ttsEnabled: state.ttsEnabled,
         ttsSpeechRate: state.ttsSpeechRate,
         ttsVoiceId: state.ttsVoiceId,
+        ttsVolume: state.ttsVolume,
         chatComposerMode: state.chatComposerMode,
         webSearchEnabled: state.webSearchEnabled,
         modelAutoFallback: state.modelAutoFallback,
@@ -359,7 +370,7 @@ export const useSettingsStore = create<SettingsState>()(
             appTheme: isAppTheme(state.appTheme) ? state.appTheme : 'dark'
           }
         }
-        if (version < 13) {
+        if (version < 13 && version > 0) {
           state = {
             ...state,
             onboardingCompleted: true
@@ -391,6 +402,47 @@ export const useSettingsStore = create<SettingsState>()(
           state = {
             ...state,
             llmMaxTokens: normalizeLlmMaxTokens(state.llmMaxTokens)
+          }
+        }
+        if (version < 18) {
+          state = {
+            ...state,
+            ttsVolume: normalizeTtsVolume(state.ttsVolume)
+          }
+        }
+        if (version < 19) {
+          const existingJson =
+            typeof state.customLlmProfileJson === 'string' ? state.customLlmProfileJson : ''
+          if (existingJson.trim()) {
+            const parsed = parseCustomLlmProfileSource(existingJson)
+            if (parsed.ok) {
+              if (parsed.importedApiKey) {
+                queueMicrotask(() => {
+                  void (async () => {
+                    try {
+                      const { getLingo, isElectronApp } = await import('@/shared/lib/lingo')
+                      if (isElectronApp()) {
+                        await getLingo().secrets.clear('custom-llm')
+                      }
+                    } catch {
+                      // ignore — key may already live only in secure storage
+                    }
+                  })()
+                })
+              }
+              state = {
+                ...state,
+                customLlmProfileJson: stringifyCustomLlmProfile(parsed.data.profile)
+              }
+            }
+          }
+        }
+        if (version < 20) {
+          if (hasPersistedChatsInStorage()) {
+            state = {
+              ...state,
+              onboardingCompleted: true
+            }
           }
         }
         if (version < 16) {
@@ -467,11 +519,14 @@ export const useSettingsStore = create<SettingsState>()(
                 ? normalizeTtsVoiceId(saved.ttsVoiceId)
                 : TTS_VOICE_AUTO
               : current.ttsVoiceId,
+          ttsVolume: normalizeTtsVolume(saved.ttsVolume ?? current.ttsVolume),
           appTheme: isAppTheme(saved.appTheme) ? saved.appTheme : current.appTheme,
-          onboardingCompleted:
+          onboardingCompleted: resolveOnboardingCompleted(
             typeof saved.onboardingCompleted === 'boolean'
               ? saved.onboardingCompleted
-              : current.onboardingCompleted
+              : undefined,
+            current.onboardingCompleted
+          )
         }
       }
     }

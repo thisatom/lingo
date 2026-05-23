@@ -12,6 +12,7 @@ import '@vscode/codicons/dist/codicon.css'
 import '@/app/styles/globals.css'
 import '@/app/styles/markdown-code.css'
 import '@/app/styles/markdown-math.css'
+import '@/app/styles/thinking-markdown.css'
 
 ensureLingoBridge()
 setupTesseractImageOcr()

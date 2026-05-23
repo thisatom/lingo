@@ -59,16 +59,23 @@ export interface ChatStreamRequest {
   maxTokensRetry?: number
 }
 
+export type PipelineSearchTargetPayload = {
+  title: string
+  url: string
+}
+
 export type ChatStreamEvent =
   | { type: 'searching' }
-  | { type: 'status'; label: string }
+  | { type: 'search-targets'; targets: PipelineSearchTargetPayload[] }
+  | { type: 'thinking-delta'; delta: string; text: string }
   | { type: 'text-delta'; delta: string; text: string }
   | { type: 'done'; text: string }
   | { type: 'error'; message: string }
 
 export interface ChatStreamHandlers {
   onSearching?: () => void
-  onStatus?: (event: Extract<ChatStreamEvent, { type: 'status' }>) => void
+  onSearchTargets?: (event: Extract<ChatStreamEvent, { type: 'search-targets' }>) => void
+  onThinkingDelta?: (event: Extract<ChatStreamEvent, { type: 'thinking-delta' }>) => void
   onTextDelta?: (event: Extract<ChatStreamEvent, { type: 'text-delta' }>) => void
   onDone?: (event: Extract<ChatStreamEvent, { type: 'done' }>) => void
   onError?: (event: Extract<ChatStreamEvent, { type: 'error' }>) => void
@@ -145,13 +152,15 @@ export interface LingoApi {
   platform: LingoPlatform
   secrets: {
     getStatus: (provider: SecretProviderId) => Promise<SecretStatus>
-    /** Full stored key (settings reveal). Prefer over legacy `get`. */
-    readKey: (provider: SecretProviderId) => Promise<string | null>
-    /** @deprecated Use readKey — kept for older preload bundles */
-    get?: (provider: SecretProviderId) => Promise<string | null>
+    /** Web-only: read key from localStorage. Not exposed in Electron preload. */
+    readKey?: (provider: SecretProviderId) => Promise<string | null>
     set: (provider: SecretProviderId, value: string) => Promise<SecretStatus>
     clear: (provider: SecretProviderId) => Promise<SecretStatus>
     validateOpenRouter: () => Promise<{ ok: boolean; error?: string }>
+  }
+  /** Desktop: model catalog without exposing API keys to renderer. */
+  openrouter?: {
+    listModels: () => Promise<string[]>
   }
   chat: {
     complete: (request: ChatCompleteRequest) => Promise<ChatCompleteResponse>
@@ -185,6 +194,9 @@ export interface LingoApi {
     openReleasesPage: () => Promise<void>
     consumePendingNotice: () => Promise<PendingUpdateNotice | null>
     onUpdateAvailable: (handler: (info: AppUpdateInfo) => void) => () => void
+  }
+  welcome?: {
+    finish: () => Promise<void>
   }
   app?: {
     onPrepareShutdown: (handler: () => void | Promise<void>) => () => void

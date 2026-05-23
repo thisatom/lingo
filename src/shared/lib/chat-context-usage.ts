@@ -3,7 +3,8 @@ import { LLM_MAX_TOKENS_DEFAULT, normalizeLlmMaxTokens } from '@/shared/lib/llm-
 import type { Message } from '@/entities/message/model/types'
 
 const MESSAGE_OVERHEAD_TOKENS = 4
-const SYSTEM_PROMPT_RESERVE = 256
+const SYSTEM_PROMPT_RESERVE = 384
+const CONTEXT_SAFETY_MARGIN = 0.05
 const DEFAULT_CONTEXT_LIMIT = 32_000
 
 /** Approximate context window sizes (tokens) for common OpenRouter models. */
@@ -25,7 +26,8 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   'openrouter/auto': 128_000,
   'nvidia/nemotron-3-super-120b-a12b:free': 256_000,
   'meta-llama/llama-3.3-70b-instruct:free': 128_000,
-  'google/gemma-3-27b-it:free': 128_000
+  'google/gemma-3-27b-it:free': 128_000,
+  'test/tiny-context': 4_000
 }
 
 export function getModelContextLimit(modelId: string): number {
@@ -41,9 +43,10 @@ export function estimateTextTokens(text: string): number {
 export function estimateChatContextTokens(
   messages: readonly Pick<Message, 'role' | 'content'>[]
 ): number {
+  const forApi = messages.filter((m) => m.role !== 'thinking')
   return (
     SYSTEM_PROMPT_RESERVE +
-    messages.reduce(
+    forApi.reduce(
       (sum, message) =>
         sum + MESSAGE_OVERHEAD_TOKENS + estimateTextTokens(message.content),
       0
@@ -74,8 +77,9 @@ export function getChatContextUsageDetails(
   modelId: string,
   reservedOutputTokens: number = LLM_MAX_TOKENS_DEFAULT
 ): ChatContextUsageDetails {
+  const forApi = messages.filter((m) => m.role !== 'thinking')
   const limitTokens = getModelContextLimit(modelId)
-  const messageTokens = messages.reduce(
+  const messageTokens = forApi.reduce(
     (sum, message) => sum + MESSAGE_OVERHEAD_TOKENS + estimateTextTokens(message.content),
     0
   )
@@ -92,7 +96,7 @@ export function getChatContextUsageDetails(
     messageTokens,
     systemReserveTokens,
     outputReserveTokens,
-    messageCount: messages.length
+    messageCount: forApi.length
   }
 }
 
@@ -114,7 +118,10 @@ export function trimMessagesForContext(
     estimateChatContextTokens(trimmed) + reservedOutput > targetTokens
   ) {
     trimmed = trimmed.slice(1)
-    while (trimmed.length > 0 && trimmed[0]?.role === 'assistant') {
+    while (
+      trimmed.length > 0 &&
+      (trimmed[0]?.role === 'assistant' || trimmed[0]?.role === 'thinking')
+    ) {
       trimmed = trimmed.slice(1)
     }
   }
@@ -122,29 +129,56 @@ export function trimMessagesForContext(
   return trimmed
 }
 
+export type TrimMessagesToTokenBudgetResult = {
+  messages: Message[]
+  /** True when older turns were dropped for the model context window. */
+  historyTruncated: boolean
+}
+
+function dropLeadingNonUser(messages: Message[]): Message[] {
+  let trimmed = messages
+  while (
+    trimmed.length > 0 &&
+    (trimmed[0]?.role === 'assistant' || trimmed[0]?.role === 'thinking')
+  ) {
+    trimmed = trimmed.slice(1)
+  }
+  return trimmed
+}
+
+/** Keeps the newest messages that fit the model input budget (output tokens reserved separately). */
+export function trimMessagesToTokenBudgetWithMeta(
+  messages: readonly Message[],
+  modelId: string,
+  reservedOutputTokens: number = LLM_MAX_TOKENS_DEFAULT
+): TrimMessagesToTokenBudgetResult {
+  if (messages.length <= 2) {
+    return { messages: [...messages], historyTruncated: false }
+  }
+
+  const limit = getModelContextLimit(modelId)
+  const reservedOutput = normalizeLlmMaxTokens(reservedOutputTokens)
+  const inputBudget = Math.floor(
+    (limit - reservedOutput - SYSTEM_PROMPT_RESERVE) * (1 - CONTEXT_SAFETY_MARGIN)
+  )
+  let trimmed = [...messages]
+  const originalLength = trimmed.length
+
+  while (trimmed.length > 2 && estimateChatContextTokens(trimmed) > inputBudget) {
+    trimmed = dropLeadingNonUser(trimmed.slice(1))
+  }
+
+  return {
+    messages: trimmed,
+    historyTruncated: trimmed.length < originalLength
+  }
+}
+
 /** Keeps the newest messages that fit the model context (for API requests). */
 export function trimMessagesToTokenBudget(
   messages: readonly Message[],
   modelId: string,
-  reservedOutputTokens: number = LLM_MAX_TOKENS_DEFAULT,
-  maxUtilization = 0.85
+  reservedOutputTokens: number = LLM_MAX_TOKENS_DEFAULT
 ): Message[] {
-  if (messages.length <= 2) return [...messages]
-
-  const limit = getModelContextLimit(modelId)
-  const reservedOutput = normalizeLlmMaxTokens(reservedOutputTokens)
-  const maxUsed = Math.floor(limit * maxUtilization)
-
-  let trimmed = [...messages]
-  while (
-    trimmed.length > 2 &&
-    estimateChatContextTokens(trimmed) + reservedOutput > maxUsed
-  ) {
-    trimmed = trimmed.slice(1)
-    while (trimmed.length > 0 && trimmed[0]?.role === 'assistant') {
-      trimmed = trimmed.slice(1)
-    }
-  }
-
-  return trimmed
+  return trimMessagesToTokenBudgetWithMeta(messages, modelId, reservedOutputTokens).messages
 }

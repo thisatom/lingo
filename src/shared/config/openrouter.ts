@@ -7,10 +7,10 @@ export const openRouterConfig = {
   webSearchModel: 'openrouter/free',
   /** Legacy; STT uses free local Whisper in the desktop app. */
   sttModel: 'openai/whisper-large-v3',
-  /** Default completion budget (fits low-credit OpenRouter accounts). */
-  maxTokens: 1024,
-  /** Retry after a short/incomplete web-search answer. */
-  maxTokensRetry: 1536,
+  /** Default completion budget per assistant turn. */
+  maxTokens: 2048,
+  /** Retry after a short/incomplete answer (higher cap). */
+  maxTokensRetry: 3072,
   /** Last resort when OpenRouter rejects the requested max_tokens budget. */
   maxTokensCreditFallback: 512
 } as const

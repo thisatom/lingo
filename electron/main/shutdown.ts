@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 
-const SHUTDOWN_TIMEOUT_MS = 12_000
+/** Allow debounced chat persist + settings flush; force-close only as last resort. */
+const SHUTDOWN_TIMEOUT_MS = 22_000
 const SHUTDOWN_CHANNEL = 'lingo:app:shutdown-complete'
 
 const closeAllowed = new WeakSet<BrowserWindow>()

@@ -2,17 +2,17 @@ import { app, BrowserWindow, session } from 'electron'
 import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools'
 import { registerIpcHandlers } from './ipc'
 import { warmOpenRouterConnection } from './openrouter-fetch'
+import { registerRendererScheme, setupRendererProtocol } from './renderer-protocol'
 import { loadEnvBootstrap, warmSecretsCache } from './secrets'
-import {
-  createMainWindow,
-  setupSingleInstanceApp,
-  setupTitlebarOnce
-} from './window-manager'
+import { setupSingleInstanceApp, setupTitlebarOnce } from './window-manager'
+import { focusMainWindow, launchDesktopWindows } from './welcome-flow'
+
+registerRendererScheme()
 
 // Allow TTS playback after async API calls (no fresh user gesture).
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
-if (!setupSingleInstanceApp(createMainWindow)) {
+if (!setupSingleInstanceApp(focusMainWindow)) {
   // Secondary process exits immediately — avoids userData / disk cache conflicts.
 } else {
   app.whenReady().then(async () => {
@@ -33,6 +33,8 @@ if (!setupSingleInstanceApp(createMainWindow)) {
       allowMedia(permission)
     )
 
+    await setupRendererProtocol()
+
     setupTitlebarOnce()
     registerDevToolsShortcut()
     registerIpcHandlers()
@@ -45,11 +47,11 @@ if (!setupSingleInstanceApp(createMainWindow)) {
       console.error('[lingo] Failed to load API key bootstrap:', error)
     }
 
-    createMainWindow()
+    void launchDesktopWindows()
   })
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    if (BrowserWindow.getAllWindows().length === 0) void launchDesktopWindows()
   })
 
   app.on('window-all-closed', () => {

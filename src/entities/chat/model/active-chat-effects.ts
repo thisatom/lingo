@@ -1,10 +1,17 @@
-/** Side effects when the active chat changes (registered from app layer). */
-let onActiveChatChange: (() => void) | null = null
+/** Side effects when the active chat changes (registered from app / features). */
+const onActiveChatChangeHandlers: (() => void)[] = []
 
 export function registerActiveChatChangeHandler(handler: () => void): void {
-  onActiveChatChange = handler
+  onActiveChatChangeHandlers.push(handler)
+}
+
+/** @internal Test-only reset. */
+export function clearActiveChatChangeHandlers(): void {
+  onActiveChatChangeHandlers.length = 0
 }
 
 export function notifyActiveChatChange(): void {
-  onActiveChatChange?.()
+  for (const handler of onActiveChatChangeHandlers) {
+    handler()
+  }
 }

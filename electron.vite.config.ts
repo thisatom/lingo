@@ -4,6 +4,7 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import type { Plugin } from 'vite'
+import { injectContentSecurityPolicy } from './vite/inject-csp'
 
 /** Keep Node-only MCP client out of the Electron renderer bundle. */
 function stubWebsearchMcpForRenderer(): Plugin {
@@ -58,16 +59,30 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: ['@incanta/custom-electron-titlebar'] })],
     build: {
       rollupOptions: {
-        input: resolve(__dirname, 'electron/preload/index.ts')
+        input: resolve(__dirname, 'electron/preload/index.ts'),
+        output: {
+          format: 'cjs',
+          entryFileNames: 'index.cjs',
+          inlineDynamicImports: true
+        }
       }
     }
   },
   renderer: {
     root: '.',
     base: './',
+    server: {
+      port: 5173,
+      host: '127.0.0.1',
+      strictPort: false
+    },
     build: {
       rollupOptions: {
-        input: resolve(__dirname, 'index.html')
+        input: {
+          index: resolve(__dirname, 'index.html'),
+          welcome: resolve(__dirname, 'welcome.html'),
+          'welcome-probe': resolve(__dirname, 'welcome-probe.html')
+        }
       }
     },
     resolve: {
@@ -75,6 +90,11 @@ export default defineConfig({
         '@': resolve(__dirname, 'src')
       }
     },
-    plugins: [stubWebsearchMcpForRenderer(), react(), tailwindcss()]
+    plugins: [
+      injectContentSecurityPolicy(),
+      stubWebsearchMcpForRenderer(),
+      react(),
+      tailwindcss()
+    ]
   }
 })

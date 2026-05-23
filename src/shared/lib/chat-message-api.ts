@@ -57,6 +57,9 @@ export function buildUserApiContent(
 export function messageToApiPayload(
   message: Pick<Message, 'role' | 'content' | 'attachments'>
 ): ChatMessagePayload {
+  if (message.role === 'thinking') {
+    throw new Error('Thinking messages are not sent to the API')
+  }
   if (message.role === 'user' && (message.attachments?.length ?? 0) > 0) {
     const text = message.content.trim() ? message.content : '(See attached files)'
     return { role: 'user', content: buildUserApiContent(text, message.attachments) }
@@ -85,5 +88,6 @@ export function messageHasApiContent(payload: ChatMessagePayload): boolean {
 }
 
 export function messageHasVisibleContent(message: Message): boolean {
+  if (message.role === 'thinking') return true
   return message.content.trim().length > 0 || (message.attachments?.length ?? 0) > 0
 }

@@ -29,12 +29,26 @@ import {
 import type { ChatStreamController } from '@/shared/types/ipc'
 import { getLingo } from '@/shared/lib/lingo'
 import { formatQueuePreview } from '@/entities/message-queue/lib/format-queue-preview'
-import { isPlaybackOnlyConversationError } from '@/features/ai-chat/lib/post-reply'
 import {
+  agentTurnTailMessageId,
+  findTurnTailRemoveId,
+  removeAgentTurnTail,
+  removeAgentTurnTailUnlessPersisted
+} from '@/features/ai-chat/lib/agent-turn-cleanup'
+import { isPlaybackOnlyConversationError } from '@/features/ai-chat/lib/post-reply'
+import '@/features/ai-chat/lib/chat-pipeline-registry'
+import {
+  getBackgroundStreamChatId,
+  setAgentStreamSession
+} from '@/features/ai-chat/lib/agent-stream-session'
+import {
+  clearPipelineDetailForChat,
   isViewingChat,
-  setPipelineActivityForChat,
   setPipelineErrorForChat,
-  setPipelineStageForChat
+  setPipelineSearchTargetsForChat,
+  setActiveChatPipelineStage,
+  setPipelineStageForChat,
+  setPipelineStreamingAnswerForChat
 } from '@/features/ai-chat/lib/pipeline-stage'
 import { beginAgentRun, cancelAgentRun, isAgentRunActive } from './agent-run'
 import {
@@ -63,6 +77,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const activeChat = useChatsStore((s) => s.getActiveChat())
   const addMessage = useChatsStore((s) => s.addMessage)
   const removeMessagesFrom = useChatsStore((s) => s.removeMessagesFrom)
+  const removeMessage = useChatsStore((s) => s.removeMessage)
   const removeMessagesAfter = useChatsStore((s) => s.removeMessagesAfter)
   const updateUserMessageContent = useChatsStore((s) => s.updateUserMessageContent)
   const updateMessageContent = useChatsStore((s) => s.updateMessageContent)
@@ -143,9 +158,16 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     stopTtsPlayback()
     setBlurAnimateMessageId(null)
     useConversationStore.getState().setQueueAheadPreview(null)
-    useConversationStore.getState().setPipelineActivity(null)
+    const streamChatId = streamTargetChatIdRef.current
     streamTargetChatIdRef.current = null
-    setStage('idle')
+    const chatId =
+      streamChatId ?? useChatsStore.getState().activeChatId ?? null
+    if (chatId) {
+      setPipelineStageForChat(chatId, 'idle')
+    } else {
+      setStage('idle')
+      useConversationStore.getState().clearPipelineDetail()
+    }
   }, [setBlurAnimateMessageId, setStage])
 
   const runAssistantReply = useCallback(
@@ -160,8 +182,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         return false
       }
 
+      clearPipelineDetailForChat(targetChatId)
+      setPipelineStreamingAnswerForChat(targetChatId, false)
       setPipelineStageForChat(targetChatId, 'thinking')
-      setPipelineActivityForChat(targetChatId, 'Preparing context…')
       setError(null, targetChatId)
 
       const activeModelId =
@@ -182,13 +205,22 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         !hasImagesInThread &&
         shouldRunWebSearch(lastUserText)
 
-      setPipelineStageForChat(targetChatId, webSearchForTurn ? 'searching' : 'thinking')
-      setPipelineActivityForChat(
-        targetChatId,
-        webSearchForTurn ? 'Starting web search…' : 'Connecting to model…'
-      )
+      if (webSearchForTurn) {
+        setPipelineStageForChat(targetChatId, 'searching')
+      } else {
+        setPipelineStageForChat(targetChatId, 'thinking')
+      }
 
       let assistantMessageId: string | null = null
+      let thinkingMessageId: string | null = null
+
+      const ensureThinkingPlaceholder = () => {
+        if (thinkingMessageId) return
+        const id = addMessage({ role: 'thinking', content: '' }, targetChatId)
+        thinkingMessageId = id || null
+      }
+
+      let finalThinkingText = ''
       let finalText = ''
       const ttsEnabled = llmSettings.ttsEnabled
       const playTts = ttsEnabled && chatComposerMode === 'conversation'
@@ -217,6 +249,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         assistantMessageId = id || null
       }
 
+      const syncThinkingToChat = (text: string) => {
+        if (thinkingMessageId) {
+          updateMessageContent(thinkingMessageId, text, targetChatId)
+          return
+        }
+        if (!text.trim()) return
+        const id = addMessage({ role: 'thinking', content: text }, targetChatId)
+        thinkingMessageId = id || null
+      }
+
+      const thinkingSync = createStreamContentSync(syncThinkingToChat)
       const streamSync = createStreamContentSync(syncAssistantText)
 
       try {
@@ -232,15 +275,23 @@ export function useAiChat(options: UseAiChatOptions = {}) {
               if (!isAgentRunActive(runId)) return
               setPipelineStageForChat(targetChatId, 'searching')
             },
-            onStatus: ({ label }) => {
+            onSearchTargets: ({ targets }) => {
               if (!isAgentRunActive(runId)) return
-              setPipelineActivityForChat(targetChatId, label)
+              setPipelineSearchTargetsForChat(targetChatId, targets)
+            },
+            onThinkingDelta: ({ text }) => {
+              if (!isAgentRunActive(runId)) return
+              finalThinkingText = text
+              setPipelineStageForChat(targetChatId, 'thinking')
+              ensureThinkingPlaceholder()
+              thinkingSync.push(text)
             },
             onTextDelta: ({ text }) => {
               if (!isAgentRunActive(runId)) return
               finalText = text
               if (text.trim()) {
-                setPipelineActivityForChat(targetChatId, null)
+                setPipelineStreamingAnswerForChat(targetChatId, true)
+                clearPipelineDetailForChat(targetChatId)
               }
               streamSync.push(text)
               if (useChatsStore.getState().activeChatId !== targetChatId) return
@@ -250,8 +301,11 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             },
             onDone: ({ text }) => {
               if (!isAgentRunActive(runId)) return
-              finalText = text
-              streamSync.flushNow(text)
+              finalText = text.trim()
+              thinkingSync.flushNow(finalThinkingText)
+              if (text.trim()) {
+                streamSync.flushNow(text)
+              }
             }
           }
         )
@@ -259,16 +313,43 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         streamControllerRef.current = stream
         streamTargetChatIdRef.current = targetChatId
         setStreamActive(true)
+        setAgentStreamSession(targetChatId, true)
         await stream.done
 
         if (!isAgentRunActive(runId)) {
-          if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
+          removeAgentTurnTailUnlessPersisted(
+            removeMessagesFrom,
+            targetChatId,
+            thinkingMessageId,
+            assistantMessageId,
+            finalText
+          )
           setPipelineStageForChat(targetChatId, 'idle')
           return false
         }
 
+        if (!finalText.trim() && assistantMessageId) {
+          const chat = useChatsStore.getState().chats.find((c) => c.id === targetChatId)
+          const message = chat?.messages.find((m) => m.id === assistantMessageId)
+          finalText = message?.content.trim() ?? ''
+        }
+
+        if (thinkingMessageId && !finalThinkingText.trim()) {
+          removeMessage(thinkingMessageId, targetChatId)
+          thinkingMessageId = null
+        }
+
         if (!finalText.trim() || !assistantMessageId) {
-          if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
+          if (assistantMessageId) {
+            removeMessage(assistantMessageId, targetChatId)
+          }
+          if (finalThinkingText.trim() && thinkingMessageId) {
+            setError('Model returned reasoning but no answer.', targetChatId)
+            setPipelineStageForChat(targetChatId, 'idle')
+            return false
+          }
+          const removeId = agentTurnTailMessageId(thinkingMessageId, assistantMessageId)
+          if (removeId) removeMessagesFrom(removeId, targetChatId)
           throw new Error('Model returned an empty response')
         }
 
@@ -325,22 +406,49 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         }
         return true
       } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Request failed'
+        const aborted = msg.includes('aborted') || (e instanceof Error && e.name === 'AbortError')
+
         if (!isAgentRunActive(runId)) {
+          if (aborted) {
+            removeAgentTurnTail(
+              removeMessagesFrom,
+              targetChatId,
+              thinkingMessageId,
+              assistantMessageId
+            )
+          } else {
+            removeAgentTurnTailUnlessPersisted(
+              removeMessagesFrom,
+              targetChatId,
+              thinkingMessageId,
+              assistantMessageId,
+              finalText
+            )
+          }
           setPipelineStageForChat(targetChatId, 'idle')
           return false
         }
 
-        const msg = e instanceof Error ? e.message : 'Request failed'
-        const aborted = msg.includes('aborted') || (e instanceof Error && e.name === 'AbortError')
         if (aborted) {
           streamingTts?.cancel()
           streamingTtsRef.current = null
-          if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
+          removeAgentTurnTail(
+            removeMessagesFrom,
+            targetChatId,
+            thinkingMessageId,
+            assistantMessageId
+          )
           setPipelineStageForChat(targetChatId, 'idle')
           return false
         }
 
-        if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
+        removeAgentTurnTail(
+          removeMessagesFrom,
+          targetChatId,
+          thinkingMessageId,
+          assistantMessageId
+        )
         if (isViewingChat(targetChatId)) setBlurAnimateMessageId(null)
         if (msg.includes('NO_OPENROUTER_KEY')) {
           setError('Add your OpenRouter API key in Settings.', targetChatId)
@@ -356,12 +464,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         }
         return false
       } finally {
+        thinkingSync.cancel()
         streamSync.cancel()
         streamControllerRef.current = null
         if (streamTargetChatIdRef.current === targetChatId) {
           streamTargetChatIdRef.current = null
         }
         setStreamActive(false)
+        setAgentStreamSession(null, false)
         if (streamingTtsRef.current === streamingTts) {
           streamingTtsRef.current = null
         }
@@ -371,6 +481,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       addMessage,
       practiceLanguage,
       removeMessagesFrom,
+      removeMessage,
       setBlurAnimateMessageId,
       setError,
       setStage,
@@ -384,17 +495,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   useEffect(() => {
     runAssistantReplyRef.current = runAssistantReply
   })
-
-  useEffect(() => {
-    if (!activeChatId) return
-    const ownsStream =
-      streamActive && streamTargetChatIdRef.current === activeChatId
-    const busyStage =
-      stage === 'thinking' || stage === 'searching' || stage === 'speaking'
-    if (busyStage && !ownsStream) {
-      setStage('idle')
-    }
-  }, [activeChatId, streamActive, stage, setStage])
 
   const enqueueUserMessage = useCallback(
     (content: string, chatId: string, attachments?: MessageAttachment[]) => {
@@ -503,9 +603,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     (messageId: string) => {
       if (!messageId) return
       removeMessagesFrom(messageId)
-      setStage('idle')
+      setActiveChatPipelineStage('idle')
     },
-    [removeMessagesFrom, setStage]
+    [removeMessagesFrom]
   )
 
   const commitVoiceUserMessage = useCallback(
@@ -608,12 +708,19 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     async (messageId: string) => {
       const chat = useChatsStore.getState().getActiveChat()
       const message = chat?.messages.find((m) => m.id === messageId)
-      if (!chat || !message || message.role !== 'assistant') return
+      if (
+        !chat ||
+        !message ||
+        (message.role !== 'assistant' && message.role !== 'thinking')
+      ) {
+        return
+      }
 
       const chatId = chat.id
+      const removeFromId = findTurnTailRemoveId(chat.messages, messageId) ?? messageId
 
       stopAgent()
-      removeMessagesFrom(messageId)
+      removeMessagesFrom(removeFromId)
       setBlurAnimateMessageId(null)
       await runAssistantReply(chatId)
     },
@@ -632,7 +739,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       return
     }
 
-    if (last.role === 'assistant') {
+    if (last.role === 'assistant' || last.role === 'thinking') {
       await regenerateAssistantMessage(last.id)
     }
   }, [regenerateAssistantMessage, runAssistantReply, setError])
@@ -642,11 +749,13 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const streamBusyForActiveChat =
     streamActive && streamTargetChatIdRef.current === activeChatId
   const agentBusy = isAgentPipelineBusy(stage, streamBusyForActiveChat)
+  const backgroundStreamChatId = getBackgroundStreamChatId(activeChatId)
 
   return {
     messages,
     stage,
     agentBusy,
+    backgroundStreamChatId,
     queuedMessages,
     sendUserMessage,
     enqueueUserMessage,

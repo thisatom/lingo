@@ -52,20 +52,25 @@ function appendBlockToUserContent(
 const MAX_LOCAL_SEARCH_CACHE = 16
 const localSearchBlockCache = new Map<string, string>()
 
-export async function substituteMessagesWithLocalWebSearch(
-  messages: ChatMessagePayload[],
+export async function fetchLocalWebSearchResults(
   query: string
-): Promise<ChatMessagePayload[]> {
+): Promise<LocalWebSearchResult[]> {
   if (!isLocalWebSearchRegistered()) {
     throw new Error(
       'Local web search is not available in this environment. Use the desktop app or browser build with network access.'
     )
   }
+  return searchWebLocal(query)
+}
 
+export function substituteMessagesWithLocalWebSearchResults(
+  messages: ChatMessagePayload[],
+  query: string,
+  results: LocalWebSearchResult[]
+): ChatMessagePayload[] {
   const cacheKey = query.trim().toLowerCase()
   let block = localSearchBlockCache.get(cacheKey)
   if (!block) {
-    const results = await searchWebLocal(query)
     block = formatLocalWebSearchBlock(query, results)
     localSearchBlockCache.set(cacheKey, block)
     if (localSearchBlockCache.size > MAX_LOCAL_SEARCH_CACHE) {
@@ -85,6 +90,14 @@ export async function substituteMessagesWithLocalWebSearch(
   }
 
   return out
+}
+
+export async function substituteMessagesWithLocalWebSearch(
+  messages: ChatMessagePayload[],
+  query: string
+): Promise<ChatMessagePayload[]> {
+  const results = await fetchLocalWebSearchResults(query)
+  return substituteMessagesWithLocalWebSearchResults(messages, query, results)
 }
 
 export function isWebSearchApiError(message: string): boolean {

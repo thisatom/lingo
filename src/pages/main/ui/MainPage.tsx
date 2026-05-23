@@ -14,17 +14,19 @@ import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { ChatComposer } from '@/widgets/chat-composer/ui/ChatComposer'
 import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
-import { AgentStatus } from '@/widgets/conversation-panel/ui/AgentStatus'
 import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
 import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
 import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
 import { ChatHeaderTitle } from '@/widgets/chat-header/ui/ChatHeaderTitle'
+import { flushChatScrollPositions } from '@/app/lib/chat-scroll-registry'
+import { flushChatPersistDebounce } from '@/entities/chat/lib/chat-persist-storage'
 import { ConversationPanel } from '@/widgets/conversation-panel/ui/ConversationPanel'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { VoiceCaptureBar } from '@/features/audio-devices/ui/VoiceCaptureBar'
 import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
 import { SidebarExpandButton } from '@/widgets/app-sidebar/ui/SidebarExpandButton'
+import { BackgroundStreamHint } from '@/features/ai-chat/ui/BackgroundStreamHint'
 
 function isErrorRetryable(message: string): boolean {
   return !message.includes('OpenRouter API key')
@@ -44,6 +46,7 @@ export function MainPage() {
     messages,
     stage,
     agentBusy,
+    backgroundStreamChatId,
     queuedMessages,
     sendUserMessage,
     updateQueuedMessage,
@@ -63,6 +66,7 @@ export function MainPage() {
   })
   const activeChat = useChatsStore((s) => s.getActiveChat())
   const activeChatId = activeChat?.id ?? null
+  const selectChat = useChatsStore((s) => s.selectChat)
   const draft = useChatsStore((s) =>
     activeChatId ? (s.composerDraftByChatId?.[activeChatId] ?? '') : ''
   )
@@ -213,19 +217,6 @@ export function MainPage() {
 
   const voiceBusy = voice.isBusy
   const actionsDisabled = agentBusy || voiceBusy
-  const lastMessage = messages[messages.length - 1]
-  const assistantStreaming =
-    agentBusy &&
-    lastMessage?.role === 'assistant' &&
-    (lastMessage.content.length ?? 0) > 0
-  const showComposerPipelineStatus =
-    !assistantStreaming &&
-    (stage === 'thinking' ||
-      stage === 'searching' ||
-      stage === 'speaking' ||
-      stage === 'listening' ||
-      stage === 'transcribing')
-
   const liveConversation = useLiveConversationLoop({
     mode: chatComposerMode,
     stage,
@@ -357,8 +348,6 @@ export function MainPage() {
     setSpeechError(null)
     chatScrollRef.current?.followBottom()
     await sendUserMessage(text, attachments)
-    chatScrollRef.current?.followBottom()
-    requestAnimationFrame(() => chatScrollRef.current?.followBottom())
   }, [
     activeChatId,
     composerAttachments,
@@ -377,6 +366,13 @@ export function MainPage() {
     if (queuedMessages.length === 0) return
     void flushQueuedMessages(activeChatId)
   }, [activeChatId, agentBusy, flushQueuedMessages, queuedMessages.length])
+
+  useEffect(() => {
+    return () => {
+      flushChatScrollPositions()
+      flushChatPersistDebounce()
+    }
+  }, [])
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
@@ -428,10 +424,17 @@ export function MainPage() {
             <div className="relative">
               <ScrollToLatestButton
                 show={showScrollToLatest}
-                onClick={() => chatScrollRef.current?.scrollToLatest('smooth')}
+                onClick={() => chatScrollRef.current?.followBottom()}
                 className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2"
               />
               <div className="space-y-1">
+            {backgroundStreamChatId ? (
+              <BackgroundStreamHint
+                streamChatId={backgroundStreamChatId}
+                onOpenChat={selectChat}
+              />
+            ) : null}
+
             {showSpeechError && speechError && (
               <div
                 role="status"
@@ -475,10 +478,6 @@ export function MainPage() {
                 onRemove={removeQueuedMessage}
                 onSendNow={(id) => void sendQueuedMessageNow(id)}
               />
-            ) : null}
-
-            {showComposerPipelineStatus ? (
-              <AgentStatus stage={stage} compact />
             ) : null}
 
               <ChatComposer

@@ -2,8 +2,12 @@ import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { cn } from '@/shared/lib/utils'
-import type { ConversationTurn as Turn } from '@/widgets/conversation-panel/lib/group-turns'
+import {
+  isThinkingMessageLive,
+  type ConversationTurn as Turn
+} from '@/widgets/conversation-panel/lib/group-turns'
 import { AgentMessage } from './AgentMessage'
+import { AgentThinkingMessage } from './AgentThinkingMessage'
 import { UserMessage } from './UserMessage'
 
 interface ConversationTurnProps {
@@ -29,8 +33,10 @@ interface ConversationTurnProps {
     attachments?: MessageAttachment[]
   ) => Promise<SubmitEditedUserMessageResult>
   onAttachmentError?: (message: string) => void
-  /** Last assistant message id when streaming — throttles markdown parse. */
+  /** Last assistant answer id when streaming — throttles markdown parse. */
   streamingAssistantMessageId?: string
+  agentBusy?: boolean
+  isLatestTurn?: boolean
 }
 
 export function ConversationTurn({
@@ -51,7 +57,9 @@ export function ConversationTurn({
   onExitEdit,
   onSubmitEdit,
   onAttachmentError,
-  streamingAssistantMessageId
+  streamingAssistantMessageId,
+  agentBusy = false,
+  isLatestTurn = false
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
 
@@ -92,16 +100,26 @@ export function ConversationTurn({
         />
       </div>
 
-      {turn.assistantMessages.map((message) => (
-        <article key={message.id} className="mt-1.5 min-w-0 max-w-full">
-          <AgentMessage
-            content={message.content}
-            parseThrottleMs={
-              message.id === streamingAssistantMessageId ? 120 : undefined
-            }
-          />
-        </article>
-      ))}
+      {turn.assistantMessages.map((message) => {
+        const isAnswerStream = message.id === streamingAssistantMessageId
+
+        return (
+          <article key={message.id} className="mt-1.5 min-w-0 max-w-full">
+            {message.role === 'thinking' ? (
+              <AgentThinkingMessage
+                message={message}
+                assistantMessages={turn.assistantMessages}
+                live={isThinkingMessageLive(turn, message.id, agentBusy, isLatestTurn)}
+              />
+            ) : (
+              <AgentMessage
+                content={message.content}
+                parseThrottleMs={isAnswerStream ? 120 : undefined}
+              />
+            )}
+          </article>
+        )
+      })}
     </section>
   )
 }

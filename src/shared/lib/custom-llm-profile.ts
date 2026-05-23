@@ -21,11 +21,44 @@ export type ParsedCustomLlmProfile = {
   completionExtras: Record<string, unknown>
 }
 
-const RESERVED_COMPLETION_KEYS = new Set(['messages', 'model', 'max_tokens', 'temperature'])
+export type ParseCustomLlmProfileResult =
+  | { ok: true; data: ParsedCustomLlmProfile; importedApiKey?: string }
+  | { ok: false; error: string }
+
+export type CustomLlmSnippetImport = {
+  profileJson: string
+  /** Raw API key without a "Bearer " prefix — store via secrets, not in profile JSON. */
+  apiKey?: string
+}
+
+const RESERVED_COMPLETION_KEYS = new Set([
+  'messages',
+  'model',
+  'max_tokens',
+  'apiKey',
+  'api_key',
+  'authorization',
+  'Authorization'
+])
+
+const PROFILE_SECRET_KEYS = ['apiKey', 'api_key'] as const
+
+/** Payload fields that map to profile.completion (not Lingo-controlled). */
+const PAYLOAD_COMPLETION_KEYS = [
+  'stream',
+  'temperature',
+  'top_p',
+  'frequency_penalty',
+  'presence_penalty',
+  'stop',
+  'seed',
+  'thinking',
+  'reasoning_effort'
+] as const
 
 export const DEFAULT_CUSTOM_LLM_PROFILE: CustomLlmProfile = {
-  baseURL: 'https://api.deepseek.com/v1',
-  model: 'deepseek-chat',
+  baseURL: customLlmConfig.defaultBaseUrl,
+  model: customLlmConfig.defaultModel,
   completion: {
     stream: false
   }
@@ -101,23 +134,49 @@ function normalizeCompletionExtras(
   return Object.keys(extras).length > 0 ? extras : undefined
 }
 
-export function parseCustomLlmProfileSource(
-  source: string
-): { ok: true; data: ParsedCustomLlmProfile } | { ok: false; error: string } {
+export function parseCustomLlmProfileSource(source: string): ParseCustomLlmProfileResult {
   const trimmed = source.trim()
   if (!trimmed) {
     return { ok: false, error: 'Profile is empty.' }
+  }
+
+  if (!trimmed.startsWith('{')) {
+    const imported = importCustomLlmProfileFromSnippet(trimmed)
+    if (!imported) {
+      return {
+        ok: false,
+        error:
+          'Could not read endpoint settings. Paste JSON or an axios / OpenAI SDK snippet.'
+      }
+    }
+    const inner = parseCustomLlmProfileSource(imported.profileJson)
+    if (!inner.ok) return inner
+    return { ...inner, importedApiKey: imported.apiKey ?? inner.importedApiKey }
   }
 
   let parsed: unknown
   try {
     parsed = JSON.parse(stripJsonComments(trimmed))
   } catch {
-    return { ok: false, error: 'Invalid JSON. Check commas and quotes.' }
+    const imported = importCustomLlmProfileFromSnippet(trimmed)
+    if (!imported) {
+      return { ok: false, error: 'Invalid JSON. Check commas and quotes.' }
+    }
+    const inner = parseCustomLlmProfileSource(imported.profileJson)
+    if (!inner.ok) return inner
+    return { ...inner, importedApiKey: imported.apiKey ?? inner.importedApiKey }
   }
 
   if (!isPlainObject(parsed)) {
     return { ok: false, error: 'Profile must be a JSON object.' }
+  }
+
+  let importedApiKey: string | undefined
+  for (const key of PROFILE_SECRET_KEYS) {
+    const raw = parsed[key]
+    if (typeof raw !== 'string' || !raw.trim()) continue
+    importedApiKey = raw.trim().replace(/^Bearer\s+/i, '')
+    break
   }
 
   const baseURL =
@@ -162,7 +221,8 @@ export function parseCustomLlmProfileSource(
 
   return {
     ok: true,
-    data: { profile, baseUrl, model: modelId, completionExtras }
+    data: { profile, baseUrl, model: modelId, completionExtras },
+    ...(importedApiKey ? { importedApiKey } : {})
   }
 }
 
@@ -176,17 +236,62 @@ export function profileFromLegacyFields(
   }
 }
 
-/** Best-effort import from OpenAI SDK-style snippets. */
-export function importCustomLlmProfileFromSnippet(code: string): string | null {
+/** Best-effort import from axios, fetch, or OpenAI SDK snippets. */
+export function importCustomLlmProfileFromSnippet(code: string): CustomLlmSnippetImport | null {
+  const trimmed = code.trim()
+  if (!trimmed) return null
+
   const baseURL =
-    extractQuotedProp(code, 'baseURL') ?? extractQuotedProp(code, 'baseUrl')
-  const model = extractQuotedProp(code, 'model')
+    extractQuotedConst(trimmed, 'invokeUrl') ??
+    extractQuotedConst(trimmed, 'url') ??
+    extractAxiosPostUrl(trimmed) ??
+    extractQuotedProp(trimmed, 'baseURL') ??
+    extractQuotedProp(trimmed, 'baseUrl')
+
+  const payload =
+    extractConstObjectLiteral(trimmed, 'payload') ??
+    extractConstObjectLiteral(trimmed, 'body')
+
+  const model =
+    (typeof payload?.model === 'string' ? payload.model : undefined) ??
+    extractQuotedProp(trimmed, 'model')
+
   if (!baseURL && !model) return null
 
+  const apiKey = extractBearerToken(trimmed)
+  const completion = completionExtrasFromSnippet(trimmed, payload)
+
+  const profile: CustomLlmProfile = {
+    baseURL: baseURL ?? customLlmConfig.defaultBaseUrl,
+    model: model ?? customLlmConfig.defaultModel,
+    ...(Object.keys(completion).length > 0 ? { completion } : {})
+  }
+
+  const normalized = parseCustomLlmProfileSource(stringifyCustomLlmProfile(profile))
+  if (!normalized.ok) return null
+
+  return {
+    profileJson: stringifyCustomLlmProfile(normalized.data.profile),
+    apiKey
+  }
+}
+
+function completionExtrasFromSnippet(
+  code: string,
+  payload: Record<string, unknown> | null
+): Record<string, unknown> {
   const completion: Record<string, unknown> = {}
 
+  if (payload) {
+    for (const key of PAYLOAD_COMPLETION_KEYS) {
+      if (key in payload && payload[key] !== undefined) {
+        completion[key] = payload[key]
+      }
+    }
+  }
+
   const thinkingRaw = extractInlineObject(code, 'thinking')
-  if (thinkingRaw) {
+  if (thinkingRaw && !('thinking' in completion)) {
     try {
       completion.thinking = JSON.parse(thinkingRaw.replace(/'/g, '"'))
     } catch {
@@ -195,19 +300,101 @@ export function importCustomLlmProfileFromSnippet(code: string): string | null {
   }
 
   const reasoning = extractQuotedProp(code, 'reasoning_effort')
-  if (reasoning) completion.reasoning_effort = reasoning
-
-  const streamMatch = code.match(/\bstream\s*:\s*(true|false)\b/i)
-  if (streamMatch) completion.stream = streamMatch[1] === 'true'
-
-  const profile: CustomLlmProfile = {
-    baseURL: baseURL ?? customLlmConfig.defaultBaseUrl,
-    model: model ?? customLlmConfig.defaultModel,
-    ...(Object.keys(completion).length > 0 ? { completion } : {})
+  if (reasoning && !('reasoning_effort' in completion)) {
+    completion.reasoning_effort = reasoning
   }
 
-  const parsed = parseCustomLlmProfileSource(stringifyCustomLlmProfile(profile))
-  return parsed.ok ? stringifyCustomLlmProfile(parsed.data.profile) : null
+  if (!('stream' in completion)) {
+    const streamMatch = code.match(/\bstream\s*:\s*(true|false)\b/i)
+    if (streamMatch) completion.stream = streamMatch[1] === 'true'
+  }
+
+  return completion
+}
+
+function extractQuotedConst(code: string, name: string): string | undefined {
+  const re = new RegExp(`\\b${name}\\s*=\\s*['"\`]([^'"\`]+)['"\`]`, 'i')
+  return re.exec(code)?.[1]?.trim()
+}
+
+function extractAxiosPostUrl(code: string): string | undefined {
+  const m = code.match(/axios\.(?:post|put|patch)\s*\(\s*['"\`]([^'"\`]+)['"\`]/i)
+  return m?.[1]?.trim()
+}
+
+function extractBearerToken(code: string): string | undefined {
+  const headers = extractConstObjectLiteral(code, 'headers')
+  if (headers && typeof headers.Authorization === 'string') {
+    const auth = headers.Authorization.trim()
+    const bearer = auth.match(/^Bearer\s+(.+)$/i)
+    if (bearer) return bearer[1].trim()
+  }
+  const inline = code.match(/['"]Authorization['"]\s*:\s*['"]Bearer\s+([^'"]+)['"]/i)
+  return inline?.[1]?.trim()
+}
+
+function extractBalancedBlock(source: string, openPos: number): string | null {
+  const open = source[openPos]
+  const close = open === '{' ? '}' : open === '[' ? ']' : null
+  if (!close) return null
+
+  let depth = 0
+  let inString: '"' | "'" | '`' | null = null
+  let escape = false
+
+  for (let i = openPos; i < source.length; i++) {
+    const ch = source[i]
+    if (inString) {
+      if (escape) {
+        escape = false
+        continue
+      }
+      if (ch === '\\') {
+        escape = true
+        continue
+      }
+      if (ch === inString) inString = null
+      continue
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch
+      continue
+    }
+    if (ch === open) depth++
+    else if (ch === close) {
+      depth--
+      if (depth === 0) return source.slice(openPos, i + 1)
+    }
+  }
+  return null
+}
+
+function parseLooseJsObject(block: string): Record<string, unknown> | null {
+  let json = stripJsonComments(block)
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+  json = json.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+  json = json.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, '"$1"')
+  json = json.replace(/,\s*([}\]])/g, '$1')
+  try {
+    const value = JSON.parse(json)
+    return isPlainObject(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+function extractConstObjectLiteral(
+  source: string,
+  name: string
+): Record<string, unknown> | null {
+  const decl = new RegExp(`\\b(?:const|let|var)\\s+${name}\\s*=\\s*\\{`, 'i')
+  const match = decl.exec(source)
+  if (!match) return null
+  const braceStart = match.index + match[0].length - 1
+  const block = extractBalancedBlock(source, braceStart)
+  if (!block) return null
+  return parseLooseJsObject(block)
 }
 
 function extractQuotedProp(code: string, key: string): string | undefined {
@@ -225,5 +412,9 @@ export function mergeCustomCompletionBody(
   extras: Record<string, unknown> | undefined
 ): Record<string, unknown> {
   if (!extras || Object.keys(extras).length === 0) return body
-  return { ...body, ...extras }
+  const merged = { ...body, ...extras }
+  for (const key of RESERVED_COMPLETION_KEYS) {
+    if (key in body) merged[key] = body[key]
+  }
+  return merged
 }

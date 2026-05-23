@@ -1,35 +1,24 @@
 # Lingo — контекст для AI-агента
 
-**Lingo** — десктопное приложение (React + Electron) для тренировки разговорной речи на разных языках.
-
-На этом этапе в репозитории только **структура контекста** (правила, документация, каркас FSD). Исходный код приложения ещё не реализован.
+**Lingo** — десктопное приложение (React + Electron + TypeScript) для тренировки разговорной речи на разных языках. Есть также **web preview** (`npm run dev:web` / `build:web`) с ограниченным паритетом.
 
 ## Продукт
 
-Пользователь говорит в микрофон → речь в текст (STT) → текст уходит в AI по API-ключу → ответ AI → ответ озвучивается (TTS).
+Пользователь говорит в микрофон → речь в текст (STT) → текст уходит в AI (OpenRouter или custom LLM) → ответ AI → ответ озвучивается (TTS).
 
-Цель: живой диалог на выбранном языке с обратной связью от модели.
-
-## Стек (план)
+## Стек (текущий)
 
 | Слой | Технология |
 |------|------------|
 | UI | React, TypeScript, **shadcn/ui**, Tailwind CSS |
-| Desktop | Electron |
-| Окно | `@incanta/custom-electron-titlebar` |
+| Desktop | **Electron** + **electron-vite** |
+| Окно | `@incanta/custom-electron-titlebar` (настройка в **main**) |
 | Архитектура UI | [Feature-Sliced Design](https://feature-sliced.design/) |
-| Сборка (план) | Vite + electron-vite или аналог |
-
-## Инструменты AI и TTS (зафиксировано)
-
-| Слой | Инструмент |
-|------|------------|
-| Диалог, streaming, история | **Vercel AI SDK** или **OpenAI SDK + свой store** |
-| Сложные сценарии позже | **LangGraph** |
-| TTS на этапе разработки | **edge-tts** (main process) |
-| TTS для релиза | **Azure Speech** (или тот же провайдер, что STT) |
-| AI-провайдер | **OpenRouter** (OpenAI-compatible API) |
-| API-ключи | Смена в **Settings**; хранение в main (`safeStorage`) |
+| AI | **OpenRouter** (OpenAI-compatible); опционально custom endpoint |
+| Ключи (desktop) | Settings UI → **keytar** в main |
+| Ключи (web preview) | `localStorage` — только для dev, не production-safe |
+| TTS (dev desktop) | **edge-tts** в main |
+| STT (desktop) | Whisper ONNX в main; в renderer — Web Speech (browser backend) |
 
 Подробности: [`docs/STACK.md`](docs/STACK.md), [`docs/UI.md`](docs/UI.md), [`docs/OPENROUTER.md`](docs/OPENROUTER.md), [`docs/API_KEYS.md`](docs/API_KEYS.md).
 
@@ -37,63 +26,66 @@
 
 ```
 lingo/
-├── AGENTS.md                 # этот файл
-├── .cursor/rules/            # правила для Cursor
-├── docs/                     # архитектура и контракты
-├── electron/                 # main, preload (пока только README)
-└── src/                      # renderer, FSD-слои (пока только README)
-    ├── app/
-    ├── pages/
-    ├── widgets/
-    ├── features/
-    ├── entities/
-    └── shared/
+├── AGENTS.md
+├── electron/                 # main, preload
+│   └── main/                 # IPC, окна, STT/TTS, secrets, welcome flow
+├── src/                      # renderer (FSD)
+│   ├── app/
+│   ├── pages/                # main, welcome, settings
+│   ├── widgets/
+│   ├── features/
+│   ├── entities/
+│   └── shared/
+├── index.html                # Electron renderer shell
+├── welcome.html              # First-run welcome window
+├── index.web.html            # Web build entry
+├── docs/
+└── vite/                     # inject-csp и прочие Vite-плагины
 ```
 
 ## FSD — куда класть код
 
 | Слой | Назначение в Lingo |
 |------|-------------------|
-| `app` | Провайдеры, роутинг, инициализация titlebar, глобальные стили |
-| `pages` | Экраны: главный диалог, настройки, выбор языка |
-| `widgets` | Крупные блоки UI: панель чата, индикатор записи |
-| `features` | Действия: запись, STT, запрос к AI, TTS, выбор языка, **manage-api-keys** |
-| `entities` | Модели: сообщение, сессия, язык, **api-credential** |
-| `shared` | **shadcn/ui** (`ui/`), API-клиент, `cn()` в `lib/`, конфиг, типы |
+| `app` | Провайдеры, глобальные стили, shutdown overlay |
+| `pages` | Главный диалог, welcome, настройки |
+| `widgets` | Панель чата, composer |
+| `features` | STT, AI chat, TTS, API keys, voice input |
+| `entities` | chat, settings, message |
+| `shared` | UI kit, API (`lingo`), конфиг, типы IPC |
 
-Импорты только **сверху вниз** (pages → widgets → features → entities → shared). См. `docs/FSD.md`.
+Импорты только **сверху вниз**. См. `docs/FSD.md`.
 
 ## Electron
 
-- **Main** (`electron/main/`): `BrowserWindow`, titlebar через `@incanta/custom-electron-titlebar`, IPC, без React.
-- **Preload** (`electron/preload/`): безопасный мост `contextBridge`.
-- **Renderer** (`src/`): React + FSD.
+- **Main** (`electron/main/`): окна, titlebar, IPC, secrets, chat stream proxy, link preview, welcome probe.
+- **Preload** (`electron/preload/`): `contextBridge` → `window.lingo`.
+- **Renderer** (`src/`): React; **не** хранит API-ключи и **не** ходит в OpenRouter напрямую (кроме Web Speech для browser STT).
 
-См. `docs/ARCHITECTURE.md` и `.cursor/rules/electron.mdc`.
+См. `docs/ARCHITECTURE.md`, `.cursor/rules/electron.mdc`.
 
 ## Пайплайн речи
 
-1. **Capture** — микрофон (`features/voice-capture` — план).
-2. **STT** — speech-to-text (`features/speech-to-text`).
-3. **AI** — OpenRouter (`features/ai-chat`); ключ из secure storage / `entities/api-credential` / settings.
-4. **TTS** — `features/text-to-speech` через `TtsProvider`: dev — edge-tts (main), prod — Azure Speech.
+1. **Capture** — `features/voice-capture`, `features/voice-input`
+2. **STT** — main (Whisper) или Web Speech в renderer
+3. **AI** — `features/ai-chat` → IPC `lingo:chat:stream` (desktop) / `browser-lingo` (web)
+4. **TTS** — main edge-tts (desktop) / Edge web API (web preview)
 
-См. `docs/SPEECH_PIPELINE.md`, `docs/STACK.md`.
+См. `docs/SPEECH_PIPELINE.md`, `docs/voice-input-architecture.md`.
 
-## Секреты и ключи
+## Секреты
 
-- **OpenRouter** — основной ключ для AI; пользователь меняет в `pages/settings` (`features/manage-api-keys`).
-- Хранение: **electron/main** + **keytar** (OS keychain), не в git, не в `localStorage`.
-- `.env` — только dev-fallback: `docs/env.example.md`.
-- Документация: `docs/API_KEYS.md`, `docs/OPENROUTER.md`.
+- Desktop: **keytar** в main; renderer не читает ключи (`readSecretKey` бросает на Electron).
+- Web preview: `src/shared/api/web-secrets.ts` (plain localStorage).
+- `.env` — dev-fallback для main: `docs/env.example.md`.
 
-## Что делать агенту при реализации
+## Что делать агенту
 
 1. Читать `.cursor/rules/*.mdc` и `docs/`.
-2. Соблюдать FSD и границы electron/main vs renderer.
-3. Titlebar — только через `@incanta/custom-electron-titlebar` в main.
-4. Не смешивать STT/AI/TTS в одном файле — отдельные features с явными портами.
-5. Минимальный дифф; не переусложнять до появления реальных требований.
+2. Соблюдать FSD и границу main vs renderer.
+3. Titlebar — только `@incanta/custom-electron-titlebar` в main.
+4. CSP для HTML — через `src/shared/config/content-security-policy.ts` + `vite/inject-csp.ts`.
+5. Минимальный дифф.
 
 ## Ссылки
 

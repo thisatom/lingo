@@ -11,10 +11,54 @@ import { resolveAppIconPath } from './icon'
 import { resolvePreloadScript } from './paths'
 import { registerWindowShortcuts } from './window-shortcuts'
 import { setupGracefulShutdown } from './shutdown'
+import { packagedRendererUrl } from './renderer-protocol'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-export function createMainWindow(): BrowserWindow {
+/** Vite dev server may bind to 127.0.0.1 while electron-vite sets localhost — fix ERR_FAILED on Windows. */
+export function resolveDevRendererUrl(): string {
+  const raw = process.env.ELECTRON_RENDERER_URL ?? 'http://127.0.0.1:5173/'
+  return raw.replace('//localhost:', '//127.0.0.1:').replace('//[::1]:', '//127.0.0.1:')
+}
+
+export type CreateMainWindowOptions = {
+  /** When false, window stays hidden until `showMainWindow` (welcome flow). */
+  showOnReady?: boolean
+  /** When true, create the shell but do not load the renderer until `loadMainRenderer`. */
+  deferLoad?: boolean
+}
+
+async function loadRendererUrl(
+  mainWindow: BrowserWindow,
+  url: string,
+  attempts = 4
+): Promise<void> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await mainWindow.loadURL(url)
+      return
+    } catch (error) {
+      lastError = error
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * attempt))
+      }
+    }
+  }
+  console.error(`[lingo] Renderer failed to load (${url}):`, lastError)
+  throw lastError
+}
+
+export function loadMainRenderer(mainWindow: BrowserWindow): Promise<void> {
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    return loadRendererUrl(mainWindow, resolveDevRendererUrl())
+  }
+  return mainWindow.loadURL(packagedRendererUrl('index.html'))
+}
+
+export function createMainWindow(options: CreateMainWindowOptions = {}): BrowserWindow {
+  const showOnReady = options.showOnReady !== false
+  const deferLoad = options.deferLoad === true
   const iconPath = resolveAppIconPath()
 
   const mainWindow = new BrowserWindow({
@@ -40,14 +84,14 @@ export function createMainWindow(): BrowserWindow {
         : false,
     webPreferences: {
       preload: resolvePreloadScript(),
-      sandbox: false,
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false
     }
   })
 
   attachTitlebarToWindow(mainWindow)
-  registerWindowShortcuts(mainWindow, createMainWindow)
+  registerWindowShortcuts(mainWindow)
   setupGracefulShutdown(mainWindow)
 
   if (process.platform === 'win32') {
@@ -59,10 +103,11 @@ export function createMainWindow(): BrowserWindow {
     })
   }
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-    mainWindow.focus()
-  })
+  if (showOnReady) {
+    mainWindow.on('ready-to-show', () => {
+      showMainWindow(mainWindow)
+    })
+  }
 
   mainWindow.webContents.once('did-finish-load', () => {
     void backgroundUpdateCheck((info) => {
@@ -77,28 +122,31 @@ export function createMainWindow(): BrowserWindow {
     return { action: 'deny' }
   })
 
-  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+  if (!deferLoad) {
+    void loadMainRenderer(mainWindow)
   }
 
   return mainWindow
 }
 
-/** One app process; extra launches open another window instead of fighting over cache/shortcuts. */
-export function setupSingleInstanceApp(onCreateWindow: () => BrowserWindow): boolean {
+export function showMainWindow(mainWindow: BrowserWindow): void {
+  if (mainWindow.isDestroyed()) return
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+/** One app process; extra launches focus the existing main window. */
+export function setupSingleInstanceApp(onSecondInstance: () => void): boolean {
   const isPrimary = app.requestSingleInstanceLock()
 
   if (!isPrimary) {
+    console.warn('[lingo] Another Lingo instance is already running — focusing it.')
     app.quit()
     return false
   }
 
   app.on('second-instance', () => {
-    const win = onCreateWindow()
-    if (win.isMinimized()) win.restore()
-    win.focus()
+    onSecondInstance()
   })
 
   return true

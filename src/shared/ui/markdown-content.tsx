@@ -24,6 +24,10 @@ const proseVariantClass = {
   compact: cn(
     'markdown-prose max-w-none text-sm leading-relaxed text-foreground',
     '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0'
+  ),
+  thinking: cn(
+    typographyProseClass,
+    'markdown-prose thinking-markdown text-[13px] leading-[1.55]'
   )
 } as const
 
@@ -31,7 +35,7 @@ interface MarkdownContentProps {
   content: string
   className?: string
   /** @default 'agent' — AI chat; use 'compact' for dialogs */
-  variant?: 'agent' | 'compact' | 'typography' | 'default'
+  variant?: 'agent' | 'compact' | 'thinking' | 'typography' | 'default'
   /** Throttle KaTeX/markdown re-parses while content grows (streaming). */
   parseThrottleMs?: number
 }
@@ -86,12 +90,22 @@ function MarkdownContentInner({
     () => segmentMarkdown(normalizeMarkdown(parsedSource)),
     [parsedSource]
   )
-  const resolvedVariant = variant === 'typography' || variant === 'default' ? 'agent' : variant
+  const resolvedVariant =
+    variant === 'typography' || variant === 'default'
+      ? 'agent'
+      : variant === 'thinking'
+        ? 'thinking'
+        : variant
   const components =
     resolvedVariant === 'compact' ? compactMarkdownComponents : agentMarkdownComponents
 
   return (
-    <div className={cn(proseVariantClass[resolvedVariant], className)}>
+    <div
+      className={cn(
+        proseVariantClass[resolvedVariant as keyof typeof proseVariantClass],
+        className
+      )}
+    >
       {segments.map((segment, index) => (
         <Fragment key={index}>{renderSegment(segment, index, components)}</Fragment>
       ))}

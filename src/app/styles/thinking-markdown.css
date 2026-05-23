@@ -1,0 +1,65 @@
+/* Reasoning — dark text in every theme; markdown nodes override agent typography colors. */
+
+.thinking-markdown {
+  color: var(--thinking-foreground);
+}
+
+.thinking-markdown :where(
+    p,
+    li,
+    span,
+    strong,
+    em,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    td,
+    th,
+    a,
+    .katex,
+    .katex-display,
+    .katex-html
+  ) {
+  color: var(--thinking-foreground);
+}
+
+.thinking-markdown :where(p, li) {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.thinking-markdown :where(code:not(pre code)) {
+  color: var(--thinking-foreground);
+}
+
+.thinking-markdown :where(li)::marker {
+  color: var(--thinking-foreground);
+}
+
+.thinking-scroll-panel {
+  position: relative;
+}
+
+.thinking-scroll-panel::before,
+.thinking-scroll-panel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  height: 1.75rem;
+  pointer-events: none;
+}
+
+.thinking-scroll-panel::before {
+  top: 0;
+  background: linear-gradient(to bottom, var(--background) 0%, transparent 100%);
+}
+
+.thinking-scroll-panel::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--background) 0%, transparent 100%);
+}

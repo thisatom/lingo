@@ -6,8 +6,8 @@ export const LLM_MAX_TOKENS_DEFAULT: number = openRouterConfig.maxTokens
 
 export const LLM_MAX_TOKENS_PRESETS: readonly { value: number; label: string }[] = [
   { value: 512, label: '512 — very short' },
-  { value: 1024, label: '1024 — default' },
-  { value: 2048, label: '2048' },
+  { value: 1024, label: '1024' },
+  { value: 2048, label: '2048 — default' },
   { value: 4096, label: '4096' },
   { value: 8192, label: '8192' },
   { value: 16_384, label: '16 384 — long replies' }

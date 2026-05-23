@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import { AppUpdateAvailableDialog } from '@/features/app-update/ui/AppUpdateAvailableDialog'
 import { AppUpdateReleaseNotesDialog } from '@/features/app-update/ui/AppUpdateReleaseNotesDialog'
 import {
+  dismissAppUpdateToast,
+  showAppUpdateToast
+} from '@/features/app-update/lib/app-update-toast'
+import {
   consumePostUpdateNotice,
   isUpdaterAvailable,
   subscribeToAppUpdateAvailable
@@ -41,8 +45,16 @@ export function AppUpdateGate() {
 
     return subscribeToAppUpdateAvailable((info) => {
       if (wasUpdateDismissed(info.version)) return
+
       setAvailableUpdate(info)
-      setAvailableOpen(true)
+      showAppUpdateToast(info, {
+        onView: () => setAvailableOpen(true),
+        onDismiss: () => {
+          markUpdateDismissed(info.version)
+          dismissAppUpdateToast()
+          setAvailableUpdate(null)
+        }
+      })
     })
   }, [])
 
@@ -68,6 +80,7 @@ export function AppUpdateGate() {
             setAvailableOpen(open)
             if (!open) {
               markUpdateDismissed(availableUpdate.version)
+              dismissAppUpdateToast()
               setAvailableUpdate(null)
             }
           }}

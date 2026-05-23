@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { NewChat } from '@/shared/ui/icons'
 import { useChatsStore } from '@/entities/chat/model/store'
-import { useConversationStore } from '@/entities/conversation/model/store'
+import { getChatPipeline } from '@/features/ai-chat/lib/chat-pipeline-registry'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { useChatSearchHotkey } from '@/features/chat-search/model/useChatSearchHotkey'
 import { ChatSearchDialog } from '@/features/chat-search/ui/ChatSearchDialog'
@@ -41,7 +41,6 @@ export function AppSidebar() {
   const sidebarShowDateGroups = useSettingsStore((s) => s.sidebarShowDateGroups ?? true)
   const sidebarChatSort = useSettingsStore((s) => s.sidebarChatSort)
   const resortChats = useChatsStore((s) => s.resortChats)
-  const pipelineStage = useConversationStore((s) => s.stage)
   const isSettings = location.pathname.startsWith('/settings')
 
   useEffect(() => {
@@ -65,15 +64,14 @@ export function AppSidebar() {
 
   const flatUnpinned = sidebarShowDateGroups ? [] : unpinnedChats
 
-  const agentActiveForChat =
-    !isSettings && isSidebarAgentStage(pipelineStage) ? activeChatId : null
-
   const renderChat = (chat: (typeof chats)[number]) => (
     <ChatListItem
       key={chat.id}
       chat={chat}
       isActive={!isSettings && chat.id === activeChatId}
-      agentActive={chat.id === agentActiveForChat}
+      agentActive={
+        !isSettings && isSidebarAgentStage(getChatPipeline(chat.id).stage)
+      }
       onOpen={() => selectChat(chat.id)}
       onTogglePin={() => togglePinChat(chat.id)}
       onDelete={() => deleteChat(chat.id)}

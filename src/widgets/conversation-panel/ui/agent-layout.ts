@@ -40,3 +40,15 @@ export const agentMessageClass = cn(
 export const messageActionButtonClass = cn(
   'text-muted-foreground/55 hover:bg-accent hover:text-muted-foreground'
 )
+
+/** “Thought for …” — New chat font, reasoning color token. */
+export const thinkingTriggerClass =
+  'text-sm font-medium leading-normal text-[color:var(--thinking-foreground)]'
+
+/** Same markdown as agent reply; color via `--thinking-foreground` + `.thinking-markdown`. */
+export const thinkingReasoningClass = cn(
+  'thinking-markdown min-w-0 text-[13px] leading-[1.5] text-[color:var(--thinking-foreground)]',
+  '[overflow-wrap:anywhere] [word-break:break-word]'
+)
+
+export const THINKING_SCROLL_MAX_HEIGHT = '7.5rem'

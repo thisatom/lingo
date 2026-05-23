@@ -1,5 +1,5 @@
 import { SidebarLoadingSkeleton } from '@/widgets/app-sidebar/ui/SidebarLoadingSkeleton'
-import { ChatStartupSpinner } from '@/widgets/conversation-panel/ui/ChatStartupSpinner'
+import { MainChatLoadingSkeleton } from '@/widgets/conversation-panel/ui/MainChatLoadingSkeleton'
 
 export function AppStartupOverlay() {
   return (
@@ -12,7 +12,7 @@ export function AppStartupOverlay() {
         <SidebarLoadingSkeleton />
       </div>
       <div className="min-h-0 min-w-0 flex-1">
-        <ChatStartupSpinner />
+        <MainChatLoadingSkeleton />
       </div>
     </div>
   )

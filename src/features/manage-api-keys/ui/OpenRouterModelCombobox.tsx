@@ -7,7 +7,7 @@ import {
   fetchOpenRouterModelCatalog,
   isOpenRouterModelIdShape
 } from '@/shared/lib/fetch-openrouter-models'
-import { readSecretKey } from '@/shared/lib/lingo'
+import { getLingo, isElectronApp, readSecretKey } from '@/shared/lib/lingo'
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import {
   settingsCommandClass,
@@ -58,15 +58,24 @@ export function OpenRouterModelCombobox({ id, value, onChange, className }: Open
 
     void (async () => {
       try {
-        const apiKey = await readSecretKey('openrouter')
-        if (!apiKey) {
-          if (!cancelled) {
-            setCatalog([])
-            setCatalogError('Add an OpenRouter API key to browse models.')
+        let ids: string[] = []
+        if (isElectronApp()) {
+          const lingo = getLingo()
+          if (!lingo.openrouter?.listModels) {
+            throw new Error('Restart the app to load the model catalog.')
           }
-          return
+          ids = await lingo.openrouter.listModels()
+        } else {
+          const apiKey = await readSecretKey('openrouter')
+          if (!apiKey) {
+            if (!cancelled) {
+              setCatalog([])
+              setCatalogError('Add an OpenRouter API key to browse models.')
+            }
+            return
+          }
+          ids = await fetchOpenRouterModelCatalog(apiKey)
         }
-        const ids = await fetchOpenRouterModelCatalog(apiKey)
         if (!cancelled) setCatalog(ids)
       } catch (error) {
         if (!cancelled) {

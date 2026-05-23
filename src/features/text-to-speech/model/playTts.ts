@@ -4,6 +4,12 @@ import {
   detachTtsPlaybackMeter
 } from '@/features/text-to-speech/lib/tts-playback-meter'
 import { applyAudioOutputDevice } from '@/shared/lib/audio-output'
+import { ttsVolumeToGain } from '@/shared/lib/tts-volume'
+
+function applyTtsPlaybackVolume(audio: HTMLAudioElement): void {
+  const { ttsVolume } = useSettingsStore.getState()
+  audio.volume = ttsVolumeToGain(ttsVolume)
+}
 
 function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64)
@@ -81,6 +87,7 @@ async function takeClipForPlayback(
   if (prepared) {
     const { speakerDeviceId } = useSettingsStore.getState()
     await applyAudioOutputDevice(prepared.audio, speakerDeviceId)
+    applyTtsPlaybackVolume(prepared.audio)
     return prepared.audio
   }
 
@@ -88,6 +95,7 @@ async function takeClipForPlayback(
   const audio = new Audio()
   audio.preload = 'auto'
   audio.src = url
+  applyTtsPlaybackVolume(audio)
   return audio
 }
 

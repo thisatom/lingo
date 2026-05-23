@@ -7,10 +7,10 @@ import { useSettingsStore } from '@/entities/settings/model/store'
 export type AppSaveStep = 'scroll' | 'chats' | 'settings' | 'done'
 
 const STEP_LABELS: Record<AppSaveStep, string> = {
-  scroll: 'Сохранение позиции в чатах…',
-  chats: 'Сохранение чатов…',
-  settings: 'Сохранение настроек…',
-  done: 'Данные сохранены'
+  scroll: 'Saving scroll position…',
+  chats: 'Saving chats…',
+  settings: 'Saving settings…',
+  done: 'All changes saved'
 }
 
 export function getAppSaveStepLabel(step: AppSaveStep): string {
@@ -41,8 +41,8 @@ export async function persistAppState(
       await waitNextFrame()
 
       onStep?.('chats')
-      flushChatPersistDebounce()
       await flushPersistedStore(useChatsStore as PersistCapableStore)
+      flushChatPersistDebounce()
 
       onStep?.('settings')
       await flushPersistedStore(useSettingsStore as PersistCapableStore)

@@ -1,0 +1,74 @@
+appId: app.lingo.desktop
+productName: Lingo
+copyright: Copyright © 2026 Lingo
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+  - '!**/*.md'
+  - '!**/*.ts'
+  - '!**/*.tsx'
+  - '!src/**'
+  - '!electron/**'
+  - '!docs/**'
+  - '!tests/**'
+  - '!**/*.test.ts'
+  - '!**/*.spec.ts'
+
+asar: true
+asarUnpack:
+  - '**/*.node'
+  - '**/node_modules/keytar/**'
+  - '**/node_modules/onnxruntime-node/**'
+  - '**/node_modules/onnxruntime-common/**'
+  - '**/node_modules/@huggingface/transformers/**'
+
+npmRebuild: true
+buildDependenciesFromSource: false
+
+win:
+  icon: icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: Lingo-${version}-win-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Lingo-${version}-win-setup.${ext}
+
+mac:
+  icon: icon.png
+  category: public.app-category.education
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  artifactName: Lingo-${version}-mac-${arch}.${ext}
+
+linux:
+  icon: icon.png
+  category: Education
+  maintainer: Lingo
+  target:
+    - target: tar.gz
+      arch:
+        - x64
+    - target: dir
+      arch:
+        - x64
+  artifactName: Lingo-${version}-linux-${arch}.${ext}
+
+publish: null

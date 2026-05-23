@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
+import { injectContentSecurityPolicy } from './vite/inject-csp'
 
 function stubWebsearchMcpForWeb(): Plugin {
   const stub = resolve(__dirname, 'src/shared/lib/websearch-mcp-client.stub.ts')
@@ -43,7 +44,7 @@ export default defineConfig({
       '@': resolve(__dirname, 'src')
     }
   },
-  plugins: [stubWebsearchMcpForWeb(), react(), tailwindcss()],
+  plugins: [injectContentSecurityPolicy(), stubWebsearchMcpForWeb(), react(), tailwindcss()],
   define: {
     'import.meta.env.VITE_LINGO_PLATFORM': JSON.stringify('web'),
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version)

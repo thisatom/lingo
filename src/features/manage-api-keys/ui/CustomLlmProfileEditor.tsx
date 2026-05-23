@@ -2,10 +2,11 @@ import '@/shared/lib/monaco-vite-setup'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
+import { getLingo } from '@/shared/lib/lingo'
 import {
   defaultCustomLlmProfileJson,
-  importCustomLlmProfileFromSnippet,
-  parseCustomLlmProfileSource
+  parseCustomLlmProfileSource,
+  stringifyCustomLlmProfile
 } from '@/shared/lib/custom-llm-profile'
 import { settingsButtonSize } from '@/shared/lib/settings-control'
 import { settingsRowDescriptionClass } from '@/shared/lib/settings-surface'
@@ -32,7 +33,28 @@ export function CustomLlmProfileEditor() {
 
   const [draft, setDraft] = useState(profileJson)
   const [parseError, setParseError] = useState<string | null>(null)
+  const [importHint, setImportHint] = useState<string | null>(null)
   const timerRef = useRef<number | null>(null)
+
+  const applyParsed = useCallback(
+    async (parsed: ReturnType<typeof parseCustomLlmProfileSource>) => {
+      if (!parsed.ok) {
+        setParseError(parsed.error)
+        return
+      }
+      applyParsedProfile(parsed.data)
+      setParseError(null)
+      if (parsed.importedApiKey) {
+        try {
+          await getLingo().secrets.set('custom-llm', parsed.importedApiKey)
+          setImportHint('API key from snippet saved to Custom endpoint key below.')
+        } catch {
+          setImportHint('Profile imported — paste the API key into Custom endpoint key below.')
+        }
+      }
+    },
+    [applyParsedProfile]
+  )
 
   useEffect(() => {
     setDraft(profileJson)
@@ -48,17 +70,21 @@ export function CustomLlmProfileEditor() {
     (next: string) => {
       if (timerRef.current) window.clearTimeout(timerRef.current)
       timerRef.current = window.setTimeout(() => {
-        setCustomLlmProfileJson(next)
         const parsed = parseCustomLlmProfileSource(next)
-        if (parsed.ok) {
-          applyParsedProfile(parsed.data)
-          setParseError(null)
-        } else {
+        if (!parsed.ok) {
+          setCustomLlmProfileJson(next)
           setParseError(parsed.error)
+          return
         }
+        const profileJson = stringifyCustomLlmProfile(parsed.data.profile)
+        if (profileJson !== next) {
+          setDraft(profileJson)
+        }
+        setCustomLlmProfileJson(profileJson)
+        void applyParsed(parsed)
       }, AUTOSAVE_MS)
     },
-    [applyParsedProfile, setCustomLlmProfileJson]
+    [applyParsed, setCustomLlmProfileJson]
   )
 
   const handleMount: OnMount = (_editor, monacoApi) => {
@@ -71,26 +97,28 @@ export function CustomLlmProfileEditor() {
 
   const handleImportSnippet = async () => {
     const pasted = window.prompt(
-      'Paste an OpenAI SDK snippet (baseURL, model, create({ … }) options):'
+      'Paste JSON, axios (invokeUrl, headers, payload), or OpenAI SDK (baseURL, model):'
     )
     if (!pasted?.trim()) return
-    const imported = importCustomLlmProfileFromSnippet(pasted)
-    if (!imported) {
-      setParseError('Could not read baseURL or model from the snippet.')
+    setImportHint(null)
+    const parsed = parseCustomLlmProfileSource(pasted)
+    if (!parsed.ok) {
+      setParseError(parsed.error)
       return
     }
-    setDraft(imported)
-    scheduleSave(imported)
+    const profileJson = stringifyCustomLlmProfile(parsed.data.profile)
+    setDraft(profileJson)
+    scheduleSave(pasted)
   }
 
   return (
     <div className="px-4 py-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className={cn(settingsRowDescriptionClass, 'mt-0')}>
-          JSON profile: <code className="text-[11px]">baseURL</code>,{' '}
-          <code className="text-[11px]">model</code>, optional{' '}
-          <code className="text-[11px]">completion</code> fields (thinking, stream, …).
-          API key stays in the field below.
+          JSON (<code className="text-[11px]">baseURL</code>, <code className="text-[11px]">model</code>,{' '}
+          <code className="text-[11px]">completion</code>) or paste an axios / NVIDIA / OpenAI SDK
+          snippet — URL, model, and <code className="text-[11px]">Bearer</code> key are applied
+          automatically (key is not stored in JSON).
         </p>
         <div className="flex shrink-0 gap-1.5">
           <Button
@@ -146,9 +174,12 @@ export function CustomLlmProfileEditor() {
 
       {parseError ? (
         <p className="mt-2 text-xs text-destructive">{parseError}</p>
+      ) : importHint ? (
+        <p className="mt-2 text-xs text-muted-foreground">{importHint}</p>
       ) : (
         <p className="mt-2 text-xs text-muted-foreground">
-          Saved when JSON is valid. Comments <code className="text-[11px]">// …</code> are allowed.
+          Saved when valid. Comments <code className="text-[11px]">// …</code> allowed. Code snippets
+          convert to JSON on save.
         </p>
       )}
     </div>

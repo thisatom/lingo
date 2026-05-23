@@ -82,6 +82,12 @@ export function flushChatPersistDebounce(): void {
   flushPendingWrite()
 }
 
+/** Write immediately (bypass debounce) for shutdown snapshots. */
+export function writeChatPersistSnapshotNow(name: string, value: string): void {
+  pendingWrite = { name, value }
+  flushPendingWrite()
+}
+
 export const chatPersistStorage: StateStorage = {
   getItem: (name) => safeGetItem(name),
   setItem: (name, value) => {

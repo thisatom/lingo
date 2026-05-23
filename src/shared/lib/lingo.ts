@@ -1,4 +1,5 @@
 import type { LingoApi, SecretProviderId } from '@/shared/types/ipc'
+import { getWebSecret } from '@/shared/api/web-secrets'
 
 const DESKTOP_ONLY =
   'Lingo API is unavailable. Start the desktop app with: npm run dev, or the browser build with: npm run dev:web'
@@ -6,16 +7,14 @@ const DESKTOP_ONLY =
 const WEB_UNAVAILABLE =
   'Lingo failed to start in the browser. Reload the page or run: npm run dev:web'
 
-const RESTART_HINT =
-  'Restart the app (npm run dev) so the desktop bridge reloads — API key reveal needs an updated preload.'
-
+/** Read stored API key — web build only (localStorage). Desktop keys stay in main. */
 export function readSecretKey(provider: SecretProviderId): Promise<string | null> {
-  const api = getLingo()
-  const read = api.secrets.readKey ?? api.secrets.get
-  if (typeof read !== 'function') {
-    throw new Error(RESTART_HINT)
+  if (isElectronApp()) {
+    return Promise.reject(
+      new Error('API keys are not exposed in the desktop app. Clear the field and enter a new key to replace.')
+    )
   }
-  return read(provider)
+  return getWebSecret(provider)
 }
 
 export function getLingo(): LingoApi {

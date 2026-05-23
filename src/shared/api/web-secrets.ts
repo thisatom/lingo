@@ -1,4 +1,10 @@
+/**
+ * Browser-only secret storage for `npm run dev:web` / `build:web`.
+ * Keys are persisted in localStorage as plain text — dev preview only, not production-safe.
+ * Desktop Electron uses keytar in main (`electron/main/secrets.ts`).
+ */
 import type { SecretProviderId, SecretStatus } from '@/shared/types/ipc'
+import { SECRET_PROVIDER_IDS } from '@/shared/types/secret-providers'
 import { openRouterConfig } from '@/shared/config/openrouter'
 import { openRouterHeaders } from '@/shared/lib/openrouter-headers'
 import { formatOpenRouterError } from '@/shared/lib/openrouter-errors'
@@ -71,15 +77,7 @@ export async function validateWebOpenRouterKey(): Promise<{ ok: boolean; error?:
 }
 
 export function clearAllWebSecrets(): void {
-  const keys: SecretProviderId[] = [
-    'openrouter',
-    'openai',
-    'anthropic',
-    'google',
-    'groq',
-    'azure-speech'
-  ]
-  for (const provider of keys) {
+  for (const provider of SECRET_PROVIDER_IDS) {
     localStorage.removeItem(storageKey(provider))
   }
 }

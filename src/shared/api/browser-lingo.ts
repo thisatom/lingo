@@ -44,8 +44,11 @@ function createWebChatStream(
         case 'searching':
           handlers.onSearching?.()
           break
-        case 'status':
-          handlers.onStatus?.(event)
+        case 'search-targets':
+          handlers.onSearchTargets?.(event)
+          break
+        case 'thinking-delta':
+          handlers.onThinkingDelta?.(event)
           break
         case 'text-delta':
           handlers.onTextDelta?.(event)
@@ -95,7 +98,6 @@ export function createBrowserLingoApi(): LingoApi {
     secrets: {
       getStatus: (provider: SecretProviderId) => getWebSecretStatus(provider),
       readKey: (provider: SecretProviderId) => getWebSecret(provider),
-      get: (provider: SecretProviderId) => getWebSecret(provider),
       set: (provider: SecretProviderId, value: string) => setWebSecret(provider, value),
       clear: (provider: SecretProviderId) => clearWebSecret(provider),
       validateOpenRouter: () => validateWebOpenRouterKey()

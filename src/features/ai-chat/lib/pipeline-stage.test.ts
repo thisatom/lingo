@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useConversationStore } from '@/entities/conversation/model/store'
+import { getChatPipeline } from './chat-pipeline-registry'
 import {
   isViewingChat,
   setPipelineErrorForChat,
@@ -16,7 +17,9 @@ describe('pipeline-stage', () => {
       blurAnimateMessageId: null,
       blurAnimatedMessageIds: [],
       queueAheadPreview: null,
-      pipelineActivity: null
+      pipelineThinkingText: '',
+      pipelineSearchTargets: [],
+      pipelineStreamingAnswer: false
     })
   })
 
@@ -33,6 +36,7 @@ describe('pipeline-stage', () => {
 
     setPipelineStageForChat(chatB, 'thinking')
     expect(useConversationStore.getState().stage).toBe('idle')
+    expect(getChatPipeline(chatB).stage).toBe('thinking')
     expect(isViewingChat(chatA)).toBe(true)
     expect(isViewingChat(chatB)).toBe(false)
   })

@@ -14,6 +14,7 @@ import {
 } from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
 import { notifyActiveChatChange } from '@/entities/chat/model/active-chat-effects'
+import { notifyChatDeleted } from '@/entities/chat/model/chat-delete-effects'
 import { useMessageQueueStore } from '@/entities/message-queue/model/store'
 import { sortChatsForSidebar } from '@/shared/lib/chat-sidebar'
 import { useSettingsStore } from '@/entities/settings/model/store'
@@ -44,6 +45,8 @@ interface ChatsState {
   notifyChatReplyReady: (chatId: string) => void
   addMessage: (message: Omit<Message, 'id' | 'createdAt'>, targetChatId?: string) => string
   removeMessagesFrom: (messageId: string, targetChatId?: string) => void
+  /** Removes a single message without affecting later messages in the thread. */
+  removeMessage: (messageId: string, targetChatId?: string) => void
   /** Keeps the message with `messageId` and removes everything after it. */
   removeMessagesAfter: (messageId: string, targetChatId?: string) => void
   updateUserMessageContent: (
@@ -326,6 +329,7 @@ export const useChatsStore = create<ChatsState>()(
         if (get().activeChatId !== prevActive) {
           notifyActiveChatChange()
         }
+        notifyChatDeleted(id)
         invalidateChatApiHistoryCache(id)
         useMessageQueueStore.getState().clearChat(id)
       },
@@ -410,6 +414,25 @@ export const useChatsStore = create<ChatsState>()(
               return {
                 ...c,
                 messages: c.messages.slice(0, index),
+                updatedAt: Date.now()
+              }
+            })
+          )
+        }))
+      },
+
+      removeMessage: (messageId, targetChatId) => {
+        const chatId = targetChatId ?? get().activeChatId
+        if (!chatId) return
+
+        set((state) => ({
+          chats: withSortedChats(
+            state.chats.map((c) => {
+              if (c.id !== chatId) return c
+              if (!c.messages.some((m) => m.id === messageId)) return c
+              return {
+                ...c,
+                messages: c.messages.filter((m) => m.id !== messageId),
                 updatedAt: Date.now()
               }
             })

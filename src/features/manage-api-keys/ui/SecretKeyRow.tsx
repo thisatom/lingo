@@ -25,10 +25,10 @@ export function SecretKeyRow({
   placeholder: string
   onMessage: (message: string | null) => void
 }) {
-  const { status, loading, apiError, save, clear, readKey } = useSecretKey(providerId)
+  const { status, loading, apiError, save, clear } = useSecretKey(providerId)
   const [value, setValue] = useState('')
   const [showSecret, setShowSecret] = useState(false)
-  const [revealed, setRevealed] = useState(false)
+  const [editingNewKey, setEditingNewKey] = useState(false)
   const [testMessage, setTestMessage] = useState<string | null>(null)
   const timerRef = useRef<number | null>(null)
   const wasKeySetRef = useRef(false)
@@ -50,20 +50,20 @@ export function SecretKeyRow({
       wasKeySetRef.current = false
       prevMaskedRef.current = undefined
       setShowSecret(false)
-      setRevealed(false)
+      setEditingNewKey(false)
       setTestMessage(null)
       return
     }
 
     wasKeySetRef.current = true
-    if (revealed) return
+    if (editingNewKey) return
 
     const masked = status.masked ?? '••••••••'
     if (prevMaskedRef.current !== masked) {
       prevMaskedRef.current = masked
       setValue(masked)
     }
-  }, [status, onMessage, revealed])
+  }, [status, onMessage, editingNewKey])
 
   const id = `api-key-${providerId}`
 
@@ -71,6 +71,8 @@ export function SecretKeyRow({
     if (timerRef.current) window.clearTimeout(timerRef.current)
     timerRef.current = window.setTimeout(async () => {
       onMessage(null)
+      const masked = status?.masked ?? '••••••••'
+      if (status?.isSet && !editingNewKey && next === masked) return
       try {
         if (next.trim().length === 0) {
           if (status?.isSet) {
@@ -106,7 +108,7 @@ export function SecretKeyRow({
             : testMessage
               ? testMessage
               : status?.isSet
-                ? 'Configured. Clear the field to remove.'
+                ? 'Configured. Clear the field to replace or remove.'
                 : 'Not configured.'}
         </p>
       </div>
@@ -118,6 +120,7 @@ export function SecretKeyRow({
           value={value}
           onChange={(e) => {
             const next = e.target.value
+            setEditingNewKey(true)
             setValue(next)
             schedule(next)
           }}
@@ -125,40 +128,16 @@ export function SecretKeyRow({
           disabled={loading}
           type={showSecret ? 'text' : 'password'}
         />
-        {(status?.isSet || value.trim().length > 0) && (
+        {editingNewKey && value.trim().length > 0 ? (
           <button
             type="button"
             className="absolute top-1/2 right-0.5 inline-flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
-            onClick={async () => {
-              if (showSecret) {
-                setShowSecret(false)
-                setRevealed(false)
-                if (status?.isSet) {
-                  setValue(status.masked ?? '••••••••')
-                }
-                return
-              }
-              if (status?.isSet && !revealed) {
-                try {
-                  const secret = await readKey()
-                  if (secret == null || secret === '') {
-                    onMessage('Could not read the saved key.')
-                    return
-                  }
-                  setValue(secret)
-                  setRevealed(true)
-                } catch (e) {
-                  onMessage(e instanceof Error ? e.message : 'Could not read the saved key.')
-                  return
-                }
-              }
-              setShowSecret(true)
-            }}
-            aria-label={showSecret ? 'Hide API key' : 'Show API key'}
+            onClick={() => setShowSecret((v) => !v)}
+            aria-label={showSecret ? 'Hide typed key' : 'Show typed key'}
           >
             {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   )

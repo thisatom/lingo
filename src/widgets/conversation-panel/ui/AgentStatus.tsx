@@ -1,14 +1,13 @@
 import { useSettingsStore } from '@/entities/settings/model/store'
-import {
-  useConversationStore,
-  type PipelineStage
-} from '@/entities/conversation/model/store'
+import type { PipelineStage } from '@/entities/conversation/model/store'
 import { SpeakingTtsLevel } from '@/features/text-to-speech/ui/SpeakingTtsLevel'
 import { isLocalWebSearchRegistered } from '@/shared/lib/local-web-search-runtime'
 import { getWebSearchProvider } from '@/shared/lib/web-search-provider'
+import { useConversationStore } from '@/entities/conversation/model/store'
 import { cn } from '@/shared/lib/utils'
 import { ShinyText } from '@/shared/ui/shiny-text'
 import { agentMessageClass } from './agent-layout'
+import { SearchTargetList } from './PipelineDetailPanels'
 
 const STAGE_LABEL: Partial<Record<PipelineStage, string>> = {
   listening: 'Listening…',
@@ -19,55 +18,35 @@ const STAGE_LABEL: Partial<Record<PipelineStage, string>> = {
 
 interface AgentStatusProps {
   stage: PipelineStage
-  /** When true, renders a compact bar for the composer dock. */
-  compact?: boolean
 }
 
-export function AgentStatus({ stage, compact = false }: AgentStatusProps) {
+export function AgentStatus({ stage }: AgentStatusProps) {
   const modelId = useSettingsStore((s) => s.modelId)
-  const pipelineActivity = useConversationStore((s) => s.pipelineActivity)
-  const activitySuffix = pipelineActivity ? (
-    <span className="text-muted-foreground"> — {pipelineActivity}</span>
-  ) : null
-  const compactClass = compact
-    ? 'rounded-xl border border-border bg-surface-raised px-3 py-2 shadow-sm'
-    : agentMessageClass
+  const pipelineSearchTargets = useConversationStore((s) => s.pipelineSearchTargets)
 
   if (stage === 'searching') {
     const local = isLocalWebSearchRegistered()
     const provider = getWebSearchProvider(modelId, { local })
+    const targets =
+      pipelineSearchTargets.length > 0
+        ? pipelineSearchTargets
+        : [{ title: provider.label, url: provider.href }]
+
     return (
       <div
-        className={compactClass}
+        className={agentMessageClass}
         role="status"
         aria-live="polite"
         aria-label={local ? 'Researching the web' : `Searching web via ${provider.label}`}
       >
-        <span className="inline-flex flex-wrap items-baseline gap-x-1 text-[13px] leading-[1.5] font-normal">
-          <ShinyText
-            text={local ? 'Researching the web' : 'Searching web'}
-            className="inline"
-            speed={2.2}
-            spread={110}
-          />
-          {pipelineActivity ? (
-            activitySuffix
-          ) : local ? (
-            <span className="text-muted-foreground"> – reading pages</span>
-          ) : (
-            <>
-              <span className="text-muted-foreground"> –</span>
-              <a
-                href={provider.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-foreground/75 underline-offset-2 hover:text-foreground hover:underline"
-              >
-                {provider.label}
-              </a>
-            </>
-          )}
-        </span>
+        <ShinyText
+          text={local ? 'Researching the web' : 'Searching web'}
+          className="text-[13px] leading-[1.5] font-normal"
+          speed={2.2}
+          spread={110}
+        />
+        <p className="mt-1 text-[12px] text-muted-foreground">Looking on:</p>
+        <SearchTargetList targets={targets} />
       </div>
     )
   }
@@ -78,7 +57,7 @@ export function AgentStatus({ stage, compact = false }: AgentStatusProps) {
   if (stage === 'speaking') {
     return (
       <div
-        className={cn(compactClass, 'flex items-center gap-2.5')}
+        className={cn(agentMessageClass, 'flex items-center gap-2.5')}
         role="status"
         aria-live="polite"
         aria-label={label}
@@ -95,11 +74,8 @@ export function AgentStatus({ stage, compact = false }: AgentStatusProps) {
   }
 
   return (
-    <div className={compactClass} role="status" aria-live="polite" aria-label={label}>
-      <span className="inline-flex flex-wrap items-baseline text-[13px] leading-[1.5] font-normal">
-        <ShinyText text={label} className="inline" speed={2.2} spread={110} />
-        {activitySuffix}
-      </span>
+    <div className={agentMessageClass} role="status" aria-live="polite" aria-label={label}>
+      <ShinyText text={label} className="text-[13px] leading-[1.5] font-normal" speed={2.2} spread={110} />
     </div>
   )
 }

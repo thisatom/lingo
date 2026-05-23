@@ -1,9 +1,6 @@
 import { useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
-import { useChatsStore } from '@/entities/chat/model/store'
-import { clearAllWebSecrets } from '@/shared/api/browser-lingo'
-import { getLingo, isElectronApp, isLingoAvailable } from '@/shared/lib/lingo'
-import { isWebPlatform } from '@/shared/lib/lingo-bridge'
+import { clearAppDataAndPersist } from '@/features/user-settings/lib/clear-app-data'
 import { settingsInputClass } from '@/shared/lib/settings-control'
 import {
   settingsCardClass,
@@ -53,31 +50,12 @@ export function UserSettingsForm() {
   const setAddressUserByName = useSettingsStore((s) => s.setAddressUserByName)
   const appTheme = useSettingsStore((s) => s.appTheme)
   const setAppTheme = useSettingsStore((s) => s.setAppTheme)
-  const resetSettings = useSettingsStore((s) => s.resetSettings)
-  const resetChats = useChatsStore((s) => s.resetChats)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const [clearConfirmInput, setClearConfirmInput] = useState('')
   const canClearAppData = clearConfirmInput.trim() === CLEAR_APP_DATA_CONFIRM_TEXT
 
   const handleClearAppData = async () => {
-    resetChats()
-    resetSettings()
-    if (isWebPlatform()) {
-      clearAllWebSecrets()
-    } else if (isElectronApp() && isLingoAvailable()) {
-      try {
-        await Promise.allSettled([
-          getLingo().secrets.clear('openrouter'),
-          getLingo().secrets.clear('openai'),
-          getLingo().secrets.clear('anthropic'),
-          getLingo().secrets.clear('google'),
-          getLingo().secrets.clear('groq'),
-          getLingo().secrets.clear('azure-speech')
-        ])
-      } catch {
-        // ignore — keytar may be unavailable
-      }
-    }
+    await clearAppDataAndPersist()
     setClearConfirmInput('')
     setClearDialogOpen(false)
   }

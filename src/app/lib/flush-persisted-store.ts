@@ -1,3 +1,7 @@
+import {
+  CHAT_PERSIST_KEY,
+  writeChatPersistSnapshotNow
+} from '@/entities/chat/lib/chat-persist-storage'
 import type { PersistStorage } from 'zustand/middleware'
 import type { StoreApi, UseBoundStore } from 'zustand'
 
@@ -19,11 +23,15 @@ export async function flushPersistedStore(store: PersistCapableStore): Promise<v
 
   const state = store.getState()
   const partialized = partialize ? partialize(state) : state
+  const payload = {
+    state: partialized,
+    version: version ?? 0
+  }
 
-  await Promise.resolve(
-    storage.setItem(name, {
-      state: partialized,
-      version: version ?? 0
-    })
-  )
+  if (name === CHAT_PERSIST_KEY) {
+    writeChatPersistSnapshotNow(name, JSON.stringify(payload))
+    return
+  }
+
+  await Promise.resolve(storage.setItem(name, payload))
 }

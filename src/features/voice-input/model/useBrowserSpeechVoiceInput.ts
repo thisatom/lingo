@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition'
 import { useConversationStore } from '@/entities/conversation/model/store'
+import { setActiveChatPipelineStage } from '@/features/ai-chat/lib/pipeline-stage'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { mapSpeechError } from '@/features/speech-to-text/lib/speech-errors'
 import {
@@ -20,7 +21,6 @@ type Phase = 'idle' | 'starting' | 'recording' | 'transcribing'
 
 export function useBrowserSpeechVoiceInput({ enabled, onLiveTranscript }: Options) {
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
-  const setStage = useConversationStore((s) => s.setStage)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
 
   const {
@@ -56,25 +56,25 @@ export function useBrowserSpeechVoiceInput({ enabled, onLiveTranscript }: Option
   const clearVoiceStage = useCallback(() => {
     const current = useConversationStore.getState().stage
     if (current === 'listening' || current === 'transcribing') {
-      setStage('idle')
+      setActiveChatPipelineStage('idle')
     }
-  }, [setStage])
+  }, [])
 
   const setPhaseSafe = useCallback(
     (next: Phase) => {
       phaseRef.current = next
       setPhase(next)
       if (next === 'starting' || next === 'recording') {
-        setStage('listening')
+        setActiveChatPipelineStage('listening')
         return
       }
       if (next === 'transcribing') {
-        setStage('transcribing')
+        setActiveChatPipelineStage('transcribing')
         return
       }
       clearVoiceStage()
     },
-    [clearVoiceStage, setStage]
+    [clearVoiceStage]
   )
 
   const hardReset = useCallback(() => {

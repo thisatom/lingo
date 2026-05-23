@@ -41,7 +41,12 @@ export function AppShutdownSaver() {
         try {
           await runSave()
         } catch (error) {
-          console.error('[lingo] Shutdown save failed:', error)
+          console.error('[lingo] Shutdown save failed, retrying once:', error)
+          try {
+            await runSave()
+          } catch (retryError) {
+            console.error('[lingo] Shutdown save failed after retry:', retryError)
+          }
         } finally {
           api.app?.notifyShutdownComplete?.()
         }

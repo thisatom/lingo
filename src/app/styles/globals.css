@@ -116,6 +116,9 @@
   --md-code-tag: #116329;
   --md-code-attr: #0550ae;
   --md-code-link: #0969da;
+
+  /** Reasoning copy — always a dark/dim tone (not answer `foreground`). */
+  --thinking-foreground: #2e2e2e;
 }
 
 /* Dark theme (Cursor-inspired) */
@@ -178,6 +181,8 @@
   --md-code-tag: #f07178;
   --md-code-attr: #ffcb6b;
   --md-code-link: #82aaff;
+
+  --thinking-foreground: #6b6b6b;
 }
 
 @layer base {

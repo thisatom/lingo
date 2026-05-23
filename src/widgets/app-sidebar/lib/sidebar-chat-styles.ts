@@ -41,7 +41,13 @@ export const sidebarRowActionNoHoverBgClass =
 
 export const sidebarAgentDotClass = 'bg-muted-foreground'
 
-export const SIDEBAR_AGENT_STAGES: PipelineStage[] = ['thinking', 'searching', 'speaking']
+export const SIDEBAR_AGENT_STAGES: PipelineStage[] = [
+  'listening',
+  'transcribing',
+  'thinking',
+  'searching',
+  'speaking'
+]
 
 export function isSidebarAgentStage(stage: PipelineStage): boolean {
   return SIDEBAR_AGENT_STAGES.includes(stage)

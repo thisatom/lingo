@@ -3,10 +3,12 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
-import type { ConversationTurn as Turn } from '@/widgets/conversation-panel/lib/group-turns'
+import { estimateTurnHeightPx } from '@/widgets/conversation-panel/lib/estimate-turn-height'
+import {
+  lastAssistantMessageId,
+  type ConversationTurn as Turn
+} from '@/widgets/conversation-panel/lib/group-turns'
 import { ConversationTurn } from './ConversationTurn'
-
-const ESTIMATED_TURN_HEIGHT_PX = 140
 
 export const VIRTUALIZE_MESSAGE_THRESHOLD = 100
 
@@ -17,6 +19,7 @@ type VirtualizedConversationTurnsProps = {
   editingUserMessageId: string | null
   actionsDisabled?: boolean
   agentBusy?: boolean
+  pipelineStreamingAnswer?: boolean
   onStopAgent?: () => void
   voiceSupported?: boolean
   voiceBusy?: boolean
@@ -41,6 +44,7 @@ export function VirtualizedConversationTurns({
   editingUserMessageId,
   actionsDisabled,
   agentBusy,
+  pipelineStreamingAnswer = false,
   onStopAgent,
   voiceSupported,
   voiceBusy,
@@ -58,12 +62,16 @@ export function VirtualizedConversationTurns({
   const virtualizer = useVirtualizer({
     count: turns.length,
     getScrollElement: () => scrollElement,
-    estimateSize: () => ESTIMATED_TURN_HEIGHT_PX,
+    estimateSize: (index) => estimateTurnHeightPx(turns[index]!),
     overscan: 3
   })
 
+  const tailTurn = turns[turns.length - 1]
+  const tailAssistantId = tailTurn ? lastAssistantMessageId(tailTurn.assistantMessages) : undefined
   const tailAssistantLen =
-    turns[turns.length - 1]?.assistantMessages.at(-1)?.content.length ?? 0
+    tailTurn?.assistantMessages.find((m) => m.id === tailAssistantId)?.content.length ?? 0
+  const tailThinkingLen =
+    tailTurn?.assistantMessages.find((m) => m.role === 'thinking')?.content.length ?? 0
 
   useEffect(() => {
     if (!agentBusy) return
@@ -75,9 +83,15 @@ export function VirtualizedConversationTurns({
     return () => {
       if (measureRafRef.current != null) cancelAnimationFrame(measureRafRef.current)
     }
-  }, [agentBusy, turns.length, tailAssistantLen, virtualizer])
+  }, [agentBusy, turns.length, tailAssistantLen, tailThinkingLen, virtualizer])
 
   const items = virtualizer.getVirtualItems()
+  const totalSize = virtualizer.getTotalSize()
+
+  useEffect(() => {
+    if (!scrollElement) return
+    virtualizer.measure()
+  }, [scrollElement, totalSize, turns.length, virtualizer])
 
   return (
     <div
@@ -115,9 +129,11 @@ export function VirtualizedConversationTurns({
               onExitEdit={onExitEdit}
               onSubmitEdit={onSubmitEdit}
               onAttachmentError={onAttachmentError}
+              agentBusy={agentBusy}
+              isLatestTurn={isLatestTurn}
               streamingAssistantMessageId={
-                agentBusy && isLatestTurn
-                  ? turn.assistantMessages[turn.assistantMessages.length - 1]?.id
+                agentBusy && isLatestTurn && pipelineStreamingAnswer
+                  ? lastAssistantMessageId(turn.assistantMessages)
                   : undefined
               }
             />

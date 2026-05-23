@@ -2,8 +2,8 @@
 export const customLlmConfig = {
   defaultBaseUrl: 'http://127.0.0.1:11434/v1',
   defaultModel: 'llama3.2',
-  maxTokens: 1024,
-  maxTokensRetry: 1536
+  maxTokens: 2048,
+  maxTokensRetry: 3072
 } as const
 
 export function normalizeCustomModelId(modelId: string): string {

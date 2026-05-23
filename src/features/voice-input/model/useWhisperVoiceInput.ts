@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useConversationStore } from '@/entities/conversation/model/store'
+import { setActiveChatPipelineStage } from '@/features/ai-chat/lib/pipeline-stage'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import {
   mapSpeechError,
@@ -40,7 +41,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 
 export function useRecordedVoiceInput({ enabled }: Options) {
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
-  const setStage = useConversationStore((s) => s.setStage)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
 
   const supported =
@@ -58,25 +58,25 @@ export function useRecordedVoiceInput({ enabled }: Options) {
   const clearVoiceStage = useCallback(() => {
     const current = useConversationStore.getState().stage
     if (current === 'listening' || current === 'transcribing') {
-      setStage('idle')
+      setActiveChatPipelineStage('idle')
     }
-  }, [setStage])
+  }, [])
 
   const setPhaseSafe = useCallback(
     (next: Phase) => {
       phaseRef.current = next
       setPhase(next)
       if (next === 'starting' || next === 'recording') {
-        setStage('listening')
+        setActiveChatPipelineStage('listening')
         return
       }
       if (next === 'transcribing') {
-        setStage('transcribing')
+        setActiveChatPipelineStage('transcribing')
         return
       }
       clearVoiceStage()
     },
-    [clearVoiceStage, setStage]
+    [clearVoiceStage]
   )
 
   const releaseMic = useCallback(() => {

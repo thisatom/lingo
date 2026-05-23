@@ -3,6 +3,7 @@ import { AgentChatScrollArea } from './AgentChatScrollArea'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
 import { registerChatScrollFlush } from '@/app/lib/chat-scroll-registry'
+import { flushChatPersistDebounce } from '@/entities/chat/lib/chat-persist-storage'
 import { CHAT_SCROLL_MIN_PX } from '@/entities/chat/lib/chat-scroll-persist'
 import { useChatsStore } from '@/entities/chat/model/store'
 import {
@@ -16,15 +17,25 @@ import {
   scrollViewportToBottom
 } from '@/widgets/conversation-panel/lib/chat-scroll-anchor'
 import {
+  buildChatTailScrollSignature,
+  isViewportNearChatBottom,
+  shouldStickToBottom,
+  stickChatViewportToBottom
+} from '@/widgets/conversation-panel/lib/chat-scroll-follow'
+import {
   recallChatScrollTop,
   rememberChatScrollTop
 } from '@/widgets/conversation-panel/lib/chat-scroll-memory'
+import {
+  mergeChatScrollRestoreTarget
+} from '@/widgets/conversation-panel/lib/chat-scroll-restore-target'
 import {
   buildScrollRestoreSessionKey,
   shouldSkipScrollRestore
 } from '@/widgets/conversation-panel/lib/chat-scroll-restore'
 import {
   groupMessagesIntoTurns,
+  lastAssistantMessageId,
   messageHasVisibleContent
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { cn } from '@/shared/lib/utils'
@@ -76,18 +87,6 @@ interface ConversationPanelProps {
   onAttachmentError?: (message: string) => void
 }
 
-function resolveSavedScrollTop(
-  chatId: string,
-  storedScrollTop: number | null | undefined
-): number | null {
-  const memory = recallChatScrollTop(chatId)
-  if (memory != null && memory >= CHAT_SCROLL_MIN_PX) return memory
-  if (storedScrollTop != null && storedScrollTop >= CHAT_SCROLL_MIN_PX) {
-    return storedScrollTop
-  }
-  return null
-}
-
 export function ConversationPanel({
   messages,
   stage,
@@ -121,9 +120,11 @@ export function ConversationPanel({
   const scrollMemoryRafRef = useRef<number | null>(null)
   const persistIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPersistedScrollRef = useRef<{ chatId: string; scrollTop: number } | null>(null)
+  const [scrollRestoreEpoch, setScrollRestoreEpoch] = useState(0)
 
   const setChatScrollPosition = useChatsStore((s) => s.setChatScrollPosition)
   const queueAheadPreview = useConversationStore((s) => s.queueAheadPreview)
+  const pipelineStreamingAnswer = useConversationStore((s) => s.pipelineStreamingAnswer)
   const clearChatScrollPosition = useChatsStore((s) => s.clearChatScrollPosition)
   const [chatsStoreHydrated, setChatsStoreHydrated] = useState(() =>
     useChatsStore.persist.hasHydrated()
@@ -143,22 +144,31 @@ export function ConversationPanel({
     messages.length > 0 &&
     messages[messages.length - 1]?.role === 'assistant' &&
     messages[messages.length - 1].content.length > 0
-  const showStatus = ACTIVE_STAGES.includes(stage) && !assistantStreaming
+  const showStatus =
+    ACTIVE_STAGES.includes(stage) &&
+    !assistantStreaming &&
+    !(stage === 'thinking' && agentBusy) &&
+    !(stage === 'thinking' && pipelineStreamingAnswer)
 
-  const tailScrollSignature = useMemo(() => {
-    if (messages.length === 0) return '0'
-    const last = messages[messages.length - 1]
-    return `${messages.length}:${last.id}:${last.content.length}:${last.role}`
-  }, [messages])
+  const tailScrollSignature = useMemo(
+    () => buildChatTailScrollSignature(messages),
+    [messages]
+  )
 
-  const scrollToLatest = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    const viewport = viewportRef.current
-    if (viewport) {
-      scrollViewportToBottom(viewport, behavior)
-      return
-    }
-    bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
-  }, [])
+  const scrollToLatest = useCallback(
+    (behavior: ScrollBehavior = 'smooth') => {
+      pinToBottomRef.current = true
+      const viewport = viewportRef.current
+      if (viewport) {
+        scrollViewportToBottom(viewport, behavior)
+      } else {
+        bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
+      }
+      atBottomRef.current = true
+      onAtBottomChange?.(true)
+    },
+    [onAtBottomChange]
+  )
 
   const followBottom = useCallback(() => {
     pinToBottomRef.current = true
@@ -200,11 +210,9 @@ export function ConversationPanel({
       const scrollTop = Math.round(viewport.scrollTop)
 
       if (scrollTop < CHAT_SCROLL_MIN_PX) {
-        if (!force) {
-          rememberChatScrollTop(chatId, 0)
-          lastPersistedScrollRef.current = null
-          clearChatScrollPosition(chatId)
-        }
+        rememberChatScrollTop(chatId, 0)
+        lastPersistedScrollRef.current = null
+        clearChatScrollPosition(chatId)
         return
       }
 
@@ -244,8 +252,21 @@ export function ConversationPanel({
     [persistScrollPosition]
   )
 
+  const syncFollowFromViewport = useCallback(
+    (viewport: HTMLDivElement) => {
+      if (isRestoringScrollRef.current) return
+      const nearBottom = isViewportNearChatBottom(viewport)
+      if (!nearBottom) {
+        pinToBottomRef.current = false
+      }
+    },
+    []
+  )
+
   const handleViewportScroll = useCallback(
     (viewport: HTMLDivElement) => {
+      syncFollowFromViewport(viewport)
+
       const chatId = activeChatIdRef.current
       if (!chatId || skipSaveRef.current || isRestoringScrollRef.current) return
 
@@ -261,7 +282,7 @@ export function ConversationPanel({
 
       schedulePersistToStore(viewport)
     },
-    [schedulePersistToStore]
+    [schedulePersistToStore, syncFollowFromViewport]
   )
 
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null)
@@ -312,11 +333,26 @@ export function ConversationPanel({
   )
 
   useEffect(() => {
-    const chatChanged = prevRestoreChatIdRef.current !== activeChatId
+    const prevChatId = prevRestoreChatIdRef.current
+    const chatChanged = prevChatId !== activeChatId
+
+    if (chatChanged && prevChatId) {
+      const viewport = viewportRef.current
+      if (viewport) {
+        const scrollTop = Math.round(viewport.scrollTop)
+        if (scrollTop >= CHAT_SCROLL_MIN_PX) {
+          rememberChatScrollTop(prevChatId, scrollTop)
+          setChatScrollPosition(prevChatId, scrollTop)
+        } else {
+          rememberChatScrollTop(prevChatId, 0)
+          clearChatScrollPosition(prevChatId)
+        }
+      }
+    }
+
     prevRestoreChatIdRef.current = activeChatId
 
     setEditingUserMessageId(null)
-    skipAutoScrollOnMountRef.current = true
     scrollSaveEnabledRef.current = false
 
     if (chatChanged) {
@@ -335,22 +371,36 @@ export function ConversationPanel({
       return
     }
 
-    if (chatChanged || restoreTargetRef.current?.chatId !== activeChatId) {
-      restoreTargetRef.current = {
-        chatId: activeChatId,
-        scrollTop: resolveSavedScrollTop(activeChatId, storedScrollTop)
-      }
+    const { target, lateHydration } = mergeChatScrollRestoreTarget(
+      restoreTargetRef.current,
+      activeChatId,
+      storedScrollTop,
+      chatsStoreHydrated
+    )
+    restoreTargetRef.current = target
+    if (lateHydration) {
+      scrollRestoreCompletedRef.current = null
+      setScrollRestoreEpoch((epoch) => epoch + 1)
     }
 
     const saved = restoreTargetRef.current.scrollTop
     isRestoringScrollRef.current = saved != null
     atBottomRef.current = saved == null
+    pinToBottomRef.current = saved == null
+    skipAutoScrollOnMountRef.current = saved != null
     onAtBottomChange?.(saved == null)
 
     if (saved == null) {
       enableScrollSave()
     }
-  }, [activeChatId, chatsStoreHydrated, enableScrollSave, onAtBottomChange, storedScrollTop])
+  }, [
+    activeChatId,
+    chatsStoreHydrated,
+    enableScrollSave,
+    onAtBottomChange,
+    setChatScrollPosition,
+    storedScrollTop
+  ])
 
   useEffect(() => {
     return registerChatScrollFlush(() => flushScrollPosition(true))
@@ -366,6 +416,7 @@ export function ConversationPanel({
         persistIdleTimerRef.current = null
       }
       flushScrollPosition(true)
+      flushChatPersistDebounce()
     }
   }, [flushScrollPosition])
 
@@ -442,11 +493,14 @@ export function ConversationPanel({
       done = true
       scrollRestoreCompletedRef.current = sessionKey
       isRestoringScrollRef.current = false
-      atBottomRef.current = false
-      onAtBottomChange?.(false)
+      const nearBottom = isViewportNearChatBottom(viewport)
+      atBottomRef.current = nearBottom
+      pinToBottomRef.current = nearBottom
+      onAtBottomChange?.(nearBottom)
       requestAnimationFrame(() => {
         skipSaveRef.current = false
         enableScrollSave()
+        viewport.dispatchEvent(new Event('scroll'))
       })
     }
 
@@ -491,8 +545,67 @@ export function ConversationPanel({
     onAtBottomChange,
     scrollToLatest,
     hasVisibleMessages,
-    messages.length
+    messages.length,
+    scrollRestoreEpoch
   ])
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    let lastScrollTop = viewport.scrollTop
+
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) {
+        pinToBottomRef.current = false
+      }
+    }
+
+    const onScroll = () => {
+      if (viewport.scrollTop < lastScrollTop - 1) {
+        pinToBottomRef.current = false
+      }
+      lastScrollTop = viewport.scrollTop
+    }
+
+    viewport.addEventListener('wheel', onWheel, { passive: true })
+    viewport.addEventListener('scroll', onScroll, { passive: true })
+
+    return () => {
+      viewport.removeEventListener('wheel', onWheel)
+      viewport.removeEventListener('scroll', onScroll)
+    }
+  }, [scrollElement, activeChatId])
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport || !hasVisibleMessages) return
+
+    const content =
+      viewport.querySelector('[data-chat-scroll-content]') ?? viewport.firstElementChild
+    if (!content) return
+
+    const onContentResize = () => {
+      if (
+        !shouldStickToBottom(
+          {
+            pinToBottom: pinToBottomRef.current,
+            isRestoring: isRestoringScrollRef.current
+          },
+          viewport
+        )
+      ) {
+        return
+      }
+      stickChatViewportToBottom(viewport, onAtBottomChange)
+      pinToBottomRef.current = true
+      atBottomRef.current = true
+    }
+
+    const observer = new ResizeObserver(onContentResize)
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [activeChatId, hasVisibleMessages, onAtBottomChange])
 
   useLayoutEffect(() => {
     const messagesGrew = messages.length > prevMessagesLengthRef.current
@@ -509,41 +622,50 @@ export function ConversationPanel({
 
     if (skipAutoScrollOnMountRef.current) {
       skipAutoScrollOnMountRef.current = false
-      return
+      if (isRestoringScrollRef.current && !userJustSent) {
+        return
+      }
     }
 
     if (isRestoringScrollRef.current && !userJustSent) {
       return
     }
 
-    const allowFollowWhileAgent = agentBusy && !scrollSaveEnabledRef.current
-    if (!scrollSaveEnabledRef.current && !allowFollowWhileAgent && !userJustSent) {
+    const viewport = viewportRef.current
+
+    if (userJustSent) {
+      pinToBottomRef.current = true
+      if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
+      else scrollToLatest('instant')
+      atBottomRef.current = true
       return
     }
 
-    if (userJustSent || messagesGrew || statusAppeared || agentJustStarted) {
-      pinToBottomRef.current = true
+    if (agentJustStarted || statusAppeared) {
+      if (viewport && isViewportNearChatBottom(viewport)) {
+        pinToBottomRef.current = true
+      }
     }
 
-    if (agentBusy && tailChanged && atBottomRef.current) {
-      pinToBottomRef.current = true
-    }
+    const stick = shouldStickToBottom(
+      {
+        pinToBottom: pinToBottomRef.current,
+        isRestoring: isRestoringScrollRef.current
+      },
+      viewport
+    )
 
-    const shouldScroll =
-      pinToBottomRef.current &&
-      (userJustSent ||
-        messagesGrew ||
-        statusAppeared ||
-        agentJustStarted ||
-        tailChanged)
+    if (!stick) return
 
-    if (!shouldScroll) {
-      return
-    }
+    const contentChanged =
+      tailChanged || messagesGrew || statusAppeared || agentJustStarted
 
-    scrollToLatest('instant')
+    if (!contentChanged) return
+
+    if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
+    else scrollToLatest('instant')
+    pinToBottomRef.current = true
     atBottomRef.current = true
-    onAtBottomChange?.(true)
   }, [
     agentBusy,
     messages.length,
@@ -565,6 +687,7 @@ export function ConversationPanel({
 
       <AgentChatScrollArea
         className="h-full min-h-0"
+        scrollSessionKey={activeChatId}
         onAtBottomChange={handleAtBottomChange}
         onShowScrollToLatestChange={onShowScrollToLatestChange}
         onViewportRef={handleViewportRef}
@@ -586,6 +709,7 @@ export function ConversationPanel({
                 editingUserMessageId={editingUserMessageId}
                 actionsDisabled={actionsDisabled}
                 agentBusy={agentBusy}
+                pipelineStreamingAnswer={pipelineStreamingAnswer}
                 onStopAgent={onStopAgent}
                 voiceSupported={voiceSupported}
                 voiceBusy={voiceBusy}
@@ -627,9 +751,11 @@ export function ConversationPanel({
                       handleSubmitEditedUserMessage(messageId, text, attachments)
                     }
                     onAttachmentError={onAttachmentError}
+                    agentBusy={agentBusy}
+                    isLatestTurn={isLatestTurn}
                     streamingAssistantMessageId={
-                      agentBusy && isLatestTurn
-                        ? turn.assistantMessages[turn.assistantMessages.length - 1]?.id
+                      agentBusy && isLatestTurn && pipelineStreamingAnswer
+                        ? lastAssistantMessageId(turn.assistantMessages)
                         : undefined
                     }
                   />
@@ -641,7 +767,7 @@ export function ConversationPanel({
 
             {showStatus ? <AgentStatus stage={stage} /> : null}
 
-            <div ref={bottomRef} className="h-px shrink-0 [overflow-anchor:auto]" />
+            <div ref={bottomRef} className="h-px shrink-0 [overflow-anchor:none]" />
           </div>
         </div>
       </AgentChatScrollArea>

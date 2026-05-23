@@ -17,15 +17,14 @@ const lingo: LingoApi = {
   secrets: {
     getStatus: (provider: SecretProviderId) =>
       ipcRenderer.invoke('lingo:secrets:getStatus', provider),
-    readKey: (provider: SecretProviderId) =>
-      ipcRenderer.invoke('lingo:secrets:get', provider),
-    get: (provider: SecretProviderId) =>
-      ipcRenderer.invoke('lingo:secrets:get', provider),
     set: (provider: SecretProviderId, value: string) =>
       ipcRenderer.invoke('lingo:secrets:set', provider, value),
     clear: (provider: SecretProviderId) =>
       ipcRenderer.invoke('lingo:secrets:clear', provider),
     validateOpenRouter: () => ipcRenderer.invoke('lingo:secrets:validateOpenRouter')
+  },
+  openrouter: {
+    listModels: () => ipcRenderer.invoke('lingo:openrouter:listModels')
   },
   chat: {
     complete: (request: ChatCompleteRequest) =>
@@ -39,8 +38,11 @@ const lingo: LingoApi = {
           case 'searching':
             handlers.onSearching?.()
             break
-          case 'status':
-            handlers.onStatus?.(payload)
+          case 'search-targets':
+            handlers.onSearchTargets?.(payload)
+            break
+          case 'thinking-delta':
+            handlers.onThinkingDelta?.(payload)
             break
           case 'text-delta':
             handlers.onTextDelta?.(payload)
@@ -127,6 +129,9 @@ const lingo: LingoApi = {
         ipcRenderer.removeListener('lingo:updater:available', listener)
       }
     }
+  },
+  welcome: {
+    finish: () => ipcRenderer.invoke('lingo:welcome:finish')
   },
   app: {
     onPrepareShutdown: (handler: () => void | Promise<void>) => {
