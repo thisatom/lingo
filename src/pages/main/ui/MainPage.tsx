@@ -14,6 +14,7 @@ import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { ChatComposer } from '@/widgets/chat-composer/ui/ChatComposer'
 import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
+import { AgentStatus } from '@/widgets/conversation-panel/ui/AgentStatus'
 import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
 import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
 import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
@@ -32,13 +33,17 @@ function isErrorRetryable(message: string): boolean {
 export function MainPage() {
   const [chatAtBottom, setChatAtBottom] = useState(true)
   const [showScrollToLatest, setShowScrollToLatest] = useState(false)
-  const scrollToLatestRef = useRef<(() => void) | null>(null)
+  const chatScrollRef = useRef<{
+    scrollToLatest: (behavior?: ScrollBehavior) => void
+    followBottom: () => void
+  } | null>(null)
 
   const scheduleAutoListenRef = useRef<(() => void) | null>(null)
 
   const {
     messages,
     stage,
+    agentBusy,
     queuedMessages,
     sendUserMessage,
     updateQueuedMessage,
@@ -206,10 +211,20 @@ export function MainPage() {
 
   startVoiceCaptureRef.current = startVoiceCapture
 
-  const agentBusy =
-    stage === 'thinking' || stage === 'searching' || stage === 'speaking'
   const voiceBusy = voice.isBusy
   const actionsDisabled = agentBusy || voiceBusy
+  const lastMessage = messages[messages.length - 1]
+  const assistantStreaming =
+    agentBusy &&
+    lastMessage?.role === 'assistant' &&
+    (lastMessage.content.length ?? 0) > 0
+  const showComposerPipelineStatus =
+    !assistantStreaming &&
+    (stage === 'thinking' ||
+      stage === 'searching' ||
+      stage === 'speaking' ||
+      stage === 'listening' ||
+      stage === 'transcribing')
 
   const liveConversation = useLiveConversationLoop({
     mode: chatComposerMode,
@@ -240,6 +255,8 @@ export function MainPage() {
     const text = (await voice.stop())?.trim() ?? ''
 
     if (editSpeechTargetRef.current) {
+      const target = editSpeechTargetRef.current
+      if (text) target.setText(text)
       setSpeechError(null)
       return
     }
@@ -338,7 +355,10 @@ export function MainPage() {
     const attachments = [...composerAttachments]
     if (activeChatId) setComposerDraft(activeChatId, '')
     setSpeechError(null)
+    chatScrollRef.current?.followBottom()
     await sendUserMessage(text, attachments)
+    chatScrollRef.current?.followBottom()
+    requestAnimationFrame(() => chatScrollRef.current?.followBottom())
   }, [
     activeChatId,
     composerAttachments,
@@ -393,8 +413,8 @@ export function MainPage() {
           onAttachmentError={handleAttachmentError}
           onAtBottomChange={setChatAtBottom}
           onShowScrollToLatestChange={setShowScrollToLatest}
-          onScrollToLatestReady={(scrollToLatest) => {
-            scrollToLatestRef.current = scrollToLatest
+          onScrollToLatestReady={(api) => {
+            chatScrollRef.current = api
           }}
         />
 
@@ -408,7 +428,7 @@ export function MainPage() {
             <div className="relative">
               <ScrollToLatestButton
                 show={showScrollToLatest}
-                onClick={() => scrollToLatestRef.current?.()}
+                onClick={() => chatScrollRef.current?.scrollToLatest('smooth')}
                 className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2"
               />
               <div className="space-y-1">
@@ -448,14 +468,18 @@ export function MainPage() {
               />
             )}
 
-            {queuedMessages.length > 0 && (
+            {queuedMessages.length > 0 ? (
               <ChatMessageQueue
                 items={queuedMessages}
                 onUpdate={updateQueuedMessage}
                 onRemove={removeQueuedMessage}
                 onSendNow={(id) => void sendQueuedMessageNow(id)}
               />
-            )}
+            ) : null}
+
+            {showComposerPipelineStatus ? (
+              <AgentStatus stage={stage} compact />
+            ) : null}
 
               <ChatComposer
                 focusChatId={activeChatId}

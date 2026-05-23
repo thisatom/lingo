@@ -108,11 +108,14 @@ export function ChatListItem({
               &quot;{chat.title}&quot; will be removed from your list. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel size="xs">Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex flex-row justify-end gap-2 sm:justify-end">
+            <AlertDialogCancel size="sm" className="min-w-[5.5rem]">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
-              size="xs"
+              size="sm"
               variant="destructive"
+              className="min-w-[5.5rem]"
               onClick={() => {
                 onDelete()
                 setDeleteOpen(false)

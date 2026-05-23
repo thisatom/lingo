@@ -1,5 +1,8 @@
 import { useSettingsStore } from '@/entities/settings/model/store'
-import type { PipelineStage } from '@/entities/conversation/model/store'
+import {
+  useConversationStore,
+  type PipelineStage
+} from '@/entities/conversation/model/store'
 import { SpeakingTtsLevel } from '@/features/text-to-speech/ui/SpeakingTtsLevel'
 import { isLocalWebSearchRegistered } from '@/shared/lib/local-web-search-runtime'
 import { getWebSearchProvider } from '@/shared/lib/web-search-provider'
@@ -16,17 +19,26 @@ const STAGE_LABEL: Partial<Record<PipelineStage, string>> = {
 
 interface AgentStatusProps {
   stage: PipelineStage
+  /** When true, renders a compact bar for the composer dock. */
+  compact?: boolean
 }
 
-export function AgentStatus({ stage }: AgentStatusProps) {
+export function AgentStatus({ stage, compact = false }: AgentStatusProps) {
   const modelId = useSettingsStore((s) => s.modelId)
+  const pipelineActivity = useConversationStore((s) => s.pipelineActivity)
+  const activitySuffix = pipelineActivity ? (
+    <span className="text-muted-foreground"> — {pipelineActivity}</span>
+  ) : null
+  const compactClass = compact
+    ? 'rounded-xl border border-border bg-surface-raised px-3 py-2 shadow-sm'
+    : agentMessageClass
 
   if (stage === 'searching') {
     const local = isLocalWebSearchRegistered()
     const provider = getWebSearchProvider(modelId, { local })
     return (
       <div
-        className={agentMessageClass}
+        className={compactClass}
         role="status"
         aria-live="polite"
         aria-label={local ? 'Researching the web' : `Searching web via ${provider.label}`}
@@ -38,11 +50,13 @@ export function AgentStatus({ stage }: AgentStatusProps) {
             speed={2.2}
             spread={110}
           />
-          {local ? (
-            <span className="text-muted-foreground">– reading pages</span>
+          {pipelineActivity ? (
+            activitySuffix
+          ) : local ? (
+            <span className="text-muted-foreground"> – reading pages</span>
           ) : (
             <>
-              <span className="text-muted-foreground">–</span>
+              <span className="text-muted-foreground"> –</span>
               <a
                 href={provider.href}
                 target="_blank"
@@ -64,7 +78,7 @@ export function AgentStatus({ stage }: AgentStatusProps) {
   if (stage === 'speaking') {
     return (
       <div
-        className={cn(agentMessageClass, 'flex items-center gap-2.5')}
+        className={cn(compactClass, 'flex items-center gap-2.5')}
         role="status"
         aria-live="polite"
         aria-label={label}
@@ -81,8 +95,11 @@ export function AgentStatus({ stage }: AgentStatusProps) {
   }
 
   return (
-    <div className={agentMessageClass} role="status" aria-live="polite" aria-label={label}>
-      <ShinyText text={label} className="text-[13px] leading-[1.5] font-normal" speed={2.2} spread={110} />
+    <div className={compactClass} role="status" aria-live="polite" aria-label={label}>
+      <span className="inline-flex flex-wrap items-baseline text-[13px] leading-[1.5] font-normal">
+        <ShinyText text={label} className="inline" speed={2.2} spread={110} />
+        {activitySuffix}
+      </span>
     </div>
   )
 }

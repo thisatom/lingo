@@ -1,4 +1,5 @@
 import { isDisplayMath, looksLikeLatex } from '@/shared/lib/math/latex'
+import { normalizeMathDelimiters } from '@/shared/lib/math/normalize-math-delimiters'
 
 export type MarkdownSegment =
   | { type: 'text'; content: string }
@@ -7,7 +8,7 @@ export type MarkdownSegment =
   | { type: 'code'; content: string }
 
 export function segmentMarkdown(input: string): MarkdownSegment[] {
-  const chunks = splitByFencedCode(input)
+  const chunks = splitByFencedCode(normalizeMathDelimiters(input))
   const segments: MarkdownSegment[] = []
 
   for (const chunk of chunks) {
@@ -55,6 +56,49 @@ function mergeAdjacent(segments: MarkdownSegment[]): MarkdownSegment[] {
     }
   }
   return out
+}
+
+function readDelimited(
+  text: string,
+  start: number,
+  open: string,
+  close: string
+): { inner: string; end: number } | null {
+  if (!text.startsWith(open, start)) return null
+  const from = start + open.length
+  const idx = text.indexOf(close, from)
+  if (idx === -1) return null
+  return { inner: text.slice(from, idx), end: idx + close.length }
+}
+
+function readUnclosedParenMath(
+  text: string,
+  start: number
+): { inner: string; end: number } | null {
+  if (!text.startsWith('\\(', start)) return null
+  const from = start + 2
+  const closeIdx = text.indexOf('\\)', from)
+  const end = closeIdx === -1 ? text.length : closeIdx
+  const inner = text.slice(from, end).trim()
+  if (!inner || !looksLikeLatex(inner)) return null
+  return { inner, end: closeIdx === -1 ? text.length : closeIdx + 2 }
+}
+
+function tryBareLatexAt(text: string, pos: number): { inner: string; end: number } | null {
+  if (pos > 0) {
+    const prev = text[pos - 1]
+    if (/[A-Za-z0-9\\)\]}_]/.test(prev)) return null
+  }
+
+  const rest = text.slice(pos)
+  const match = rest.match(
+    /^([A-Za-z](?:(?:\^|_)(?:\\[a-zA-Z]+|\{[^}]*\}|[A-Za-z0-9+\-/]+))+)(?:\s*[=<>±+\-]\s*[-+0-9.,\u202f\s]+)?/
+  )
+  if (!match) return null
+
+  const inner = match[0].trimEnd()
+  if (!looksLikeLatex(inner) || !/\\[a-zA-Z]+/.test(inner)) return null
+  return { inner, end: pos + match[0].length }
 }
 
 function segmentProse(text: string): MarkdownSegment[] {
@@ -121,6 +165,24 @@ function segmentProse(text: string): MarkdownSegment[] {
         pos = block.end
         continue
       }
+      const open = readUnclosedParenMath(text, pos)
+      if (open) {
+        flushText()
+        out.push({ type: 'math-inline', content: open.inner.trim() })
+        pos = open.end
+        continue
+      }
+    }
+
+    const bare = tryBareLatexAt(text, pos)
+    if (bare) {
+      flushText()
+      out.push({
+        type: isDisplayMath(bare.inner) ? 'math-display' : 'math-inline',
+        content: bare.inner.trim()
+      })
+      pos = bare.end
+      continue
     }
 
     if (text[pos] === '$' && text[pos + 1] !== '$') {
@@ -166,19 +228,6 @@ function segmentProse(text: string): MarkdownSegment[] {
 
 function isLineStart(text: string, pos: number): boolean {
   return pos === 0 || text[pos - 1] === '\n'
-}
-
-function readDelimited(
-  text: string,
-  start: number,
-  open: string,
-  close: string
-): { inner: string; end: number } | null {
-  if (!text.startsWith(open, start)) return null
-  const from = start + open.length
-  const idx = text.indexOf(close, from)
-  if (idx === -1) return null
-  return { inner: text.slice(from, idx), end: idx + close.length }
 }
 
 function readSingleDollar(text: string, start: number): { inner: string; end: number } | null {

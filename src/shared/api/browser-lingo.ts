@@ -44,6 +44,9 @@ function createWebChatStream(
         case 'searching':
           handlers.onSearching?.()
           break
+        case 'status':
+          handlers.onStatus?.(event)
+          break
         case 'text-delta':
           handlers.onTextDelta?.(event)
           break

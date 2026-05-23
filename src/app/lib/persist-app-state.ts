@@ -1,5 +1,6 @@
 import { flushChatScrollPositions } from '@/app/lib/chat-scroll-registry'
 import { flushPersistedStore, type PersistCapableStore } from '@/app/lib/flush-persisted-store'
+import { flushChatPersistDebounce } from '@/entities/chat/lib/chat-persist-storage'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 
@@ -40,6 +41,7 @@ export async function persistAppState(
       await waitNextFrame()
 
       onStep?.('chats')
+      flushChatPersistDebounce()
       await flushPersistedStore(useChatsStore as PersistCapableStore)
 
       onStep?.('settings')

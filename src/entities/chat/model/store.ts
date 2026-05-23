@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { chatPersistStorage } from '@/entities/chat/lib/chat-persist-storage'
+import { invalidateChatApiHistoryCache } from '@/entities/chat/lib/chat-api-history-cache'
 import {
   chatScrollFromLegacyChat,
   isValidChatScrollTop,
@@ -13,6 +14,7 @@ import {
 } from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
 import { notifyActiveChatChange } from '@/entities/chat/model/active-chat-effects'
+import { useMessageQueueStore } from '@/entities/message-queue/model/store'
 import { sortChatsForSidebar } from '@/shared/lib/chat-sidebar'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import type { Chat } from './types'
@@ -193,6 +195,8 @@ export const useChatsStore = create<ChatsState>()(
           }
         })
         notifyActiveChatChange()
+        invalidateChatApiHistoryCache(sourceChatId)
+        invalidateChatApiHistoryCache(forked.id)
         return forked.id
       },
 
@@ -322,6 +326,8 @@ export const useChatsStore = create<ChatsState>()(
         if (get().activeChatId !== prevActive) {
           notifyActiveChatChange()
         }
+        invalidateChatApiHistoryCache(id)
+        useMessageQueueStore.getState().clearChat(id)
       },
 
       setChatHasError: (id, hasError) => {
@@ -439,6 +445,9 @@ export const useChatsStore = create<ChatsState>()(
         const chatId = targetChatId ?? get().activeChatId
         if (!chatId) return
 
+        const chatBefore = get().chats.find((c) => c.id === chatId)
+        const messageBefore = chatBefore?.messages.find((m) => m.id === messageId)
+
         set((state) => ({
           chats: withSortedChats(
             state.chats.map((c) => {
@@ -459,6 +468,13 @@ export const useChatsStore = create<ChatsState>()(
                 return c
               }
               const nextContent = message.role === 'user' ? content : content
+              const attachmentsUnchanged =
+                options?.attachments === undefined ||
+                options.attachments === message.attachments ||
+                (options.attachments?.length === 0 && !message.attachments?.length)
+              if (message.content === nextContent && attachmentsUnchanged) {
+                return c
+              }
               const isFirstUser =
                 message.role === 'user' &&
                 index === 0 &&
@@ -483,6 +499,17 @@ export const useChatsStore = create<ChatsState>()(
             })
           )
         }))
+
+        if (messageBefore) {
+          const nextContent = messageBefore.role === 'user' ? content : content
+          const attachmentsUnchanged =
+            options?.attachments === undefined ||
+            options.attachments === messageBefore.attachments ||
+            (options.attachments?.length === 0 && !messageBefore.attachments?.length)
+          if (messageBefore.content !== nextContent || !attachmentsUnchanged) {
+            invalidateChatApiHistoryCache(chatId)
+          }
+        }
       },
 
       getComposerDraft: (chatId) => get().composerDraftByChatId?.[chatId] ?? '',

@@ -1,4 +1,5 @@
-import { Check, ChevronsUpDown, Trash2 } from '@/shared/ui/icons'
+import { ChevronsUpDown } from 'lucide-react'
+import { Check, Trash2 } from '@/shared/ui/icons'
 import { useEffect, useMemo, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { normalizeOpenRouterModelId, openRouterSuggestedModels } from '@/shared/config/openrouter'
@@ -156,7 +157,7 @@ export function OpenRouterModelCombobox({ id, value, onChange, className }: Open
           <span className="min-w-0 flex-1 truncate text-left text-xs leading-tight">
             {value || 'Model…'}
           </span>
-          <ChevronsUpDown className="ml-1 size-3 shrink-0 opacity-50" />
+          <ChevronsUpDown className="ml-1 size-3.5 shrink-0 opacity-50" strokeWidth={2} />
         </Button>
       </PopoverTrigger>
       <PopoverContent

@@ -49,6 +49,9 @@ function appendBlockToUserContent(
   return [{ type: 'text', text: block }, ...content]
 }
 
+const MAX_LOCAL_SEARCH_CACHE = 16
+const localSearchBlockCache = new Map<string, string>()
+
 export async function substituteMessagesWithLocalWebSearch(
   messages: ChatMessagePayload[],
   query: string
@@ -59,8 +62,17 @@ export async function substituteMessagesWithLocalWebSearch(
     )
   }
 
-  const results = await searchWebLocal(query)
-  const block = formatLocalWebSearchBlock(query, results)
+  const cacheKey = query.trim().toLowerCase()
+  let block = localSearchBlockCache.get(cacheKey)
+  if (!block) {
+    const results = await searchWebLocal(query)
+    block = formatLocalWebSearchBlock(query, results)
+    localSearchBlockCache.set(cacheKey, block)
+    if (localSearchBlockCache.size > MAX_LOCAL_SEARCH_CACHE) {
+      const oldest = localSearchBlockCache.keys().next().value
+      if (oldest) localSearchBlockCache.delete(oldest)
+    }
+  }
   const out = [...messages]
 
   for (let i = out.length - 1; i >= 0; i--) {

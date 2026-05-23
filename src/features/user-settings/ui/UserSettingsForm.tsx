@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { clearAllWebSecrets } from '@/shared/api/browser-lingo'
@@ -13,8 +14,19 @@ import {
   settingsRowTitleClass,
   settingsSectionTitleClass
 } from '@/shared/lib/settings-surface'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/shared/ui/alert-dialog'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
+import { Label } from '@/shared/ui/label'
 import {
   Select,
   SelectContent,
@@ -32,6 +44,8 @@ import { cn } from '@/shared/lib/utils'
 import { APP_THEME_OPTIONS } from '@/shared/lib/theme-options'
 import { AppUpdateSettingsSection } from '@/features/app-update/ui/AppUpdateSettingsSection'
 
+const CLEAR_APP_DATA_CONFIRM_TEXT = 'Confirm'
+
 export function UserSettingsForm() {
   const displayName = useSettingsStore((s) => s.displayName)
   const setDisplayName = useSettingsStore((s) => s.setDisplayName)
@@ -41,6 +55,32 @@ export function UserSettingsForm() {
   const setAppTheme = useSettingsStore((s) => s.setAppTheme)
   const resetSettings = useSettingsStore((s) => s.resetSettings)
   const resetChats = useChatsStore((s) => s.resetChats)
+  const [clearDialogOpen, setClearDialogOpen] = useState(false)
+  const [clearConfirmInput, setClearConfirmInput] = useState('')
+  const canClearAppData = clearConfirmInput.trim() === CLEAR_APP_DATA_CONFIRM_TEXT
+
+  const handleClearAppData = async () => {
+    resetChats()
+    resetSettings()
+    if (isWebPlatform()) {
+      clearAllWebSecrets()
+    } else if (isElectronApp() && isLingoAvailable()) {
+      try {
+        await Promise.allSettled([
+          getLingo().secrets.clear('openrouter'),
+          getLingo().secrets.clear('openai'),
+          getLingo().secrets.clear('anthropic'),
+          getLingo().secrets.clear('google'),
+          getLingo().secrets.clear('groq'),
+          getLingo().secrets.clear('azure-speech')
+        ])
+      } catch {
+        // ignore — keytar may be unavailable
+      }
+    }
+    setClearConfirmInput('')
+    setClearDialogOpen(false)
+  }
 
   return (
     <section>
@@ -135,31 +175,64 @@ export function UserSettingsForm() {
             variant="destructive"
             size="xs"
             className="h-6 px-2 text-[11px]"
-            onClick={async () => {
-              resetChats()
-              resetSettings()
-              if (isWebPlatform()) {
-                clearAllWebSecrets()
-              } else if (isElectronApp() && isLingoAvailable()) {
-                try {
-                  await Promise.allSettled([
-                    getLingo().secrets.clear('openrouter'),
-                    getLingo().secrets.clear('openai'),
-                    getLingo().secrets.clear('anthropic'),
-                    getLingo().secrets.clear('google'),
-                    getLingo().secrets.clear('groq'),
-                    getLingo().secrets.clear('azure-speech')
-                  ])
-                } catch {
-                  // ignore — keytar may be unavailable
-                }
-              }
-            }}
+            onClick={() => setClearDialogOpen(true)}
           >
             Clear
           </Button>
         </div>
       </div>
+
+      <AlertDialog
+        open={clearDialogOpen}
+        onOpenChange={(open) => {
+          setClearDialogOpen(open)
+          if (!open) setClearConfirmInput('')
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader className="sm:text-left">
+            <AlertDialogTitle>Clear app data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes all chats and resets settings to defaults. API keys stored in the
+              system keychain are cleared when available. Type{' '}
+              <span className="font-medium text-foreground">{CLEAR_APP_DATA_CONFIRM_TEXT}</span> to
+              continue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="clear-app-data-confirm" className="text-xs text-muted-foreground">
+              Confirmation
+            </Label>
+            <Input
+              id="clear-app-data-confirm"
+              className={cn(settingsInputClass, '!h-7 dark:!h-7')}
+              value={clearConfirmInput}
+              onChange={(e) => setClearConfirmInput(e.target.value)}
+              placeholder={CLEAR_APP_DATA_CONFIRM_TEXT}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <AlertDialogFooter className="flex flex-row justify-end gap-2 sm:justify-end">
+            <AlertDialogCancel size="sm" className="min-w-[5.5rem]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              size="sm"
+              variant="destructive"
+              className="min-w-[5.5rem]"
+              disabled={!canClearAppData}
+              onClick={(e) => {
+                e.preventDefault()
+                if (!canClearAppData) return
+                void handleClearAppData()
+              }}
+            >
+              Clear
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   )
 }

@@ -19,7 +19,10 @@ export interface StreamingSentenceTtsOptions {
   onSpeaking?: () => void
 }
 
-const MAX_SYNTH_IN_FLIGHT = 3
+type TtsSynthResult = { audioBase64: string; mimeType: string }
+
+/** In-flight synth cap; one extra slot prefetches the next sentence while the current plays. */
+const MAX_SYNTH_IN_FLIGHT = 4
 
 export class StreamingSentenceTts {
   private readonly locale: string
@@ -32,6 +35,7 @@ export class StreamingSentenceTts {
   private consumedLength = 0
   private playChain: Promise<void> = Promise.resolve()
   private synthInFlight = 0
+  private synthWaiters: Array<() => void> = []
   private hasStartedSpeaking = false
 
   constructor(options: StreamingSentenceTtsOptions) {
@@ -90,26 +94,52 @@ export class StreamingSentenceTts {
     stopTtsPlayback()
     this.playChain = Promise.resolve()
     this.synthInFlight = 0
+    this.drainSynthWaiters()
+  }
+
+  private drainSynthWaiters(): void {
+    while (this.synthWaiters.length > 0) {
+      const next = this.synthWaiters.shift()
+      next?.()
+    }
+  }
+
+  private async acquireSynthSlot(): Promise<boolean> {
+    while (this.synthInFlight >= MAX_SYNTH_IN_FLIGHT) {
+      await new Promise<void>((resolve) => {
+        this.synthWaiters.push(resolve)
+      })
+      if (this.cancelled || !this.shouldContinue()) return false
+    }
+    if (this.cancelled || !this.shouldContinue()) return false
+    this.synthInFlight++
+    return true
+  }
+
+  private releaseSynthSlot(): void {
+    this.synthInFlight = Math.max(0, this.synthInFlight - 1)
+    const next = this.synthWaiters.shift()
+    if (next) next()
+  }
+
+  private startSynth(text: string): Promise<TtsSynthResult | null> {
+    return (async () => {
+      if (!(await this.acquireSynthSlot())) return null
+      try {
+        return await getLingo().tts.synthesize(buildTtsSynthesizeRequest(text, this.locale))
+      } catch {
+        return null
+      } finally {
+        this.releaseSynthSlot()
+      }
+    })()
   }
 
   private scheduleChunk(text: string): void {
     if (this.cancelled || text.length < 2) return
     if (!this.shouldContinue()) return
 
-    const runSynth = async () => {
-      while (this.synthInFlight >= MAX_SYNTH_IN_FLIGHT) {
-        await new Promise((r) => setTimeout(r, 16))
-        if (this.cancelled || !this.shouldContinue()) return null
-      }
-      this.synthInFlight++
-      try {
-        return await getLingo().tts.synthesize(buildTtsSynthesizeRequest(text, this.locale))
-      } finally {
-        this.synthInFlight--
-      }
-    }
-
-    const synthPromise = runSynth()
+    const synthPromise = this.startSynth(text)
 
     void synthPromise.then((result) => {
       if (!result || this.cancelled) return

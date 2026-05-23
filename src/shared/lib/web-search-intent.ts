@@ -22,6 +22,27 @@ export function shouldUseResearchMode(userMessage: string): boolean {
   return false
 }
 
+/** Whether to run web search plugins / local search (skip short casual drill phrases). */
+export function shouldRunWebSearch(userMessage: string): boolean {
+  const text = userMessage.trim()
+  if (!text) return false
+  if (shouldForceWebSearch(text)) return true
+  if (text.length < 12 && !FACTUAL_QUESTION.test(text)) return false
+  if (RESEARCH_QUESTION.test(text)) return true
+  if (FACTUAL_QUESTION.test(text)) return true
+  return text.length >= 24
+}
+
+export function shouldRetryWebSearchAnswer(
+  answer: string,
+  userMessage: string,
+  finishReason: string | null
+): boolean {
+  if (finishReason === 'length') return true
+  if (!shouldRunWebSearch(userMessage)) return false
+  return looksTruncatedOrRefusal(answer) || !isSubstantiveReply(answer, userMessage)
+}
+
 import type { ChatMessagePayload } from '../types/ipc'
 import { extractPlainTextFromPayload } from './chat-message-api'
 

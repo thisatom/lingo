@@ -1,5 +1,6 @@
 import type { ChatContentPart, ChatMessagePayload } from '@/shared/types/ipc'
-import { extractImageText, isImageOcrRegistered } from '@/shared/lib/image-ocr-runtime'
+import { extractImageTextCached } from '@/shared/lib/image-ocr-cache'
+import { isImageOcrRegistered } from '@/shared/lib/image-ocr-runtime'
 import { contentPartHasImage, messagesHaveImages } from '@/shared/lib/vision-models'
 
 function formatOcrBlock(text: string): string {
@@ -57,7 +58,7 @@ export async function substituteMessagesWithOcr(
         continue
       }
       if (part.type === 'image_url' && part.image_url.url?.startsWith('data:')) {
-        const extracted = await extractImageText(part.image_url.url)
+        const extracted = await extractImageTextCached(part.image_url.url)
         parts.push({ type: 'text', text: formatOcrBlock(extracted) })
       }
     }

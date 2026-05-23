@@ -17,10 +17,15 @@ interface ConversationState {
   blurAnimateMessageId: string | null
   /** Ids that already played blur animation */
   blurAnimatedMessageIds: string[]
+  /** Next queued user message shown when TTS was skipped for the queue (conversation). */
+  queueAheadPreview: string | null
+  /** Sub-step label under Thinking / Searching (web fetch, OCR, etc.). */
+  pipelineActivity: string | null
   setStage: (stage: PipelineStage) => void
   setError: (error: string | null) => void
   setSpeechError: (speechError: string | null) => void
   setBlurAnimateMessageId: (id: string | null) => void
+  setQueueAheadPreview: (preview: string | null) => void
   markBlurAnimationDone: (id: string) => void
   resetPipeline: () => void
 }
@@ -31,7 +36,11 @@ export const useConversationStore = create<ConversationState>((set) => ({
   speechError: null,
   blurAnimateMessageId: null,
   blurAnimatedMessageIds: [],
+  queueAheadPreview: null,
+  pipelineActivity: null,
   setStage: (stage) => set({ stage }),
+  setQueueAheadPreview: (queueAheadPreview) => set({ queueAheadPreview }),
+  setPipelineActivity: (pipelineActivity) => set({ pipelineActivity }),
   setError: (error) =>
     set((state) => ({
       error,
@@ -53,6 +62,8 @@ export const useConversationStore = create<ConversationState>((set) => ({
       error: null,
       speechError: null,
       blurAnimateMessageId: null,
-      blurAnimatedMessageIds: []
+      blurAnimatedMessageIds: [],
+      queueAheadPreview: null,
+      pipelineActivity: null
     })
 }))

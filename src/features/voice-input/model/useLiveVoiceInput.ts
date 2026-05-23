@@ -25,25 +25,33 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
   const useLocal = backend === 'local'
   const useBrowser = backend === 'browser'
 
+  const applyTextDraft = useCallback(
+    (spoken: string) => {
+      const prefix = draftPrefixRef.current
+      const next = prefix
+        ? spoken
+          ? `${prefix}${prefix.endsWith(' ') ? '' : ' '}${spoken}`.trim()
+          : prefix
+        : spoken
+      handlers.onTextDraft(next)
+      return next
+    },
+    [handlers]
+  )
+
   const onLiveTranscript = useCallback(
     (spoken: string) => {
       const useTextDraft = handlers.mode === 'text' || handlers.isEditSpeech?.()
 
       if (useTextDraft) {
-        const prefix = draftPrefixRef.current
-        const next = prefix
-          ? spoken
-            ? `${prefix}${prefix.endsWith(' ') ? '' : ' '}${spoken}`
-            : prefix
-          : spoken
-        handlers.onTextDraft(next)
+        applyTextDraft(spoken)
         return
       }
 
       const messageId = conversationMessageIdRef.current
       if (messageId) handlers.onConversationLive(spoken)
     },
-    [handlers]
+    [applyTextDraft, handlers]
   )
 
   const browser = useBrowserSpeechVoiceInput({
@@ -67,8 +75,9 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
     if (useBrowser) {
       const text = (await browser.stop())?.trim() ?? ''
       if (handlers.mode === 'text' || handlers.isEditSpeech?.()) {
+        const final = text ? applyTextDraft(text) : draftPrefixRef.current
         draftPrefixRef.current = ''
-        return text || null
+        return final.trim() || null
       }
       const messageId = conversationMessageIdRef.current
       conversationMessageIdRef.current = ''
@@ -81,10 +90,9 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
       if (!text) return null
 
       if (handlers.mode === 'text' || handlers.isEditSpeech?.()) {
-        const prefix = draftPrefixRef.current
+        const final = applyTextDraft(text)
         draftPrefixRef.current = ''
-        handlers.onTextDraft(prefix ? `${prefix} ${text}`.trim() : text)
-        return text
+        return final.trim() || null
       }
 
       const messageId = conversationMessageIdRef.current
@@ -97,7 +105,7 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
     }
 
     return null
-  }, [browser, handlers, recorded, useBrowser, useLocal])
+  }, [applyTextDraft, browser, handlers, recorded, useBrowser, useLocal])
 
   const cancel = useCallback(async () => {
     if (handlers.mode === 'text' || handlers.isEditSpeech?.()) {
@@ -111,7 +119,7 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
 
     if (useBrowser) await browser.cancel()
     else if (useLocal) recorded.cancel()
-  }, [browser, handlers, recorded, useBrowser, useLocal])
+  }, [applyTextDraft, browser, handlers, recorded, useBrowser, useLocal])
 
   const active = useLocal ? recorded : browser
 

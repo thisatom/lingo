@@ -14,6 +14,8 @@ import {
   isSubstantiveReply,
   looksTruncatedOrRefusal,
   shouldForceWebSearch,
+  shouldRetryWebSearchAnswer,
+  shouldRunWebSearch,
   shouldUseResearchMode
 } from '@/shared/lib/web-search-intent'
 import {
@@ -50,6 +52,8 @@ export type OpenRouterStreamRequest = {
   customLlm?: CustomLlmConfig
   webSearch?: boolean
   modelAutoFallback?: boolean
+  maxTokens?: number
+  maxTokensRetry?: number
 }
 
 function isCustomBackend(request: OpenRouterStreamRequest): boolean {
@@ -73,10 +77,12 @@ function requestHeaders(request: OpenRouterStreamRequest, apiKey: string): Recor
 }
 
 function maxTokensBudget(request: OpenRouterStreamRequest): number {
+  if (typeof request.maxTokens === 'number') return request.maxTokens
   return isCustomBackend(request) ? customLlmConfig.maxTokens : openRouterConfig.maxTokens
 }
 
 function maxTokensRetryBudget(request: OpenRouterStreamRequest): number {
+  if (typeof request.maxTokensRetry === 'number') return request.maxTokensRetry
   return isCustomBackend(request) ? customLlmConfig.maxTokensRetry : openRouterConfig.maxTokensRetry
 }
 
@@ -88,8 +94,15 @@ function withCustomCompletionExtras(
   return mergeCustomCompletionBody(body, request.customLlm?.completionExtras)
 }
 
+export type OpenRouterFetch = (
+  input: RequestInfo | URL,
+  init?: RequestInit
+) => Promise<Response>
+
 export type OpenRouterStreamOptions = {
   defaultModel?: string
+  /** Electron main: HTTPS keep-alive fetch. */
+  fetchImpl?: OpenRouterFetch
 }
 
 function formatTodayLine(): string {
@@ -208,12 +221,13 @@ async function fetchCompletion(
   request: OpenRouterStreamRequest,
   apiKey: string,
   body: Record<string, unknown>,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch
 ): Promise<CompletionResult> {
   const url = chatCompletionsUrl(request)
   if (!url) throw new Error('Custom API base URL is not configured.')
 
-  const response = await fetch(url, {
+  const response = await fetchImpl(url, {
     method: 'POST',
     headers: requestHeaders(request, apiKey),
     body: JSON.stringify({ ...body, stream: false }),
@@ -252,10 +266,11 @@ async function fetchCompletionResilient(
   request: OpenRouterStreamRequest,
   apiKey: string,
   body: Record<string, unknown>,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch
 ): Promise<CompletionResult> {
   try {
-    return await fetchCompletion(request, apiKey, body, signal)
+    return await fetchCompletion(request, apiKey, body, signal, fetchImpl)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const maxTokens = body.max_tokens
@@ -271,7 +286,139 @@ async function fetchCompletionResilient(
       request,
       apiKey,
       { ...body, max_tokens: openRouterConfig.maxTokensCreditFallback },
-      signal
+      signal,
+      fetchImpl
+    )
+  }
+}
+
+type SseChunk = {
+  choices?: Array<{
+    delta?: { content?: string | Array<{ type?: string; text?: string }> }
+    finish_reason?: string | null
+  }>
+  error?: { message?: string }
+}
+
+function extractStreamDelta(chunk: SseChunk): string {
+  return extractAssistantText(chunk.choices?.[0]?.delta ?? {})
+}
+
+async function fetchCompletionStreaming(
+  request: OpenRouterStreamRequest,
+  apiKey: string,
+  body: Record<string, unknown>,
+  send: SendEvent,
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch
+): Promise<CompletionResult> {
+  const merged = withCustomCompletionExtras(request, { ...body, stream: true })
+  if (merged.stream === false) {
+    send({ type: 'status', label: 'Waiting for model response…' })
+    const result = await fetchCompletion(request, apiKey, body, signal, fetchImpl)
+    send({ type: 'text-delta', delta: result.text, text: result.text })
+    return result
+  }
+
+  const url = chatCompletionsUrl(request)
+  if (!url) throw new Error('Custom API base URL is not configured.')
+
+  const response = await fetchImpl(url, {
+    method: 'POST',
+    headers: requestHeaders(request, apiKey),
+    body: JSON.stringify(merged),
+    signal
+  })
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    const message = parseApiError(errText, response.status)
+    throw new Error(isCustomBackend(request) ? message : formatOpenRouterError(message))
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('Streaming response has no body')
+  }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let text = ''
+  let finishReason: string | null = null
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    let lineEnd = buffer.indexOf('\n')
+    while (lineEnd !== -1) {
+      const rawLine = buffer.slice(0, lineEnd).trim()
+      buffer = buffer.slice(lineEnd + 1)
+      lineEnd = buffer.indexOf('\n')
+
+      if (!rawLine.startsWith('data:')) continue
+      const payload = rawLine.slice(rawLine.startsWith('data: ') ? 6 : 5).trim()
+      if (!payload || payload === '[DONE]') continue
+
+      let chunk: SseChunk
+      try {
+        chunk = JSON.parse(payload) as SseChunk
+      } catch {
+        continue
+      }
+
+      if (chunk.error?.message) {
+        const message = chunk.error.message
+        throw new Error(isCustomBackend(request) ? message : formatOpenRouterError(message))
+      }
+
+      const delta = extractStreamDelta(chunk)
+      if (delta) {
+        text += delta
+        send({ type: 'text-delta', delta, text })
+      }
+
+      const fr = chunk.choices?.[0]?.finish_reason
+      if (fr) finishReason = fr
+    }
+  }
+
+  if (!text.trim()) {
+    throw new Error('Model returned an empty response')
+  }
+
+  return { text, finishReason }
+}
+
+async function fetchCompletionResilientStreaming(
+  request: OpenRouterStreamRequest,
+  apiKey: string,
+  body: Record<string, unknown>,
+  send: SendEvent,
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch
+): Promise<CompletionResult> {
+  try {
+    return await fetchCompletionStreaming(request, apiKey, body, send, signal, fetchImpl)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const maxTokens = body.max_tokens
+    if (
+      isCustomBackend(request) ||
+      !isOpenRouterCreditError(message) ||
+      typeof maxTokens !== 'number' ||
+      maxTokens <= openRouterConfig.maxTokensCreditFallback
+    ) {
+      throw error
+    }
+    return fetchCompletionStreaming(
+      request,
+      apiKey,
+      { ...body, max_tokens: openRouterConfig.maxTokensCreditFallback },
+      send,
+      signal,
+      fetchImpl
     )
   }
 }
@@ -289,17 +436,20 @@ async function completeWithWebSearch(
   body: Record<string, unknown>,
   send: SendEvent,
   lastUserMessage: string,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch
 ): Promise<void> {
-  let result = await fetchCompletionResilient(request, apiKey, body, signal)
+  let result = await fetchCompletionResilientStreaming(
+    request,
+    apiKey,
+    body,
+    send,
+    signal,
+    fetchImpl
+  )
   let text = result.text
 
-  const needsRetry =
-    !isSubstantiveReply(text, lastUserMessage) ||
-    looksTruncatedOrRefusal(text) ||
-    result.finishReason === 'length'
-
-  if (needsRetry) {
+  if (shouldRetryWebSearchAnswer(text, lastUserMessage, result.finishReason)) {
     const retryMessages = [
       ...(body.messages as Array<{ role: string; content: string | ChatMessagePayload['content'] }>),
       { role: 'assistant', content: text },
@@ -308,11 +458,13 @@ async function completeWithWebSearch(
         content: `Your answer was incomplete or too short. Answer this clearly in full sentences: "${lastUserMessage}"`
       }
     ]
-    result = await fetchCompletionResilient(
+    result = await fetchCompletionResilientStreaming(
       request,
       apiKey,
       { ...body, messages: retryMessages, max_tokens: maxTokensRetryBudget(request) },
-      signal
+      send,
+      signal,
+      fetchImpl
     )
     text = result.text
   }
@@ -321,7 +473,6 @@ async function completeWithWebSearch(
     throw new Error('The model returned an incomplete answer.')
   }
 
-  send({ type: 'text-delta', delta: text, text })
   send({ type: 'done', text })
 }
 
@@ -333,9 +484,12 @@ async function completeWithLocalWebSearch(
   practiceLanguage: string | undefined,
   lastUserMessage: string,
   send: SendEvent,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch
 ): Promise<void> {
+  send({ type: 'status', label: 'Fetching web results…' })
   const augmented = await substituteMessagesWithLocalWebSearch(apiMessages, lastUserMessage)
+  send({ type: 'status', label: 'Writing answer…' })
   const body = withCustomCompletionExtras(request, {
     model: userModelId.trim(),
     messages: buildMessages(augmented, practiceLanguage, 'research'),
@@ -343,8 +497,14 @@ async function completeWithLocalWebSearch(
     temperature: 0.3
   })
 
-  const { text } = await fetchCompletionResilient(request, apiKey, body, signal)
-  send({ type: 'text-delta', delta: text, text })
+  const { text } = await fetchCompletionResilientStreaming(
+    request,
+    apiKey,
+    body,
+    send,
+    signal,
+    fetchImpl
+  )
   send({ type: 'done', text })
 }
 
@@ -355,7 +515,8 @@ async function tryNativeWebSearch(
   apiMessages: ChatMessagePayload[],
   practiceLanguage: string | undefined,
   send: SendEvent,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch
 ): Promise<void> {
   const lastUserMessage = getLastUserMessageContent(apiMessages)
   const researchMode =
@@ -369,7 +530,8 @@ async function tryNativeWebSearch(
   })
 
   attachWebCapabilities(body, userModelId)
-  await completeWithWebSearch(request, apiKey, body, send, lastUserMessage, signal)
+  send({ type: 'status', label: 'Searching via model…' })
+  await completeWithWebSearch(request, apiKey, body, send, lastUserMessage, signal, fetchImpl)
 }
 
 async function completeTextChat(
@@ -380,14 +542,19 @@ async function completeTextChat(
   practiceLanguage: string | undefined,
   webSearchRequested: boolean,
   send: SendEvent,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch
 ): Promise<void> {
   const lastUserMessage = getLastUserMessageContent(apiMessages)
   const webSearchEnabled =
-    !isCustomBackend(request) && webSearchRequested && !messagesHaveImages(apiMessages)
+    !isCustomBackend(request) &&
+    webSearchRequested &&
+    !messagesHaveImages(apiMessages) &&
+    shouldRunWebSearch(lastUserMessage)
 
   if (webSearchEnabled) {
     send({ type: 'searching' })
+    send({ type: 'status', label: 'Searching the web…' })
 
     if (isLocalWebSearchRegistered()) {
       await completeWithLocalWebSearch(
@@ -398,7 +565,8 @@ async function completeTextChat(
         practiceLanguage,
         lastUserMessage,
         send,
-        signal
+        signal,
+        fetchImpl
       )
       return
     }
@@ -411,7 +579,8 @@ async function completeTextChat(
         apiMessages,
         practiceLanguage,
         send,
-        signal
+        signal,
+        fetchImpl
       )
       return
     } catch (error) {
@@ -429,7 +598,8 @@ async function completeTextChat(
         practiceLanguage,
         lastUserMessage,
         send,
-        signal
+        signal,
+        fetchImpl
       )
       return
     }
@@ -447,8 +617,15 @@ async function completeTextChat(
     temperature: researchMode ? 0.3 : 0.7
   })
 
-  const { text } = await fetchCompletionResilient(request, apiKey, body, signal)
-  send({ type: 'text-delta', delta: text, text })
+  send({ type: 'status', label: 'Generating answer…' })
+  const { text } = await fetchCompletionResilientStreaming(
+    request,
+    apiKey,
+    body,
+    send,
+    signal,
+    fetchImpl
+  )
   send({ type: 'done', text })
 }
 
@@ -459,6 +636,7 @@ export async function streamOpenRouterChat(
   options?: OpenRouterStreamOptions,
   signal?: AbortSignal
 ): Promise<void> {
+  const fetchImpl = options?.fetchImpl ?? fetch
   const apiKey = (await getApiKey()) ?? ''
   if (!apiKey.trim() && !isCustomBackend(request)) {
     throw new Error('NO_OPENROUTER_KEY')
@@ -478,6 +656,7 @@ export async function streamOpenRouterChat(
     let hasImages = messagesHaveImages(apiMessages)
 
     if (hasImages && !isVisionCapableModel(tryModelId)) {
+      send({ type: 'status', label: 'Reading attached images…' })
       apiMessages = await substituteMessagesWithOcr(apiMessages)
       hasImages = false
     }
@@ -491,19 +670,27 @@ export async function streamOpenRouterChat(
       })
 
       try {
-        const { text } = await fetchCompletionResilient(request, apiKey, body, signal)
-        send({ type: 'text-delta', delta: text, text })
+        const { text } = await fetchCompletionResilientStreaming(
+          request,
+          apiKey,
+          body,
+          send,
+          signal,
+          fetchImpl
+        )
         send({ type: 'done', text })
         return
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (!isVisionApiError(message)) throw error
+        send({ type: 'status', label: 'Reading attached images…' })
         apiMessages = await substituteMessagesWithOcr(apiMessages)
         hasImages = false
       }
     }
 
     if (hasImages) {
+      send({ type: 'status', label: 'Reading attached images…' })
       apiMessages = await substituteMessagesWithOcr(apiMessages)
     }
 
@@ -515,7 +702,8 @@ export async function streamOpenRouterChat(
       request.practiceLanguage,
       webSearchRequested,
       send,
-      signal
+      signal,
+      fetchImpl
     )
   })
 }

@@ -6,6 +6,8 @@ import type { SecretProviderId, SecretStatus } from '../../src/shared/types/ipc'
 
 const SERVICE = 'Lingo'
 
+const secretCache = new Map<SecretProviderId, string | null>()
+
 function account(provider: SecretProviderId): string {
   return `lingo.${provider}`
 }
@@ -33,12 +35,27 @@ export async function getSecretStatus(provider: SecretProviderId): Promise<Secre
   }
 }
 
+export async function warmSecretsCache(): Promise<void> {
+  const providers: SecretProviderId[] = ['openrouter', 'custom-llm']
+  await Promise.all(
+    providers.map(async (provider) => {
+      try {
+        const value = await keytar.getPassword(SERVICE, account(provider))
+        secretCache.set(provider, value)
+      } catch {
+        secretCache.delete(provider)
+      }
+    })
+  )
+}
+
 export async function setSecret(provider: SecretProviderId, value: string): Promise<SecretStatus> {
   const trimmed = value.trim()
   if (!trimmed) throw new Error('EMPTY_KEY')
 
   try {
     await keytar.setPassword(SERVICE, account(provider), trimmed)
+    secretCache.set(provider, trimmed)
     return getSecretStatus(provider)
   } catch (error) {
     throw wrapKeytarError('save', error)
@@ -48,6 +65,7 @@ export async function setSecret(provider: SecretProviderId, value: string): Prom
 export async function clearSecret(provider: SecretProviderId): Promise<SecretStatus> {
   try {
     await keytar.deletePassword(SERVICE, account(provider))
+    secretCache.set(provider, null)
     return getSecretStatus(provider)
   } catch (error) {
     throw wrapKeytarError('delete', error)
@@ -55,8 +73,13 @@ export async function clearSecret(provider: SecretProviderId): Promise<SecretSta
 }
 
 export async function getSecret(provider: SecretProviderId): Promise<string | null> {
+  if (secretCache.has(provider)) {
+    return secretCache.get(provider) ?? null
+  }
   try {
-    return keytar.getPassword(SERVICE, account(provider))
+    const value = await keytar.getPassword(SERVICE, account(provider))
+    secretCache.set(provider, value)
+    return value
   } catch (error) {
     throw wrapKeytarError('read', error)
   }

@@ -1,4 +1,5 @@
 import { Fragment, memo, useMemo } from 'react'
+import { useThrottledValue } from '@/shared/lib/use-throttled-value'
 import ReactMarkdown from 'react-markdown'
 import type { PluggableList } from 'unified'
 import rehypeHighlight from 'rehype-highlight'
@@ -31,6 +32,8 @@ interface MarkdownContentProps {
   className?: string
   /** @default 'agent' — AI chat; use 'compact' for dialogs */
   variant?: 'agent' | 'compact' | 'typography' | 'default'
+  /** Throttle KaTeX/markdown re-parses while content grows (streaming). */
+  parseThrottleMs?: number
 }
 
 function renderSegment(
@@ -71,10 +74,17 @@ function renderSegment(
   }
 }
 
-function MarkdownContentInner({ content, className, variant = 'agent' }: MarkdownContentProps) {
+function MarkdownContentInner({
+  content,
+  className,
+  variant = 'agent',
+  parseThrottleMs
+}: MarkdownContentProps) {
+  const throttleMs = parseThrottleMs ?? 0
+  const parsedSource = useThrottledValue(content, throttleMs, throttleMs > 0)
   const segments = useMemo(
-    () => segmentMarkdown(normalizeMarkdown(content)),
-    [content]
+    () => segmentMarkdown(normalizeMarkdown(parsedSource)),
+    [parsedSource]
   )
   const resolvedVariant = variant === 'typography' || variant === 'default' ? 'agent' : variant
   const components =

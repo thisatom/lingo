@@ -7,6 +7,8 @@ import {
 } from '@/entities/message/lib/attachment-payload'
 import { loadAttachmentBlob, saveAttachmentBlob } from '@/entities/message/lib/attachment-storage'
 
+const resolvedPayloadCache = new Map<string, string>()
+
 export async function persistAttachment(att: MessageAttachment): Promise<MessageAttachment> {
   if (isAttachmentRef(att.payload)) return att
 
@@ -14,6 +16,7 @@ export async function persistAttachment(att: MessageAttachment): Promise<Message
   if (!payload) return att
 
   await saveAttachmentBlob(att.id, payload)
+  resolvedPayloadCache.delete(att.id)
   return { ...att, payload: toAttachmentRef(att.id) }
 }
 
@@ -29,8 +32,13 @@ export async function resolveAttachmentPayload(att: MessageAttachment): Promise<
   }
 
   const id = attachmentIdFromRef(att.payload) ?? att.id
+  const cached = resolvedPayloadCache.get(id)
+  if (cached !== undefined) return cached
+
   const stored = await loadAttachmentBlob(id)
-  return stored ?? ''
+  const payload = stored ?? ''
+  if (payload) resolvedPayloadCache.set(id, payload)
+  return payload
 }
 
 export async function resolveAttachments(

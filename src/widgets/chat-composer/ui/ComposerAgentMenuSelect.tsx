@@ -3,10 +3,10 @@ import type { ChatComposerMode } from '@/entities/settings/model/store'
 import type { LlmBackend } from '@/shared/types/ipc'
 import { shortOpenRouterModelLabel } from '@/widgets/chat-composer/lib/model-label'
 import {
+  composerAgentPickerTriggerClass,
   sidebarMenuItemClass,
   sidebarMenuPickerChevronClass,
   sidebarMenuPickerDotClass,
-  sidebarMenuPickerTriggerClass,
   sidebarMenuSubTriggerClass,
   sidebarMenuSurfaceClass
 } from '@/shared/lib/sidebar-filter-menu-styles'
@@ -60,11 +60,11 @@ export function ComposerAgentMenuSelect({
       <DropdownMenuTrigger asChild disabled={disabled}>
         <button
           type="button"
-          className={sidebarMenuPickerTriggerClass}
+          className={composerAgentPickerTriggerClass}
           aria-label="Agent mode and model"
         >
           <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-            <span className="truncate text-[13px] leading-normal">
+            <span className="whitespace-nowrap text-[13px] leading-normal">
               {selectedMode?.label ?? mode}
             </span>
             {modelAutoFallback ? (

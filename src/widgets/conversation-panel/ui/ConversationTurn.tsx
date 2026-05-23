@@ -1,4 +1,5 @@
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { cn } from '@/shared/lib/utils'
 import type { ConversationTurn as Turn } from '@/widgets/conversation-panel/lib/group-turns'
@@ -26,8 +27,10 @@ interface ConversationTurnProps {
     messageId: string,
     text: string,
     attachments?: MessageAttachment[]
-  ) => void | Promise<void>
+  ) => Promise<SubmitEditedUserMessageResult>
   onAttachmentError?: (message: string) => void
+  /** Last assistant message id when streaming — throttles markdown parse. */
+  streamingAssistantMessageId?: string
 }
 
 export function ConversationTurn({
@@ -47,7 +50,8 @@ export function ConversationTurn({
   onEnterEdit,
   onExitEdit,
   onSubmitEdit,
-  onAttachmentError
+  onAttachmentError,
+  streamingAssistantMessageId
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
 
@@ -90,7 +94,12 @@ export function ConversationTurn({
 
       {turn.assistantMessages.map((message) => (
         <article key={message.id} className="mt-1.5 min-w-0 max-w-full">
-          <AgentMessage content={message.content} messageId={message.id} />
+          <AgentMessage
+            content={message.content}
+            parseThrottleMs={
+              message.id === streamingAssistantMessageId ? 120 : undefined
+            }
+          />
         </article>
       ))}
     </section>

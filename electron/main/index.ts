@@ -1,7 +1,8 @@
 import { app, BrowserWindow, session } from 'electron'
 import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools'
 import { registerIpcHandlers } from './ipc'
-import { loadEnvBootstrap } from './secrets'
+import { warmOpenRouterConnection } from './openrouter-fetch'
+import { loadEnvBootstrap, warmSecretsCache } from './secrets'
 import {
   createMainWindow,
   setupSingleInstanceApp,
@@ -38,6 +39,8 @@ if (!setupSingleInstanceApp(createMainWindow)) {
 
     try {
       await loadEnvBootstrap()
+      await warmSecretsCache()
+      void warmOpenRouterConnection()
     } catch (error) {
       console.error('[lingo] Failed to load API key bootstrap:', error)
     }

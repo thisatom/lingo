@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChatsStore } from '@/entities/chat/model/store'
 import {
   EMPTY_MESSAGE_QUEUE,
@@ -14,9 +14,10 @@ import {
   createStreamingSentenceTts,
   type StreamingSentenceTts
 } from '@/features/text-to-speech/model/streamingSentenceTts'
-import { messageHasVisibleContent } from '@/shared/lib/chat-message-api'
-import { resolveMessagesForApi } from '@/shared/lib/resolve-chat-api-messages'
 import { messagesHaveImages } from '@/shared/lib/vision-models'
+import { getHistoryForApi } from '@/features/ai-chat/lib/chat-api-history'
+import { createStreamContentSync } from '@/features/ai-chat/lib/stream-content-sync'
+import { shouldRunWebSearch } from '@/shared/lib/web-search-intent'
 import { persistAttachments } from '@/entities/message/lib/prepare-attachment'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { EMPTY_MESSAGES } from '@/entities/message/model/types'
@@ -25,9 +26,24 @@ import {
   buildChatStreamLlmFields,
   validateCustomLlmSettings
 } from '@/shared/lib/resolve-chat-stream-llm'
-import type { ChatMessagePayload, ChatStreamController } from '@/shared/types/ipc'
+import type { ChatStreamController } from '@/shared/types/ipc'
 import { getLingo } from '@/shared/lib/lingo'
+import { formatQueuePreview } from '@/entities/message-queue/lib/format-queue-preview'
+import { isPlaybackOnlyConversationError } from '@/features/ai-chat/lib/post-reply'
+import {
+  isViewingChat,
+  setPipelineActivityForChat,
+  setPipelineErrorForChat,
+  setPipelineStageForChat
+} from '@/features/ai-chat/lib/pipeline-stage'
 import { beginAgentRun, cancelAgentRun, isAgentRunActive } from './agent-run'
+import {
+  restoreUserMessageEdit,
+  snapshotUserMessageEdit,
+  type SubmitEditedUserMessageResult
+} from './submit-edited-user-message'
+
+export type { SubmitEditedUserMessageResult } from './submit-edited-user-message'
 
 function isAgentPipelineBusy(stage: PipelineStage, streamActive: boolean): boolean {
   return (
@@ -36,25 +52,6 @@ function isAgentPipelineBusy(stage: PipelineStage, streamActive: boolean): boole
     stage === 'searching' ||
     stage === 'speaking'
   )
-}
-
-async function getHistoryForApi(chatId: string): Promise<ChatMessagePayload[]> {
-  const chat = useChatsStore.getState().chats.find((c) => c.id === chatId)
-  const base = await resolveMessagesForApi(
-    chat?.messages.filter(messageHasVisibleContent) ?? []
-  )
-
-  const { addressUserByName, displayName } = useSettingsStore.getState()
-  const name = displayName?.trim()
-  if (!addressUserByName || !name) return base
-
-  return [
-    {
-      role: 'system',
-      content: `The user's name is ${name}. Address the user by name when replying.`
-    },
-    ...base
-  ]
 }
 
 type UseAiChatOptions = {
@@ -73,21 +70,23 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const chatComposerMode = useSettingsStore((s) => s.chatComposerMode)
   const stage = useConversationStore((s) => s.stage)
   const setStage = useConversationStore((s) => s.setStage)
-  const setConversationError = useConversationStore((s) => s.setError)
-  const setChatHasError = useChatsStore((s) => s.setChatHasError)
   const setBlurAnimateMessageId = useConversationStore((s) => s.setBlurAnimateMessageId)
 
   const setError = useCallback(
-    (error: string | null) => {
-      setConversationError(error)
-      const chatId = useChatsStore.getState().activeChatId
-      if (chatId) setChatHasError(chatId, Boolean(error))
+    (error: string | null, targetChatId?: string) => {
+      const chatId = targetChatId ?? useChatsStore.getState().activeChatId
+      if (!chatId) return
+      setPipelineErrorForChat(chatId, error)
     },
-    [setConversationError, setChatHasError]
+    []
   )
   const streamControllerRef = useRef<ChatStreamController | null>(null)
+  const streamTargetChatIdRef = useRef<string | null>(null)
+  const [streamActive, setStreamActive] = useState(false)
   const streamingTtsRef = useRef<StreamingSentenceTts | null>(null)
-  const runAssistantReplyRef = useRef<(chatId: string) => Promise<void>>(async () => {})
+  const runAssistantReplyRef = useRef<(chatId: string) => Promise<boolean>>(
+    async () => false
+  )
 
   const messages = activeChat?.messages ?? EMPTY_MESSAGES
   const activeChatId = activeChat?.id ?? null
@@ -97,15 +96,20 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
   const processNextInQueue = useCallback(
     async (chatId: string) => {
+      useConversationStore.getState().setQueueAheadPreview(null)
+
       while (useMessageQueueStore.getState().getQueue(chatId).length > 0) {
-        const item = useMessageQueueStore.getState().dequeue(chatId)
+        const item = useMessageQueueStore.getState().getQueue(chatId)[0]
         if (!item) break
 
         const hasText = Boolean(item.content.trim())
         const hasAttachments = (item.attachments?.length ?? 0) > 0
-        if (!hasText && !hasAttachments) continue
+        if (!hasText && !hasAttachments) {
+          useMessageQueueStore.getState().remove(chatId, item.id)
+          continue
+        }
 
-        addMessage(
+        const userMessageId = addMessage(
           {
             role: 'user',
             content: item.content,
@@ -113,44 +117,80 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           },
           chatId
         )
-        await runAssistantReplyRef.current(chatId)
+        const ok = await runAssistantReplyRef.current(chatId)
+        if (ok) {
+          useMessageQueueStore.getState().remove(chatId, item.id)
+          return
+        }
+
+        if (userMessageId) removeMessagesFrom(userMessageId, chatId)
+        setPipelineStageForChat(chatId, 'idle')
         return
       }
-      setStage('idle')
+
+      setPipelineStageForChat(chatId, 'idle')
     },
-    [addMessage, setStage]
+    [addMessage, removeMessagesFrom]
   )
 
   const stopAgent = useCallback(() => {
     streamControllerRef.current?.abort()
     streamControllerRef.current = null
+    setStreamActive(false)
     streamingTtsRef.current?.cancel()
     streamingTtsRef.current = null
     cancelAgentRun()
     stopTtsPlayback()
     setBlurAnimateMessageId(null)
+    useConversationStore.getState().setQueueAheadPreview(null)
+    useConversationStore.getState().setPipelineActivity(null)
+    streamTargetChatIdRef.current = null
     setStage('idle')
   }, [setBlurAnimateMessageId, setStage])
 
   const runAssistantReply = useCallback(
-    async (targetChatId: string) => {
+    async (targetChatId: string): Promise<boolean> => {
       const runId = beginAgentRun()
-      const history = await getHistoryForApi(targetChatId)
-      const hasImagesInThread = messagesHaveImages(history)
-
       const llmSettings = useSettingsStore.getState()
-      setStage(
+
+      const customError = validateCustomLlmSettings(llmSettings)
+      if (customError) {
+        setError(customError, targetChatId)
+        setPipelineStageForChat(targetChatId, 'idle')
+        return false
+      }
+
+      setPipelineStageForChat(targetChatId, 'thinking')
+      setPipelineActivityForChat(targetChatId, 'Preparing context…')
+      setError(null, targetChatId)
+
+      const activeModelId =
+        llmSettings.llmBackend === 'custom' ? llmSettings.customModelId : llmSettings.modelId
+      const history = await getHistoryForApi(targetChatId, {
+        modelId: activeModelId,
+        maxTokens: llmSettings.llmMaxTokens
+      })
+      const hasImagesInThread = messagesHaveImages(history)
+      const lastUserText =
+        [...(useChatsStore.getState().chats.find((c) => c.id === targetChatId)?.messages ?? [])]
+          .reverse()
+          .find((m) => m.role === 'user')
+          ?.content.trim() ?? ''
+      const webSearchForTurn =
         llmSettings.webSearchEnabled &&
-          llmSettings.llmBackend === 'openrouter' &&
-          !hasImagesInThread
-          ? 'searching'
-          : 'thinking'
+        llmSettings.llmBackend === 'openrouter' &&
+        !hasImagesInThread &&
+        shouldRunWebSearch(lastUserText)
+
+      setPipelineStageForChat(targetChatId, webSearchForTurn ? 'searching' : 'thinking')
+      setPipelineActivityForChat(
+        targetChatId,
+        webSearchForTurn ? 'Starting web search…' : 'Connecting to model…'
       )
-      setError(null)
 
       let assistantMessageId: string | null = null
       let finalText = ''
-      const ttsEnabled = useSettingsStore.getState().ttsEnabled
+      const ttsEnabled = llmSettings.ttsEnabled
       const playTts = ttsEnabled && chatComposerMode === 'conversation'
       let streamingTts: StreamingSentenceTts | null = null
 
@@ -161,8 +201,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           targetChatId,
           onSpeaking: () => {
             if (!isAgentRunActive(runId)) return
-            if (useChatsStore.getState().activeChatId !== targetChatId) return
-            setStage('speaking')
+            setPipelineStageForChat(targetChatId, 'speaking')
           }
         })
         streamingTtsRef.current = streamingTts
@@ -178,56 +217,54 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         assistantMessageId = id || null
       }
 
-      try {
-        const customError = validateCustomLlmSettings(llmSettings)
-        if (customError) {
-          setError(customError)
-          setStage('idle')
-          return
-        }
+      const streamSync = createStreamContentSync(syncAssistantText)
 
+      try {
         const stream = getLingo().chat.stream(
           {
             messages: history,
             practiceLanguage,
             ...buildChatStreamLlmFields(llmSettings),
-            webSearch:
-              llmSettings.webSearchEnabled &&
-              llmSettings.llmBackend === 'openrouter' &&
-              !hasImagesInThread
+            webSearch: webSearchForTurn
           },
           {
             onSearching: () => {
               if (!isAgentRunActive(runId)) return
-              if (useChatsStore.getState().activeChatId === targetChatId) {
-                setStage('searching')
-              }
+              setPipelineStageForChat(targetChatId, 'searching')
+            },
+            onStatus: ({ label }) => {
+              if (!isAgentRunActive(runId)) return
+              setPipelineActivityForChat(targetChatId, label)
             },
             onTextDelta: ({ text }) => {
               if (!isAgentRunActive(runId)) return
               finalText = text
-              syncAssistantText(text)
+              if (text.trim()) {
+                setPipelineActivityForChat(targetChatId, null)
+              }
+              streamSync.push(text)
               if (useChatsStore.getState().activeChatId !== targetChatId) return
               if (streamingTts) {
                 streamingTts.feed(text)
-              } else {
-                setStage('idle')
               }
             },
             onDone: ({ text }) => {
               if (!isAgentRunActive(runId)) return
               finalText = text
-              syncAssistantText(text)
+              streamSync.flushNow(text)
             }
           }
         )
 
         streamControllerRef.current = stream
+        streamTargetChatIdRef.current = targetChatId
+        setStreamActive(true)
         await stream.done
 
         if (!isAgentRunActive(runId)) {
           if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
-          return
+          setPipelineStageForChat(targetChatId, 'idle')
+          return false
         }
 
         if (!finalText.trim() || !assistantMessageId) {
@@ -237,47 +274,61 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
         useChatsStore.getState().notifyChatReplyReady(targetChatId)
 
-        const isViewingTargetChat =
-          useChatsStore.getState().activeChatId === targetChatId &&
-          !window.location.hash.startsWith('#/settings')
+        const hasQueued = useMessageQueueStore.getState().getQueue(targetChatId).length > 0
+
+        const isViewingTargetChat = isViewingChat(targetChatId)
 
         if (!isViewingTargetChat) {
           streamingTts?.cancel()
           streamingTtsRef.current = null
-          return
+          if (isAgentRunActive(runId) && hasQueued) {
+            await processNextInQueue(targetChatId)
+          }
+          return true
         }
 
         setBlurAnimateMessageId(assistantMessageId)
 
-        if (streamingTts) {
+        if (hasQueued) {
+          if (playTts && streamingTts?.isActive) {
+            const nextQueued = useMessageQueueStore.getState().getQueue(targetChatId)[0]
+            const preview = formatQueuePreview(nextQueued)
+            if (preview) useConversationStore.getState().setQueueAheadPreview(preview)
+          }
+          streamingTts?.cancel()
+          streamingTtsRef.current = null
+        } else if (streamingTts) {
           try {
             await streamingTts.finish()
           } catch (playError) {
-            if (!isAgentRunActive(runId)) return
-            if (useChatsStore.getState().activeChatId !== targetChatId) return
-            const playMsg = playError instanceof Error ? playError.message : 'PLAYBACK_FAILED'
-            setError(
-              playMsg.includes('PLAYBACK_FAILED') || playMsg.includes('TTS_')
-                ? 'Could not play audio. The assistant reply is shown in the chat.'
-                : playMsg
-            )
+            if (isAgentRunActive(runId)) {
+              const playMsg = playError instanceof Error ? playError.message : 'PLAYBACK_FAILED'
+              setError(
+                playMsg.includes('PLAYBACK_FAILED') || playMsg.includes('TTS_')
+                  ? 'Could not play audio. The assistant reply is shown in the chat.'
+                  : playMsg,
+                targetChatId
+              )
+            }
           } finally {
             streamingTtsRef.current = null
           }
         }
 
-        if (isAgentRunActive(runId) && useChatsStore.getState().activeChatId === targetChatId) {
-          const hasQueued = useMessageQueueStore.getState().getQueue(targetChatId).length > 0
+        if (isAgentRunActive(runId) && isViewingChat(targetChatId)) {
           if (hasQueued) {
             await processNextInQueue(targetChatId)
           } else {
-            setStage('idle')
+            setPipelineStageForChat(targetChatId, 'idle')
             if (playTts) options.onLiveConversationTurnComplete?.()
           }
         }
+        return true
       } catch (e) {
-        if (!isAgentRunActive(runId)) return
-        if (useChatsStore.getState().activeChatId !== targetChatId) return
+        if (!isAgentRunActive(runId)) {
+          setPipelineStageForChat(targetChatId, 'idle')
+          return false
+        }
 
         const msg = e instanceof Error ? e.message : 'Request failed'
         const aborted = msg.includes('aborted') || (e instanceof Error && e.name === 'AbortError')
@@ -285,23 +336,32 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           streamingTts?.cancel()
           streamingTtsRef.current = null
           if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
-          setStage('idle')
-          return
+          setPipelineStageForChat(targetChatId, 'idle')
+          return false
         }
 
         if (assistantMessageId) removeMessagesFrom(assistantMessageId, targetChatId)
-        setBlurAnimateMessageId(null)
+        if (isViewingChat(targetChatId)) setBlurAnimateMessageId(null)
         if (msg.includes('NO_OPENROUTER_KEY')) {
-          setError('Add your OpenRouter API key in Settings.')
+          setError('Add your OpenRouter API key in Settings.', targetChatId)
         } else if (msg.includes('TTS_EMPTY')) {
-          setError('Speech synthesis returned no audio. The text reply is still in the chat.')
-          setStage('idle')
+          setError(
+            'Speech synthesis returned no audio. The text reply is still in the chat.',
+            targetChatId
+          )
+          setPipelineStageForChat(targetChatId, 'idle')
         } else {
-          setError(formatLlmError(msg))
-          setStage('idle')
+          setError(formatLlmError(msg), targetChatId)
+          setPipelineStageForChat(targetChatId, 'idle')
         }
+        return false
       } finally {
+        streamSync.cancel()
         streamControllerRef.current = null
+        if (streamTargetChatIdRef.current === targetChatId) {
+          streamTargetChatIdRef.current = null
+        }
+        setStreamActive(false)
         if (streamingTtsRef.current === streamingTts) {
           streamingTtsRef.current = null
         }
@@ -324,6 +384,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   useEffect(() => {
     runAssistantReplyRef.current = runAssistantReply
   })
+
+  useEffect(() => {
+    if (!activeChatId) return
+    const ownsStream =
+      streamActive && streamTargetChatIdRef.current === activeChatId
+    const busyStage =
+      stage === 'thinking' || stage === 'searching' || stage === 'speaking'
+    if (busyStage && !ownsStream) {
+      setStage('idle')
+    }
+  }, [activeChatId, streamActive, stage, setStage])
 
   const enqueueUserMessage = useCallback(
     (content: string, chatId: string, attachments?: MessageAttachment[]) => {
@@ -467,7 +538,11 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   )
 
   const submitEditedUserMessage = useCallback(
-    async (messageId: string, content: string, attachments?: MessageAttachment[]) => {
+    async (
+      messageId: string,
+      content: string,
+      attachments?: MessageAttachment[]
+    ): Promise<SubmitEditedUserMessageResult> => {
       const trimmed = content.trim()
       const editAttachments = attachments ?? []
 
@@ -477,21 +552,53 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       if (!trimmed && editAttachments.length === 0) return
 
       const chatId = chat.id
+      const snapshot = snapshotUserMessageEdit(chat.messages, messageId)
+      if (!snapshot) return
+
+      const rollbackEdit = (): SubmitEditedUserMessageResult => {
+        const current = useChatsStore.getState().chats.find((c) => c.id === chatId)
+        if (current) {
+          useChatsStore
+            .getState()
+            .setChatMessages(chatId, restoreUserMessageEdit(current.messages, snapshot))
+        }
+        return { rollbackToEdit: messageId }
+      }
 
       stopAgent()
-      const preparedAttachments =
-        editAttachments.length > 0 ? await persistAttachments(editAttachments) : editAttachments
-      updateUserMessageContent(messageId, trimmed, preparedAttachments)
+      updateUserMessageContent(
+        messageId,
+        trimmed,
+        editAttachments.length > 0 ? editAttachments : undefined
+      )
       removeMessagesAfter(messageId, chatId)
       setBlurAnimateMessageId(null)
-      setError(null)
+      setError(null, chatId)
+
+      try {
+        if (editAttachments.length > 0) {
+          const preparedAttachments = await persistAttachments(editAttachments)
+          updateUserMessageContent(messageId, trimmed, preparedAttachments)
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Request failed'
+        setError(formatLlmError(msg), chatId)
+        setPipelineStageForChat(chatId, 'idle')
+        return rollbackEdit()
+      }
+
       await runAssistantReply(chatId)
+      const err = useConversationStore.getState().error
+      if (err && !isPlaybackOnlyConversationError(err)) {
+        return rollbackEdit()
+      }
     },
     [
       runAssistantReply,
       removeMessagesAfter,
       setBlurAnimateMessageId,
       setError,
+      setStage,
       stopAgent,
       updateUserMessageContent
     ]
@@ -532,9 +639,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
   const clearError = useCallback(() => setError(null), [setError])
 
+  const streamBusyForActiveChat =
+    streamActive && streamTargetChatIdRef.current === activeChatId
+  const agentBusy = isAgentPipelineBusy(stage, streamBusyForActiveChat)
+
   return {
     messages,
     stage,
+    agentBusy,
     queuedMessages,
     sendUserMessage,
     enqueueUserMessage,

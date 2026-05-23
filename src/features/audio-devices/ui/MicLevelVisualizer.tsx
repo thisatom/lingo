@@ -15,7 +15,7 @@ export function MicLevelVisualizer({
 }: MicLevelVisualizerProps) {
   return (
     <div
-      className={cn('flex min-w-0 flex-1 items-center gap-[3px]', className)}
+      className={cn('flex h-[18px] min-w-0 flex-1 items-end gap-[3px]', className)}
       role="meter"
       aria-label={isReceiving ? 'Microphone receiving audio' : 'No microphone signal'}
       aria-valuenow={Math.round((isReceiving ? 1 : 0) * 100)}

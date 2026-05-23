@@ -9,6 +9,7 @@ export function looksLikeLatex(text: string): boolean {
 export function sanitizeAiLatex(latex: string): string {
   return (
     latex
+      .replace(/\^\\circ\b/g, '^{\\circ}')
       .replace(/(\\[a-zA-Z]+)!/g, '$1')
       .replace(/_(\d+)!/g, '_$1')
       .replace(/\^{!(\d+)/g, '^{$1}')

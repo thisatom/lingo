@@ -39,6 +39,9 @@ const lingo: LingoApi = {
           case 'searching':
             handlers.onSearching?.()
             break
+          case 'status':
+            handlers.onStatus?.(payload)
+            break
           case 'text-delta':
             handlers.onTextDelta?.(payload)
             break

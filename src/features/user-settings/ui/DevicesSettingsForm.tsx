@@ -1,3 +1,4 @@
+import { Play, Square } from 'lucide-react'
 import { RefreshCw } from '@/shared/ui/icons'
 import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
@@ -163,7 +164,7 @@ export function DevicesSettingsForm() {
               }}
               disabled={micLoading || micPermissionDenied}
             >
-              <SelectTrigger id="devices-microphone" size="sm" className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}>
+              <SelectTrigger id="devices-microphone" size="sm" className={`${settingsSelectTriggerClass} w-[280px] min-w-0`}>
                 <SelectValue placeholder="System default" />
               </SelectTrigger>
               <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
@@ -199,7 +200,7 @@ export function DevicesSettingsForm() {
               if (option) setMicNoiseSuppression(option.value)
             }}
           >
-            <SelectTrigger id="devices-noise-suppression" size="sm" className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}>
+            <SelectTrigger id="devices-noise-suppression" size="sm" className={`${settingsSelectTriggerClass} w-[280px] min-w-0`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
@@ -245,7 +246,7 @@ export function DevicesSettingsForm() {
               }}
               disabled={speakerLoading || !sinkSupported}
             >
-              <SelectTrigger id="devices-speaker" size="sm" className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}>
+              <SelectTrigger id="devices-speaker" size="sm" className={`${settingsSelectTriggerClass} w-[280px] min-w-0`}>
                 <SelectValue placeholder="System default" />
               </SelectTrigger>
               <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
@@ -276,8 +277,8 @@ export function DevicesSettingsForm() {
             Start the test and speak — bars should move. &quot;Signal OK&quot; means audio is reaching
             the app.
           </p>
-          <div className="mt-3 flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
-            <MicLevelVisualizer levels={levels} isReceiving={isReceiving} />
+          <div className="mt-3 flex h-9 items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
+            <MicLevelVisualizer levels={levels} isReceiving={isReceiving} className="shrink" />
             <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
               {micTestActive ? durationLabel : '0:00'}
             </span>
@@ -306,11 +307,12 @@ export function DevicesSettingsForm() {
               <Button
                 type="button"
                 size="xs"
-                variant="secondary"
-                className="h-6 px-2 text-[11px]"
+                variant="outline"
+                className={cn(settingsSelectTriggerClass, 'h-6 gap-1.5 px-2 text-[11px]')}
                 disabled={micPermissionDenied}
                 onClick={() => setMicTestActive(true)}
               >
+                <Play className="size-3 shrink-0" strokeWidth={2} />
                 Start test
               </Button>
             ) : (
@@ -318,9 +320,10 @@ export function DevicesSettingsForm() {
                 type="button"
                 size="xs"
                 variant="outline"
-                className="h-6 px-2 text-[11px]"
+                className={cn(settingsSelectTriggerClass, 'h-6 gap-1.5 px-2 text-[11px]')}
                 onClick={() => setMicTestActive(false)}
               >
+                <Square className="size-3 shrink-0" strokeWidth={2} />
                 Stop test
               </Button>
             )}

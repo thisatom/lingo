@@ -37,7 +37,11 @@ export function MarkdownCodeBlock({ children, className }: MarkdownCodeBlockProp
   const label = language ? formatCodeLanguageLabel(language) : 'Code'
 
   const handleCopy = useCallback(async () => {
-    const text = preRef.current?.textContent?.trim() ?? extractTextFromChildren(children).trim()
+    const fromDom =
+      preRef.current?.querySelector('code')?.textContent ??
+      preRef.current?.textContent ??
+      ''
+    const text = fromDom.trim() || extractTextFromChildren(children).trim()
     if (!text) return
     const ok = await copyToClipboard(text)
     if (!ok) return
@@ -53,7 +57,11 @@ export function MarkdownCodeBlock({ children, className }: MarkdownCodeBlockProp
           type="button"
           className={typography.codeBlockCopyButton}
           aria-label={copied ? 'Copied' : 'Copy code'}
-          onClick={() => void handleCopy()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            void handleCopy()
+          }}
         >
           {copied ? <Check className="size-3 shrink-0" aria-hidden /> : <Copy className="size-3 shrink-0" aria-hidden />}
           <span>{copied ? 'Copied' : 'Copy'}</span>

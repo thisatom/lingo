@@ -38,7 +38,7 @@ function FilterMenuItem({
   return (
     <DropdownMenuItem className={sidebarMenuItemClass} onSelect={onSelect}>
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1 whitespace-nowrap">{label}</span>
       <Check className={cn('ml-1 size-3 shrink-0', selected ? 'opacity-100' : 'opacity-0')} />
     </DropdownMenuItem>
   )
@@ -108,7 +108,7 @@ export function SidebarFilterMenu() {
         side="top"
         align="start"
         sideOffset={6}
-        className={cn('w-52 p-1', sidebarMenuSurfaceClass)}
+        className={cn('w-max min-w-[11.5rem] p-1', sidebarMenuSurfaceClass)}
       >
         <DropdownMenuLabel className={sidebarMenuLabelClass}>Sort by</DropdownMenuLabel>
 

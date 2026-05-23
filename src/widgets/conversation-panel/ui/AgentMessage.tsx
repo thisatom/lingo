@@ -5,15 +5,16 @@ import { agentMessageClass, agentMessageWrapClass, chatSelectableClass } from '.
 
 interface AgentMessageProps {
   content: string
-  messageId: string
+  parseThrottleMs?: number
 }
 
-export function AgentMessage({ content }: AgentMessageProps) {
+export function AgentMessage({ content, parseThrottleMs }: AgentMessageProps) {
   return (
     <ChatTextContextMenu className={cn(agentMessageWrapClass, chatSelectableClass)}>
       <MarkdownContent
         content={content}
         variant="typography"
+        parseThrottleMs={parseThrottleMs}
         className={cn(agentMessageClass, chatSelectableClass)}
       />
     </ChatTextContextMenu>

@@ -3,6 +3,11 @@ import {
   normalizeCustomModelId
 } from '@/shared/config/custom-llm'
 import { parseCustomLlmProfileSource } from '@/shared/lib/custom-llm-profile'
+import {
+  clampLlmMaxTokens,
+  llmMaxTokensRetryBudget,
+  normalizeLlmMaxTokens
+} from '@/shared/lib/llm-max-tokens'
 import type { ChatStreamRequest, CustomLlmConfig, LlmBackend } from '@/shared/types/ipc'
 
 export type ChatStreamLlmSettings = {
@@ -13,6 +18,7 @@ export type ChatStreamLlmSettings = {
   customLlmProfileJson: string
   webSearchEnabled: boolean
   modelAutoFallback: boolean
+  llmMaxTokens: number
 }
 
 function resolveCustomFromSettings(settings: ChatStreamLlmSettings): CustomLlmConfig | null {
@@ -30,9 +36,22 @@ function resolveCustomFromSettings(settings: ChatStreamLlmSettings): CustomLlmCo
   return { baseUrl, model }
 }
 
+function completionTokenBudget(settings: ChatStreamLlmSettings): {
+  maxTokens: number
+  maxTokensRetry: number
+} {
+  const maxTokens = clampLlmMaxTokens(normalizeLlmMaxTokens(settings.llmMaxTokens))
+  return { maxTokens, maxTokensRetry: llmMaxTokensRetryBudget(maxTokens) }
+}
+
 export function buildChatStreamLlmFields(
   settings: ChatStreamLlmSettings
-): Pick<ChatStreamRequest, 'model' | 'llmBackend' | 'customLlm' | 'webSearch' | 'modelAutoFallback'> {
+): Pick<
+  ChatStreamRequest,
+  'model' | 'llmBackend' | 'customLlm' | 'webSearch' | 'modelAutoFallback' | 'maxTokens' | 'maxTokensRetry'
+> {
+  const tokens = completionTokenBudget(settings)
+
   if (settings.llmBackend === 'custom') {
     const customLlm = resolveCustomFromSettings(settings)
     if (!customLlm) {
@@ -41,7 +60,8 @@ export function buildChatStreamLlmFields(
         model: '',
         customLlm: { baseUrl: '', model: '' },
         webSearch: false,
-        modelAutoFallback: false
+        modelAutoFallback: false,
+        ...tokens
       }
     }
     return {
@@ -49,7 +69,8 @@ export function buildChatStreamLlmFields(
       model: customLlm.model,
       customLlm,
       webSearch: false,
-      modelAutoFallback: false
+      modelAutoFallback: false,
+      ...tokens
     }
   }
 
@@ -57,7 +78,8 @@ export function buildChatStreamLlmFields(
     llmBackend: 'openrouter',
     model: settings.modelId,
     webSearch: settings.webSearchEnabled,
-    modelAutoFallback: settings.modelAutoFallback
+    modelAutoFallback: settings.modelAutoFallback,
+    ...tokens
   }
 }
 

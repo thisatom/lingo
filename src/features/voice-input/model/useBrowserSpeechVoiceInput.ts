@@ -49,8 +49,9 @@ export function useBrowserSpeechVoiceInput({ enabled, onLiveTranscript }: Option
   useEffect(() => {
     if (!enabled || !onLiveTranscript) return
     if (phaseRef.current !== 'recording' && phaseRef.current !== 'starting') return
-    onLiveTranscript(transcript.trim())
-  }, [enabled, onLiveTranscript, transcript])
+    const spoken = [transcript, interimTranscript].filter(Boolean).join(' ').trim()
+    onLiveTranscript(spoken)
+  }, [enabled, interimTranscript, onLiveTranscript, transcript])
 
   const clearVoiceStage = useCallback(() => {
     const current = useConversationStore.getState().stage

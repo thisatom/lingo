@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/shared/ui/select'
+import { LLM_MAX_TOKENS_PRESETS } from '@/shared/lib/llm-max-tokens'
 import type { LlmBackend, SecretProviderId } from '@/shared/types/ipc'
 import { OpenRouterModelCombobox } from './OpenRouterModelCombobox'
 
@@ -73,6 +74,8 @@ export function ApiSettingsForm() {
   const setLlmBackend = useSettingsStore((s) => s.setLlmBackend)
   const modelId = useSettingsStore((s) => s.modelId)
   const setModelId = useSettingsStore((s) => s.setModelId)
+  const llmMaxTokens = useSettingsStore((s) => s.llmMaxTokens)
+  const setLlmMaxTokens = useSettingsStore((s) => s.setLlmMaxTokens)
   const [message, setMessage] = useState<string | null>(null)
   const [moreKeysOpen, setMoreKeysOpen] = useState(false)
 
@@ -115,6 +118,44 @@ export function ApiSettingsForm() {
                   className={settingsSelectItemClass}
                 >
                   {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <p className={settingsSubsectionTitleClass}>Completion</p>
+      <div className={settingsCardClass}>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <Label htmlFor="llm-max-tokens" className={settingsRowTitleClass}>
+              Max response tokens
+            </Label>
+            <p className={settingsRowDescriptionClass}>
+              Upper bound for each assistant reply (`max_tokens` in the API). Does not change the
+              model context window — only how long a single answer may be.
+            </p>
+          </div>
+          <Select
+            value={String(llmMaxTokens)}
+            onValueChange={(value) => setLlmMaxTokens(Number(value))}
+          >
+            <SelectTrigger
+              id="llm-max-tokens"
+              size="sm"
+              className={cn(settingsSelectTriggerClass, 'w-[280px] min-w-0')}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className={settingsSelectContentClass}>
+              {LLM_MAX_TOKENS_PRESETS.map((preset) => (
+                <SelectItem
+                  key={preset.value}
+                  value={String(preset.value)}
+                  className={settingsSelectItemClass}
+                >
+                  {preset.label}
                 </SelectItem>
               ))}
             </SelectContent>

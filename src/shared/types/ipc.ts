@@ -53,16 +53,22 @@ export interface ChatStreamRequest {
   webSearch?: boolean
   /** Try other free models when the selected one errors (no repeat attempts). */
   modelAutoFallback?: boolean
+  /** Max completion tokens for this request (from Settings → API). */
+  maxTokens?: number
+  /** Retry budget when the first answer looks truncated (defaults to ~1.5× maxTokens). */
+  maxTokensRetry?: number
 }
 
 export type ChatStreamEvent =
   | { type: 'searching' }
+  | { type: 'status'; label: string }
   | { type: 'text-delta'; delta: string; text: string }
   | { type: 'done'; text: string }
   | { type: 'error'; message: string }
 
 export interface ChatStreamHandlers {
   onSearching?: () => void
+  onStatus?: (event: Extract<ChatStreamEvent, { type: 'status' }>) => void
   onTextDelta?: (event: Extract<ChatStreamEvent, { type: 'text-delta' }>) => void
   onDone?: (event: Extract<ChatStreamEvent, { type: 'done' }>) => void
   onError?: (event: Extract<ChatStreamEvent, { type: 'error' }>) => void

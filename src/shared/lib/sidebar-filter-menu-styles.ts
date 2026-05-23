@@ -67,6 +67,15 @@ export const sidebarMenuIconButtonClass = cn(
 
 /** Text picker trigger — composer Agent / model selects. */
 
+/** Agent mode picker — fits "Agent Speech" + optional Auto suffix. */
+export const composerAgentPickerTriggerClass = cn(
+  'inline-flex h-7 min-h-7 w-fit max-w-none min-w-0 shrink-0 cursor-pointer items-center gap-1',
+  'rounded-full py-0 pl-2.5 pr-2 text-[13px] leading-none text-muted-foreground outline-none',
+  composerInputHoverClass,
+  'focus-visible:bg-accent dark:focus-visible:bg-[#303030]',
+  'disabled:pointer-events-none disabled:opacity-50'
+)
+
 export const sidebarMenuPickerTriggerClass = cn(
 
   'inline-flex h-7 min-h-7 w-fit max-w-[9rem] min-w-0 shrink-0 cursor-pointer items-center gap-1',

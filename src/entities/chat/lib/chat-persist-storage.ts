@@ -4,6 +4,11 @@ export const CHAT_PERSIST_KEY = 'lingo-chats-v3'
 
 const LEGACY_KEYS = ['lingo-chats', 'lingo-chats-v2']
 
+const CHAT_PERSIST_DEBOUNCE_MS = 450
+
+let pendingWrite: { name: string; value: string } | null = null
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
 /** Remove huge base64 blobs from raw JSON before parse (fixes slow startup). */
 function stripHeavyPayloads(raw: string): string {
   return raw
@@ -53,16 +58,42 @@ function safeGetItem(name: string): string | null {
   }
 }
 
+function writeNow(name: string, value: string): void {
+  try {
+    localStorage.setItem(name, value)
+  } catch (e) {
+    console.warn('[lingo] Could not persist chats:', e)
+  }
+}
+
+function flushPendingWrite(): void {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+  if (!pendingWrite) return
+  const { name, value } = pendingWrite
+  pendingWrite = null
+  writeNow(name, value)
+}
+
+/** Flush debounced chat persist before shutdown or explicit save. */
+export function flushChatPersistDebounce(): void {
+  flushPendingWrite()
+}
+
 export const chatPersistStorage: StateStorage = {
   getItem: (name) => safeGetItem(name),
   setItem: (name, value) => {
-    try {
-      localStorage.setItem(name, value)
-    } catch (e) {
-      console.warn('[lingo] Could not persist chats:', e)
-    }
+    pendingWrite = { name, value }
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushPendingWrite()
+    }, CHAT_PERSIST_DEBOUNCE_MS)
   },
   removeItem: (name) => {
+    flushPendingWrite()
     for (const key of [name, ...LEGACY_KEYS]) {
       localStorage.removeItem(key)
     }

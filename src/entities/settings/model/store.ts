@@ -25,6 +25,7 @@ import {
 } from '@/shared/config/openrouter-free-models'
 import { TTS_VOICE_AUTO, isKnownTtsVoiceId, normalizeTtsVoiceId } from '@/shared/config/tts-voices'
 import { isSidebarChatSort, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
+import { LLM_MAX_TOKENS_DEFAULT, normalizeLlmMaxTokens } from '@/shared/lib/llm-max-tokens'
 import { isTtsSpeechRate, type TtsSpeechRate } from '@/shared/lib/tts-rate'
 import { isAppTheme } from '@/shared/lib/theme'
 import type { AppTheme } from '@/shared/types/app-theme'
@@ -67,6 +68,8 @@ interface SettingsState {
   webSearchEnabled: boolean
   /** On API error, try other free OpenRouter models (each at most once). */
   modelAutoFallback: boolean
+  /** Max completion tokens sent as `max_tokens` on each chat request. */
+  llmMaxTokens: number
   sidebarShowDateGroups: boolean
   sidebarChatSort: SidebarChatSort
   /** First-run setup wizard completed. */
@@ -92,6 +95,7 @@ interface SettingsState {
   setChatComposerMode: (mode: ChatComposerMode) => void
   setWebSearchEnabled: (enabled: boolean) => void
   setModelAutoFallback: (enabled: boolean) => void
+  setLlmMaxTokens: (maxTokens: number) => void
   setSidebarShowDateGroups: (show: boolean) => void
   setSidebarChatSort: (sort: SidebarChatSort) => void
   setOnboardingCompleted: (completed: boolean) => void
@@ -121,6 +125,7 @@ type PersistedSettings = Pick<
   | 'chatComposerMode'
   | 'webSearchEnabled'
   | 'modelAutoFallback'
+  | 'llmMaxTokens'
   | 'sidebarShowDateGroups'
   | 'sidebarChatSort'
   | 'onboardingCompleted'
@@ -149,6 +154,7 @@ const DEFAULT_SETTINGS: Omit<
   | 'setChatComposerMode'
   | 'setWebSearchEnabled'
   | 'setModelAutoFallback'
+  | 'setLlmMaxTokens'
   | 'setSidebarShowDateGroups'
   | 'setSidebarChatSort'
   | 'setOnboardingCompleted'
@@ -175,6 +181,7 @@ const DEFAULT_SETTINGS: Omit<
   chatComposerMode: 'text',
   webSearchEnabled: true,
   modelAutoFallback: true,
+  llmMaxTokens: LLM_MAX_TOKENS_DEFAULT,
   sidebarShowDateGroups: true,
   sidebarChatSort: 'updated-desc',
   onboardingCompleted: false
@@ -259,6 +266,7 @@ export const useSettingsStore = create<SettingsState>()(
       setChatComposerMode: (chatComposerMode) => set({ chatComposerMode }),
       setWebSearchEnabled: (webSearchEnabled) => set({ webSearchEnabled }),
       setModelAutoFallback: (modelAutoFallback) => set({ modelAutoFallback }),
+      setLlmMaxTokens: (llmMaxTokens) => set({ llmMaxTokens: normalizeLlmMaxTokens(llmMaxTokens) }),
       setSidebarShowDateGroups: (sidebarShowDateGroups) => set({ sidebarShowDateGroups }),
       setSidebarChatSort: (sidebarChatSort) => set({ sidebarChatSort }),
       setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
@@ -266,7 +274,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'lingo-settings',
-      version: 16,
+      version: 17,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
         llmBackend: state.llmBackend,
@@ -289,6 +297,7 @@ export const useSettingsStore = create<SettingsState>()(
         chatComposerMode: state.chatComposerMode,
         webSearchEnabled: state.webSearchEnabled,
         modelAutoFallback: state.modelAutoFallback,
+        llmMaxTokens: state.llmMaxTokens,
         sidebarShowDateGroups: state.sidebarShowDateGroups,
         sidebarChatSort: state.sidebarChatSort,
         onboardingCompleted: state.onboardingCompleted
@@ -378,6 +387,12 @@ export const useSettingsStore = create<SettingsState>()(
             customModelId: customLlmConfig.defaultModel
           }
         }
+        if (version < 17) {
+          state = {
+            ...state,
+            llmMaxTokens: normalizeLlmMaxTokens(state.llmMaxTokens)
+          }
+        }
         if (version < 16) {
           const baseUrl =
             typeof state.customApiBaseUrl === 'string'
@@ -442,6 +457,7 @@ export const useSettingsStore = create<SettingsState>()(
             typeof saved.modelAutoFallback === 'boolean'
               ? saved.modelAutoFallback
               : current.modelAutoFallback,
+          llmMaxTokens: normalizeLlmMaxTokens(saved.llmMaxTokens ?? current.llmMaxTokens),
           ttsSpeechRate: isTtsSpeechRate(saved.ttsSpeechRate)
             ? saved.ttsSpeechRate
             : current.ttsSpeechRate,

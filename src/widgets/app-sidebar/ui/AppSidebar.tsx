@@ -109,10 +109,7 @@ export function AppSidebar() {
               >
                 <NewChat className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-left">New chat</span>
-                <KbdGroup
-                  className="shrink-0 opacity-90 [--kbd-divider:var(--kbd-divider)]"
-                  aria-hidden
-                >
+                <KbdGroup className="shrink-0" aria-hidden>
                   <Kbd>Ctrl</Kbd>
                   <Kbd>N</Kbd>
                 </KbdGroup>

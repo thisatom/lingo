@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from '@/shared/ui/icons'
 import { ArrowUp, Mic, Square } from 'lucide-react'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import { useComposerPaste } from '@/features/chat-attachments/model/useComposerPaste'
 import { ComposerAttachments } from '@/features/chat-attachments/ui/ComposerAttachments'
 import { ComposerFileInput } from '@/features/chat-attachments/ui/ComposerFileInput'
@@ -34,7 +35,10 @@ interface UserMessageProps {
   onStopAgent?: () => void
   onEnterEdit: () => void
   onExitEdit: () => void
-  onSubmitEdit: (text: string, attachments?: MessageAttachment[]) => void | Promise<void>
+  onSubmitEdit: (
+    text: string,
+    attachments?: MessageAttachment[]
+  ) => Promise<SubmitEditedUserMessageResult>
   onAttachmentError?: (message: string) => void
   voiceSupported?: boolean
   voiceBusy?: boolean
@@ -68,21 +72,29 @@ export function UserMessage({
   const [editAttachments, setEditAttachments] = useState<MessageAttachment[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const draftRef = useRef(draft)
+  const editSessionIdRef = useRef<string | null>(null)
   draftRef.current = draft
 
   useEffect(() => {
     if (!isEditing) {
+      editSessionIdRef.current = null
       setDraft(content)
       setEditAttachments(attachments ? [...attachments] : [])
       return
     }
+
+    if (editSessionIdRef.current === messageId) return
+
+    editSessionIdRef.current = messageId
     setDraft(content)
     setEditAttachments(attachments ? [...attachments] : [])
     const el = textareaRef.current
     if (el) {
-      resizeTextarea(el)
-      el.focus()
-      el.setSelectionRange(el.value.length, el.value.length)
+      requestAnimationFrame(() => {
+        resizeTextarea(el)
+        el.focus()
+        el.setSelectionRange(el.value.length, el.value.length)
+      })
     }
   }, [isEditing, content, messageId, attachments])
 
@@ -93,6 +105,7 @@ export function UserMessage({
       messageId,
       setText: (text) => {
         setDraft(text)
+        draftRef.current = text
         const el = textareaRef.current
         if (el) {
           requestAnimationFrame(() => resizeTextarea(el))
@@ -119,10 +132,12 @@ export function UserMessage({
     setEditAttachments((prev) => [...prev, ...items])
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!canSend) return
-    await onSubmitEdit(draft.trim(), editAttachments)
+    const text = draft.trim()
+    const attachments = hasAttachments ? editAttachments : undefined
     onExitEdit()
+    void onSubmitEdit(text, attachments)
   }
 
   const handleCancel = () => {
