@@ -7,7 +7,7 @@ import {
 import {
   customLlmConfig,
   isValidCustomApiBaseUrl,
-  normalizeCustomApiBaseUrl,
+  normalizeCustomApiRootUrl,
   normalizeCustomModelId
 } from '@/shared/config/custom-llm'
 import {
@@ -73,7 +73,7 @@ interface SettingsState {
   webSearchEnabled: boolean
   /** On API error, try other free OpenRouter models (each at most once). */
   modelAutoFallback: boolean
-  /** Max completion tokens sent as `max_tokens` on each chat request. */
+  /** Max completion tokens (`max_tokens`); `0` = no limit (omit on API). */
   llmMaxTokens: number
   sidebarShowDateGroups: boolean
   sidebarChatSort: SidebarChatSort
@@ -204,7 +204,7 @@ export const useSettingsStore = create<SettingsState>()(
       setLlmBackend: (llmBackend) =>
         set({ llmBackend: isLlmBackend(llmBackend) ? llmBackend : 'openrouter' }),
       setCustomApiBaseUrl: (customApiBaseUrl) => {
-        const baseUrl = normalizeCustomApiBaseUrl(customApiBaseUrl)
+        const baseUrl = normalizeCustomApiRootUrl(customApiBaseUrl)
         const model = useSettingsStore.getState().customModelId
         set({
           customApiBaseUrl: baseUrl,
@@ -491,7 +491,7 @@ export const useSettingsStore = create<SettingsState>()(
           customApiBaseUrl:
             typeof saved.customApiBaseUrl === 'string' &&
             isValidCustomApiBaseUrl(saved.customApiBaseUrl)
-              ? normalizeCustomApiBaseUrl(saved.customApiBaseUrl)
+              ? normalizeCustomApiRootUrl(saved.customApiBaseUrl)
               : current.customApiBaseUrl,
           customModelId:
             typeof saved.customModelId === 'string'

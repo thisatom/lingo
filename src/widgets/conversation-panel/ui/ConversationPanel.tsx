@@ -36,7 +36,8 @@ import {
 import {
   groupMessagesIntoTurns,
   lastAssistantMessageId,
-  messageHasVisibleContent
+  messageHasVisibleContent,
+  voiceCaptureLabelForUserMessage
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { cn } from '@/shared/lib/utils'
 import { AgentStatus } from './AgentStatus'
@@ -85,6 +86,8 @@ interface ConversationPanelProps {
     followBottom: () => void
   }) => void
   onAttachmentError?: (message: string) => void
+  /** User message id while Agent Speech capture is in progress (may be empty). */
+  liveVoiceUserMessageId?: string | null
 }
 
 export function ConversationPanel({
@@ -104,7 +107,8 @@ export function ConversationPanel({
   onAtBottomChange,
   onShowScrollToLatestChange,
   onScrollToLatestReady,
-  onAttachmentError
+  onAttachmentError,
+  liveVoiceUserMessageId = null
 }: ConversationPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -141,14 +145,24 @@ export function ConversationPanel({
   const pinToBottomRef = useRef(false)
   const assistantStreaming =
     agentBusy &&
+    stage !== 'speaking' &&
+    stage !== 'listening' &&
+    stage !== 'transcribing' &&
     messages.length > 0 &&
     messages[messages.length - 1]?.role === 'assistant' &&
     messages[messages.length - 1].content.length > 0
+  const thinkingLiveInChat = useMemo(() => {
+    if (!agentBusy || pipelineStreamingAnswer) return false
+    const reasoningStage =
+      stage === 'thinking' || (stage === 'speaking' && !pipelineStreamingAnswer)
+    if (!reasoningStage) return false
+    const latestTurn = groupMessagesIntoTurns(messages).at(-1)
+    return latestTurn?.assistantMessages.some((m) => m.role === 'thinking') ?? false
+  }, [agentBusy, messages, pipelineStreamingAnswer, stage])
   const showStatus =
     ACTIVE_STAGES.includes(stage) &&
     !assistantStreaming &&
-    !(stage === 'thinking' && agentBusy) &&
-    !(stage === 'thinking' && pipelineStreamingAnswer)
+    !(stage === 'thinking' && thinkingLiveInChat)
 
   const tailScrollSignature = useMemo(
     () => buildChatTailScrollSignature(messages),
@@ -434,7 +448,10 @@ export function ConversationPanel({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [editingUserMessageId])
 
-  const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages])
+  const turns = useMemo(
+    () => groupMessagesIntoTurns(messages, { preserveEmptyUserMessageId: liveVoiceUserMessageId }),
+    [liveVoiceUserMessageId, messages]
+  )
   const useVirtualizedTurns =
     messages.length >= VIRTUALIZE_MESSAGE_THRESHOLD && !editingUserMessageId
 
@@ -710,6 +727,7 @@ export function ConversationPanel({
                 actionsDisabled={actionsDisabled}
                 agentBusy={agentBusy}
                 pipelineStreamingAnswer={pipelineStreamingAnswer}
+                stage={stage}
                 onStopAgent={onStopAgent}
                 voiceSupported={voiceSupported}
                 voiceBusy={voiceBusy}
@@ -723,6 +741,7 @@ export function ConversationPanel({
                   handleSubmitEditedUserMessage(messageId, text, attachments)
                 }
                 onAttachmentError={onAttachmentError}
+                liveVoiceUserMessageId={liveVoiceUserMessageId}
               />
             ) : (
               turns.map((turn, turnIndex) => {
@@ -753,6 +772,17 @@ export function ConversationPanel({
                     onAttachmentError={onAttachmentError}
                     agentBusy={agentBusy}
                     isLatestTurn={isLatestTurn}
+                    pipelineStage={isLatestTurn ? stage : 'idle'}
+                    pipelineStreamingAnswer={
+                      agentBusy && isLatestTurn ? pipelineStreamingAnswer : false
+                    }
+                    liveVoiceUserMessageId={liveVoiceUserMessageId}
+                    voiceCaptureLabel={voiceCaptureLabelForUserMessage(
+                      turn.user.id,
+                      turn.user.content,
+                      liveVoiceUserMessageId,
+                      stage
+                    )}
                     streamingAssistantMessageId={
                       agentBusy && isLatestTurn && pipelineStreamingAnswer
                         ? lastAssistantMessageId(turn.assistantMessages)

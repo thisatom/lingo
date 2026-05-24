@@ -5,15 +5,16 @@ export const CHAT_PERSIST_KEY = 'lingo-chats-v3'
 const LEGACY_KEYS = ['lingo-chats', 'lingo-chats-v2']
 
 const CHAT_PERSIST_DEBOUNCE_MS = 450
+/** Skip expensive cleanup on typical payloads; large histories need it before parse. */
+const STRIP_HEAVY_PAYLOADS_MIN_BYTES = 200_000
 
 let pendingWrite: { name: string; value: string } | null = null
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-/** Remove huge base64 blobs from raw JSON before parse (fixes slow startup). */
+/** Strip huge inline blobs before JSON.parse (avoids multi-second startup on big histories). */
 function stripHeavyPayloads(raw: string): string {
-  return raw
-    .replace(/"payload":"data:[^"]{400,}"/g, '"payload":""')
-    .replace(/"attachments":\[[^\]]{50000,}\]/g, '"attachments":[]')
+  if (raw.length < STRIP_HEAVY_PAYLOADS_MIN_BYTES) return raw
+  return raw.replace(/"payload":"data:[^"]{400,}"/g, '"payload":""')
 }
 
 function readRaw(name: string): string | null {
@@ -40,7 +41,8 @@ function readRaw(name: string): string | null {
 function safeGetItem(name: string): string | null {
   const raw = readRaw(name)
   if (!raw) return null
-
+  // Large histories: one parse in zustand only (validate small payloads here).
+  if (raw.length >= STRIP_HEAVY_PAYLOADS_MIN_BYTES) return raw
   try {
     JSON.parse(raw)
     return raw

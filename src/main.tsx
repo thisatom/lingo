@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import { App } from '@/app/App'
 import { HtmlSplashGate } from '@/app/HtmlSplashGate'
 import { registerActiveChatEffects } from '@/app/register-active-chat-effects'
-import { setupTesseractImageOcr } from '@/shared/lib/image-ocr-tesseract'
 import { setupLocalWebSearch } from '@/shared/lib/setup-local-web-search'
 import { ensureLingoBridge } from '@/shared/lib/lingo-bridge'
 import { initThemeFromStorage } from '@/shared/lib/theme'
@@ -15,8 +14,10 @@ import '@/app/styles/markdown-math.css'
 import '@/app/styles/thinking-markdown.css'
 
 ensureLingoBridge()
-setupTesseractImageOcr()
 setupLocalWebSearch()
+void import('@/shared/lib/image-ocr-tesseract').then(({ setupTesseractImageOcr }) => {
+  setupTesseractImageOcr()
+})
 initThemeFromStorage()
 registerActiveChatEffects()
 

@@ -1,4 +1,5 @@
 import type { Chat } from '@/entities/chat/model/types'
+import { getChatHeaderDisplayTitle } from '@/shared/lib/chat-header-title'
 import type { ChatContextUsageDetails } from '@/shared/lib/chat-context-usage'
 import { ContextUsageDetails } from '@/features/chat-context/ui/ContextUsageDetails'
 import { ContextUsageRing } from '@/features/chat-context/ui/ContextUsageRing'
@@ -45,6 +46,8 @@ export function ChatHeaderTitle({
 }: ChatHeaderTitleProps) {
   const clamped = Math.min(100, Math.max(0, contextPercent))
   const hasContext = contextUsage != null && messageCount > 0
+  const displayTitle = getChatHeaderDisplayTitle(title)
+  const detailTitle = title.trim() === '' || title.trim() === 'New chat' ? null : title.trim()
 
   return (
     <div className="min-w-0 flex-1">
@@ -53,11 +56,11 @@ export function ChatHeaderTitle({
         <h1
           className={cn(
             'inline-flex max-w-full min-w-0 cursor-default truncate rounded-md px-2 py-1',
-            'text-[13px] font-normal leading-[1.5] text-foreground transition-colors hover:bg-chat-header-hover',
+            'text-[13px] font-normal leading-[1.5] text-muted-foreground transition-colors hover:bg-chat-header-hover hover:text-foreground',
             'outline-none focus-visible:ring-1 focus-visible:ring-ring'
           )}
         >
-          {title}
+          {displayTitle}
         </h1>
       </HoverCardTrigger>
       <HoverCardContent
@@ -66,9 +69,11 @@ export function ChatHeaderTitle({
         sideOffset={6}
         className={cn('w-72 p-3 text-xs', sidebarMenuSurfaceClass)}
       >
-        <p className="text-sm leading-snug text-foreground">{title}</p>
+        {detailTitle ? (
+          <p className="text-sm leading-snug text-foreground">{detailTitle}</p>
+        ) : null}
 
-        <div className="mt-2.5 space-y-1.5">
+        <div className={cn('space-y-1.5', detailTitle ? 'mt-2.5' : '')}>
           <InfoRow label="Messages" value={String(messageCount)} />
           {chat ? (
             <>

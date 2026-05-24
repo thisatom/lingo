@@ -7,9 +7,7 @@ import {
 describe('content-security-policy', () => {
   it('resolves profiles from html paths', () => {
     expect(resolveCspProfileFromHtmlPath('/proj/index.html')).toBe('electron-main')
-    expect(resolveCspProfileFromHtmlPath('/proj/welcome.html')).toBe('electron-welcome')
     expect(resolveCspProfileFromHtmlPath('/proj/index.web.html')).toBe('web-main')
-    expect(resolveCspProfileFromHtmlPath('/proj/welcome-probe.html')).toBeNull()
   })
 
   it('electron prod omits openrouter and unsafe-eval', () => {
@@ -19,10 +17,18 @@ describe('content-security-policy', () => {
     expect(csp).toContain('speech.googleapis.com')
   })
 
-  it('electron dev allows vite HMR', () => {
+  it('electron dev allows vite HMR and react preamble', () => {
     const csp = buildContentSecurityPolicy('electron-main', 'development')
     expect(csp).toContain('unsafe-eval')
+    expect(csp).toContain('unsafe-inline')
     expect(csp).toContain('ws://localhost:*')
+  })
+
+  it('electron prod blocks unsafe script sources', () => {
+    const csp = buildContentSecurityPolicy('electron-main', 'production')
+    expect(csp).toMatch(/script-src 'self'/)
+    expect(csp).not.toMatch(/script-src[^;]*unsafe-eval/)
+    expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/)
   })
 
   it('web prod includes openrouter', () => {

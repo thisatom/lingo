@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { LLM_MAX_TOKENS_UNLIMITED } from '@/shared/lib/llm-max-tokens'
 import { buildChatStreamLlmFields } from './resolve-chat-stream-llm'
 
 describe('buildChatStreamLlmFields', () => {
@@ -28,5 +29,20 @@ describe('buildChatStreamLlmFields', () => {
     expect(userOllama.customLlm?.baseUrl).toContain('127.0.0.1')
     expect(attackerPayload.customLlm?.baseUrl).toContain('169.254.169.254')
     expect(userOllama.customLlm?.baseUrl).not.toBe(attackerPayload.customLlm?.baseUrl)
+  })
+
+  it('passes zero maxTokens when settings use unlimited reply budget', () => {
+    const fields = buildChatStreamLlmFields({
+      llmBackend: 'openrouter',
+      modelId: 'openai/gpt-4o-mini',
+      customApiBaseUrl: '',
+      customModelId: '',
+      customLlmProfileJson: '',
+      webSearchEnabled: false,
+      modelAutoFallback: false,
+      llmMaxTokens: LLM_MAX_TOKENS_UNLIMITED
+    })
+    expect(fields.maxTokens).toBe(0)
+    expect(fields.maxTokensRetry).toBe(0)
   })
 })

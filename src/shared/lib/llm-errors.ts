@@ -10,7 +10,7 @@ export function formatLlmError(message: string, provider: LlmProviderId = 'openr
       : 'Add your OpenRouter API key in Settings.'
   }
   if (message.includes('NO_CUSTOM_LLM_KEY')) {
-    return 'Add your custom endpoint API key in Settings → API.'
+    return 'Add your API key under Settings → API → Custom endpoint API key (nvapi-… for NVIDIA).'
   }
   if (message.includes('NO_OPENROUTER_KEY')) {
     return 'Add your OpenRouter API key in Settings.'

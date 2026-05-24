@@ -37,7 +37,6 @@ lingo/
 │   ├── entities/
 │   └── shared/
 ├── index.html                # Electron renderer shell
-├── welcome.html              # First-run welcome window
 ├── index.web.html            # Web build entry
 ├── docs/
 └── vite/                     # inject-csp и прочие Vite-плагины

@@ -21,13 +21,6 @@ export function resolveDevRendererUrl(): string {
   return raw.replace('//localhost:', '//127.0.0.1:').replace('//[::1]:', '//127.0.0.1:')
 }
 
-export type CreateMainWindowOptions = {
-  /** When false, window stays hidden until `showMainWindow` (welcome flow). */
-  showOnReady?: boolean
-  /** When true, create the shell but do not load the renderer until `loadMainRenderer`. */
-  deferLoad?: boolean
-}
-
 async function loadRendererUrl(
   mainWindow: BrowserWindow,
   url: string,
@@ -50,15 +43,15 @@ async function loadRendererUrl(
 }
 
 export function loadMainRenderer(mainWindow: BrowserWindow): Promise<void> {
-  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    return loadRendererUrl(mainWindow, resolveDevRendererUrl())
+  if (!app.isPackaged) {
+    const url = resolveDevRendererUrl()
+    console.info(`[lingo] Loading dev renderer: ${url}`)
+    return loadRendererUrl(mainWindow, url)
   }
   return mainWindow.loadURL(packagedRendererUrl('index.html'))
 }
 
-export function createMainWindow(options: CreateMainWindowOptions = {}): BrowserWindow {
-  const showOnReady = options.showOnReady !== false
-  const deferLoad = options.deferLoad === true
+export function createMainWindow(): BrowserWindow {
   const iconPath = resolveAppIconPath()
 
   const mainWindow = new BrowserWindow({
@@ -103,11 +96,29 @@ export function createMainWindow(options: CreateMainWindowOptions = {}): Browser
     })
   }
 
-  if (showOnReady) {
-    mainWindow.on('ready-to-show', () => {
+  const showFallbackTimer = setTimeout(() => {
+    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      console.warn('[lingo] Window did not become visible in time; showing anyway.')
       showMainWindow(mainWindow)
-    })
-  }
+    }
+  }, 8_000)
+
+  mainWindow.on('ready-to-show', () => {
+    clearTimeout(showFallbackTimer)
+    showMainWindow(mainWindow)
+  })
+
+  mainWindow.once('closed', () => {
+    clearTimeout(showFallbackTimer)
+  })
+
+  mainWindow.webContents.once('did-fail-load', (_event, code, description, url, isMainFrame) => {
+    if (!isMainFrame) return
+    console.error(`[lingo] Renderer failed to load (${code}): ${description} — ${url}`)
+    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      showMainWindow(mainWindow)
+    }
+  })
 
   mainWindow.webContents.once('did-finish-load', () => {
     void backgroundUpdateCheck((info) => {
@@ -122,9 +133,7 @@ export function createMainWindow(options: CreateMainWindowOptions = {}): Browser
     return { action: 'deny' }
   })
 
-  if (!deferLoad) {
-    void loadMainRenderer(mainWindow)
-  }
+  void loadMainRenderer(mainWindow)
 
   return mainWindow
 }
@@ -140,7 +149,9 @@ export function setupSingleInstanceApp(onSecondInstance: () => void): boolean {
   const isPrimary = app.requestSingleInstanceLock()
 
   if (!isPrimary) {
-    console.warn('[lingo] Another Lingo instance is already running — focusing it.')
+    console.warn(
+      '[lingo] Another Lingo instance is already running. Close it or end all "electron.exe" / "Lingo" processes in Task Manager, then run again.'
+    )
     app.quit()
     return false
   }

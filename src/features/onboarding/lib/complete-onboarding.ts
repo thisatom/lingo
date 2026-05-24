@@ -26,7 +26,9 @@ export async function completeOnboarding(
   store.setAppTheme(values.appTheme)
   store.setPracticeLanguage(values.practiceLanguage)
   store.setModelId(values.modelId)
-  store.setAddressUserByName(values.addressUserByName)
+  if (typeof values.addressUserByName === 'boolean') {
+    store.setAddressUserByName(values.addressUserByName)
+  }
 
   const apiKey = values.apiKey?.trim() ?? ''
   if (!options.skipApiKey && apiKey.length > 0) {

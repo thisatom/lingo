@@ -37,7 +37,14 @@ export function ContextUsageDetails({ usage, modelId, className }: ContextUsageD
           value={`${usage.messageCount} (${formatTokens(usage.messageTokens)} tokens)`}
         />
         <UsageRow label="System reserve" value={`${formatTokens(usage.systemReserveTokens)} tokens`} />
-        <UsageRow label="Reply budget" value={`${formatTokens(usage.outputReserveTokens)} tokens`} />
+        <UsageRow
+          label="Reply budget"
+          value={
+            usage.replyBudgetUnlimited
+              ? 'No limit (model default)'
+              : `${formatTokens(usage.outputReserveTokens)} tokens`
+          }
+        />
       </div>
     </div>
   )

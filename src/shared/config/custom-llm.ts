@@ -14,12 +14,25 @@ export function normalizeCustomApiBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, '')
 }
 
-/** Accepts `https://host/v1` or a full `…/chat/completions` URL. */
-export function resolveChatCompletionsUrl(baseUrl: string): string {
-  const trimmed = normalizeCustomApiBaseUrl(baseUrl)
+/**
+ * OpenAI-compatible API root: no trailing slash, no `/chat/completions`, usually ends with `/v1`.
+ * Accepts pasted snippet URLs that already include `/chat/completions`.
+ */
+export function normalizeCustomApiRootUrl(baseUrl: string): string {
+  let trimmed = normalizeCustomApiBaseUrl(baseUrl)
   if (!trimmed) return ''
-  if (/\/chat\/completions$/i.test(trimmed)) return trimmed
-  return `${trimmed}/chat/completions`
+  trimmed = trimmed.replace(/\/chat\/completions$/i, '')
+  if (!/\/v\d+$/i.test(trimmed)) {
+    trimmed = `${trimmed}/v1`
+  }
+  return trimmed
+}
+
+/** Builds POST URL from API root or a pasted full completions URL. */
+export function resolveChatCompletionsUrl(baseUrl: string): string {
+  const root = normalizeCustomApiRootUrl(baseUrl)
+  if (!root) return ''
+  return `${root}/chat/completions`
 }
 
 export function isValidCustomApiBaseUrl(baseUrl: string): boolean {

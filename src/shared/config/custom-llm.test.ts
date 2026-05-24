@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { resolveChatCompletionsUrl } from '@/shared/config/custom-llm'
+import {
+  normalizeCustomApiRootUrl,
+  resolveChatCompletionsUrl
+} from '@/shared/config/custom-llm'
+
+describe('normalizeCustomApiRootUrl', () => {
+  it('strips /chat/completions and keeps /v1', () => {
+    expect(normalizeCustomApiRootUrl('https://integrate.api.nvidia.com/v1/chat/completions')).toBe(
+      'https://integrate.api.nvidia.com/v1'
+    )
+  })
+
+  it('appends /v1 when missing', () => {
+    expect(normalizeCustomApiRootUrl('https://integrate.api.nvidia.com')).toBe(
+      'https://integrate.api.nvidia.com/v1'
+    )
+  })
+})
 
 describe('resolveChatCompletionsUrl', () => {
   it('appends chat/completions to OpenAI-style base', () => {
@@ -8,9 +25,14 @@ describe('resolveChatCompletionsUrl', () => {
     )
   })
 
-  it('keeps a full completions URL', () => {
-    expect(resolveChatCompletionsUrl('https://api.example.com/v1/chat/completions')).toBe(
-      'https://api.example.com/v1/chat/completions'
+  it('normalizes a pasted full completions URL once', () => {
+    expect(resolveChatCompletionsUrl('https://integrate.api.nvidia.com/v1/chat/completions')).toBe(
+      'https://integrate.api.nvidia.com/v1/chat/completions'
     )
+  })
+
+  it('never doubles /chat/completions', () => {
+    const url = resolveChatCompletionsUrl('https://integrate.api.nvidia.com/v1/chat/completions')
+    expect(url).not.toMatch(/chat\/completions\/chat\/completions/i)
   })
 })

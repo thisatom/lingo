@@ -4,10 +4,7 @@ import {
   EMPTY_MESSAGE_QUEUE,
   useMessageQueueStore
 } from '@/entities/message-queue/model/store'
-import {
-  useConversationStore,
-  type PipelineStage
-} from '@/entities/conversation/model/store'
+import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { stopTtsPlayback } from '@/features/text-to-speech/model/playTts'
 import {
@@ -22,12 +19,14 @@ import { persistAttachments } from '@/entities/message/lib/prepare-attachment'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { EMPTY_MESSAGES } from '@/entities/message/model/types'
 import { formatLlmError } from '@/shared/lib/llm-errors'
+import { customEndpointRequiresApiKey } from '@/shared/lib/custom-llm-errors'
+import { parseCustomLlmProfileSource } from '@/shared/lib/custom-llm-profile'
 import {
   buildChatStreamLlmFields,
   validateCustomLlmSettings
 } from '@/shared/lib/resolve-chat-stream-llm'
 import type { ChatStreamController } from '@/shared/types/ipc'
-import { getLingo } from '@/shared/lib/lingo'
+import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
 import { formatQueuePreview } from '@/entities/message-queue/lib/format-queue-preview'
 import {
   agentTurnTailMessageId,
@@ -39,8 +38,19 @@ import { isPlaybackOnlyConversationError } from '@/features/ai-chat/lib/post-rep
 import '@/features/ai-chat/lib/chat-pipeline-registry'
 import {
   getBackgroundStreamChatId,
+  getAgentStreamChatId,
   setAgentStreamSession
 } from '@/features/ai-chat/lib/agent-stream-session'
+import {
+  consumePendingAgentReply,
+  hasPendingAgentReply,
+  markPendingAgentReply
+} from '@/features/ai-chat/lib/pending-agent-reply'
+import {
+  getOtherChatStreamBlocking,
+  OTHER_CHAT_STREAM_MESSAGE,
+  shouldDeferChatAgentTurn
+} from '@/features/ai-chat/lib/agent-stream-guard'
 import {
   clearPipelineDetailForChat,
   isViewingChat,
@@ -50,6 +60,10 @@ import {
   setPipelineStageForChat,
   setPipelineStreamingAnswerForChat
 } from '@/features/ai-chat/lib/pipeline-stage'
+import {
+  isAgentPipelineBusy,
+  isChatAgentBusy
+} from '@/features/ai-chat/lib/chat-agent-busy'
 import { beginAgentRun, cancelAgentRun, isAgentRunActive } from './agent-run'
 import {
   restoreUserMessageEdit,
@@ -59,17 +73,68 @@ import {
 
 export type { SubmitEditedUserMessageResult } from './submit-edited-user-message'
 
-function isAgentPipelineBusy(stage: PipelineStage, streamActive: boolean): boolean {
-  return (
-    streamActive ||
-    stage === 'thinking' ||
-    stage === 'searching' ||
-    stage === 'speaking'
-  )
+export type StopAgentOptions = {
+  /** Only cancel when the in-flight stream targets this chat. */
+  chatId?: string | null
+  /** Cancel any in-flight stream regardless of chat (Stop button, mode switch). */
+  force?: boolean
+}
+
+/** Prevents live mode / UI staying busy if TTS playback never resolves. */
+const STREAMING_TTS_FINISH_MS = 120_000
+
+async function waitStreamingTtsFinish(tts: StreamingSentenceTts): Promise<void> {
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    tts.cancel()
+  }, STREAMING_TTS_FINISH_MS)
+  try {
+    await tts.finish()
+  } finally {
+    clearTimeout(timer)
+    if (timedOut) tts.cancel()
+  }
+}
+
+function playbackErrorMessage(playError: unknown): string {
+  const playMsg = playError instanceof Error ? playError.message : 'PLAYBACK_FAILED'
+  if (playMsg.includes('TTS_EMPTY')) {
+    return 'Speech synthesis returned no audio. The text reply is still in the chat.'
+  }
+  return playMsg.includes('PLAYBACK_FAILED') || playMsg.includes('TTS_')
+    ? 'Could not play audio. The assistant reply is shown in the chat.'
+    : playMsg
+}
+
+async function finishStreamingTtsPlayback(
+  tts: StreamingSentenceTts,
+  finalText: string,
+  onPlaybackError: (message: string) => void
+): Promise<void> {
+  if (finalText.trim()) {
+    tts.feed(finalText)
+  }
+  try {
+    await waitStreamingTtsFinish(tts)
+  } catch (playError) {
+    onPlaybackError(playbackErrorMessage(playError))
+  }
+}
+
+function finishAgentTurnForChat(
+  targetChatId: string,
+  agentSpeechMode: boolean,
+  onLiveConversationTurnComplete?: () => void
+): void {
+  setPipelineStageForChat(targetChatId, 'idle')
+  if (agentSpeechMode && isViewingChat(targetChatId)) {
+    onLiveConversationTurnComplete?.()
+  }
 }
 
 type UseAiChatOptions = {
-  /** Called when an agent speech turn finishes (TTS done) — used to reopen the mic in live mode. */
+  /** Agent Speech: reopen mic after the assistant turn (with or without TTS). */
   onLiveConversationTurnComplete?: () => void
 }
 
@@ -103,6 +168,13 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     async () => false
   )
 
+  const tryRunPendingAgentReply = useCallback(async (chatId: string): Promise<boolean> => {
+    if (!hasPendingAgentReply(chatId)) return false
+    if (shouldDeferChatAgentTurn(chatId)) return false
+    consumePendingAgentReply(chatId)
+    return runAssistantReplyRef.current(chatId)
+  }, [])
+
   const messages = activeChat?.messages ?? EMPTY_MESSAGES
   const activeChatId = activeChat?.id ?? null
   const queuedMessages = useMessageQueueStore((s) =>
@@ -114,6 +186,11 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       useConversationStore.getState().setQueueAheadPreview(null)
 
       while (useMessageQueueStore.getState().getQueue(chatId).length > 0) {
+        if (getOtherChatStreamBlocking(chatId)) {
+          setPipelineStageForChat(chatId, 'idle')
+          return
+        }
+
         const item = useMessageQueueStore.getState().getQueue(chatId)[0]
         if (!item) break
 
@@ -139,16 +216,29 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         }
 
         if (userMessageId) removeMessagesFrom(userMessageId, chatId)
+        useMessageQueueStore.getState().remove(chatId, item.id)
         setPipelineStageForChat(chatId, 'idle')
+        return
+      }
+
+      if (await tryRunPendingAgentReply(chatId)) {
         return
       }
 
       setPipelineStageForChat(chatId, 'idle')
     },
-    [addMessage, removeMessagesFrom]
+    [addMessage, removeMessagesFrom, tryRunPendingAgentReply]
   )
 
-  const stopAgent = useCallback(() => {
+  const stopAgent = useCallback((options: StopAgentOptions = {}) => {
+    const { force = false, chatId: scopeChatId = null } = options
+    const streamChatId =
+      streamTargetChatIdRef.current ?? getAgentStreamChatId()
+
+    if (!force && streamChatId && scopeChatId && streamChatId !== scopeChatId) {
+      return
+    }
+
     streamControllerRef.current?.abort()
     streamControllerRef.current = null
     setStreamActive(false)
@@ -158,10 +248,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     stopTtsPlayback()
     setBlurAnimateMessageId(null)
     useConversationStore.getState().setQueueAheadPreview(null)
-    const streamChatId = streamTargetChatIdRef.current
     streamTargetChatIdRef.current = null
     const chatId =
-      streamChatId ?? useChatsStore.getState().activeChatId ?? null
+      streamChatId ?? scopeChatId ?? useChatsStore.getState().activeChatId ?? null
     if (chatId) {
       setPipelineStageForChat(chatId, 'idle')
     } else {
@@ -172,6 +261,10 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
   const runAssistantReply = useCallback(
     async (targetChatId: string): Promise<boolean> => {
+      if (getOtherChatStreamBlocking(targetChatId)) {
+        return false
+      }
+
       const runId = beginAgentRun()
       const llmSettings = useSettingsStore.getState()
 
@@ -180,6 +273,26 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         setError(customError, targetChatId)
         setPipelineStageForChat(targetChatId, 'idle')
         return false
+      }
+
+      if (llmSettings.llmBackend === 'custom') {
+        const parsed = parseCustomLlmProfileSource(llmSettings.customLlmProfileJson)
+        if (parsed.ok && customEndpointRequiresApiKey(parsed.data.baseUrl)) {
+          if (!isLingoAvailable()) {
+            setError('Custom cloud endpoints require the desktop app (npm run dev).', targetChatId)
+            setPipelineStageForChat(targetChatId, 'idle')
+            return false
+          }
+          const keyStatus = await getLingo().secrets.getStatus('custom-llm')
+          if (!keyStatus.isSet) {
+            setError(
+              'Add your NVIDIA API key under Settings → API → Custom endpoint API key (nvapi-…).',
+              targetChatId
+            )
+            setPipelineStageForChat(targetChatId, 'idle')
+            return false
+          }
+        }
       }
 
       clearPipelineDetailForChat(targetChatId)
@@ -223,10 +336,12 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       let finalThinkingText = ''
       let finalText = ''
       const ttsEnabled = llmSettings.ttsEnabled
-      const playTts = ttsEnabled && chatComposerMode === 'conversation'
+      const playTts = ttsEnabled
       let streamingTts: StreamingSentenceTts | null = null
+      let ttsAnswerFeedEnabled = false
 
-      if (playTts) {
+      const ensureStreamingTts = (): StreamingSentenceTts | null => {
+        if (!playTts || streamingTts) return streamingTts
         streamingTts = createStreamingSentenceTts({
           locale: practiceLanguage,
           runId,
@@ -237,6 +352,15 @@ export function useAiChat(options: UseAiChatOptions = {}) {
           }
         })
         streamingTtsRef.current = streamingTts
+        return streamingTts
+      }
+
+      const feedStreamingTts = (text: string) => {
+        if (!playTts || !text.trim() || !isViewingChat(targetChatId)) return
+        if (!ttsAnswerFeedEnabled) {
+          ttsAnswerFeedEnabled = true
+        }
+        ensureStreamingTts()?.feed(text)
       }
 
       const syncAssistantText = (text: string) => {
@@ -261,6 +385,10 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
       const thinkingSync = createStreamContentSync(syncThinkingToChat)
       const streamSync = createStreamContentSync(syncAssistantText)
+
+      if (!webSearchForTurn) {
+        ensureThinkingPlaceholder()
+      }
 
       try {
         const stream = getLingo().chat.stream(
@@ -289,15 +417,16 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             onTextDelta: ({ text }) => {
               if (!isAgentRunActive(runId)) return
               finalText = text
+              if (text.trim() && !finalThinkingText.trim() && thinkingMessageId) {
+                removeMessage(thinkingMessageId, targetChatId)
+                thinkingMessageId = null
+              }
               if (text.trim()) {
                 setPipelineStreamingAnswerForChat(targetChatId, true)
                 clearPipelineDetailForChat(targetChatId)
               }
               streamSync.push(text)
-              if (useChatsStore.getState().activeChatId !== targetChatId) return
-              if (streamingTts) {
-                streamingTts.feed(text)
-              }
+              feedStreamingTts(text)
             },
             onDone: ({ text }) => {
               if (!isAgentRunActive(runId)) return
@@ -305,6 +434,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
               thinkingSync.flushNow(finalThinkingText)
               if (text.trim()) {
                 streamSync.flushNow(text)
+                feedStreamingTts(text)
               }
             }
           }
@@ -362,8 +492,17 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         if (!isViewingTargetChat) {
           streamingTts?.cancel()
           streamingTtsRef.current = null
-          if (isAgentRunActive(runId) && hasQueued) {
-            await processNextInQueue(targetChatId)
+          if (isAgentRunActive(runId)) {
+            if (hasQueued) {
+              await processNextInQueue(targetChatId)
+            } else {
+              finishAgentTurnForChat(
+                targetChatId,
+                chatComposerMode === 'conversation',
+                options.onLiveConversationTurnComplete
+              )
+              await tryRunPendingAgentReply(targetChatId)
+            }
           }
           return true
         }
@@ -376,32 +515,36 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             const preview = formatQueuePreview(nextQueued)
             if (preview) useConversationStore.getState().setQueueAheadPreview(preview)
           }
-          streamingTts?.cancel()
-          streamingTtsRef.current = null
-        } else if (streamingTts) {
-          try {
-            await streamingTts.finish()
-          } catch (playError) {
-            if (isAgentRunActive(runId)) {
-              const playMsg = playError instanceof Error ? playError.message : 'PLAYBACK_FAILED'
-              setError(
-                playMsg.includes('PLAYBACK_FAILED') || playMsg.includes('TTS_')
-                  ? 'Could not play audio. The assistant reply is shown in the chat.'
-                  : playMsg,
-                targetChatId
-              )
-            }
-          } finally {
+          if (playTts && streamingTts) {
+            await finishStreamingTtsPlayback(streamingTts, finalText, (message) => {
+              if (isAgentRunActive(runId)) {
+                setError(message, targetChatId)
+              }
+            })
+            streamingTtsRef.current = null
+          } else {
+            streamingTts?.cancel()
             streamingTtsRef.current = null
           }
+        } else if (streamingTts) {
+          await finishStreamingTtsPlayback(streamingTts, finalText, (message) => {
+            if (isAgentRunActive(runId)) {
+              setError(message, targetChatId)
+            }
+          })
+          streamingTtsRef.current = null
         }
 
-        if (isAgentRunActive(runId) && isViewingChat(targetChatId)) {
+        if (isAgentRunActive(runId)) {
           if (hasQueued) {
             await processNextInQueue(targetChatId)
           } else {
-            setPipelineStageForChat(targetChatId, 'idle')
-            if (playTts) options.onLiveConversationTurnComplete?.()
+            finishAgentTurnForChat(
+              targetChatId,
+              chatComposerMode === 'conversation',
+              options.onLiveConversationTurnComplete
+            )
+            await tryRunPendingAgentReply(targetChatId)
           }
         }
         return true
@@ -458,6 +601,9 @@ export function useAiChat(options: UseAiChatOptions = {}) {
             targetChatId
           )
           setPipelineStageForChat(targetChatId, 'idle')
+          if (chatComposerMode === 'conversation' && isViewingChat(targetChatId)) {
+            options.onLiveConversationTurnComplete?.()
+          }
         } else {
           setError(formatLlmError(msg), targetChatId)
           setPipelineStageForChat(targetChatId, 'idle')
@@ -488,7 +634,8 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       chatComposerMode,
       updateMessageContent,
       processNextInQueue,
-      options.onLiveConversationTurnComplete
+      options.onLiveConversationTurnComplete,
+      tryRunPendingAgentReply
     ]
   )
 
@@ -524,7 +671,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       if (!item) return
 
       useMessageQueueStore.getState().remove(chatId, id)
-      stopAgent()
+      stopAgent({ force: true })
       useConversationStore.getState().setSpeechError(null)
       addMessage(
         {
@@ -543,12 +690,12 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     async (chatId?: string) => {
       const targetId = chatId ?? useChatsStore.getState().activeChatId
       if (!targetId) return
+      if (shouldDeferChatAgentTurn(targetId)) return
+      if (await tryRunPendingAgentReply(targetId)) return
       if (useMessageQueueStore.getState().getQueue(targetId).length === 0) return
-      const { stage: currentStage } = useConversationStore.getState()
-      if (isAgentPipelineBusy(currentStage, streamControllerRef.current != null)) return
       await processNextInQueue(targetId)
     },
-    [processNextInQueue]
+    [processNextInQueue, tryRunPendingAgentReply]
   )
 
   const sendUserMessage = useCallback(
@@ -561,10 +708,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
       useConversationStore.getState().setSpeechError(null)
 
-      const { stage: currentStage } = useConversationStore.getState()
-      const busy = isAgentPipelineBusy(currentStage, streamControllerRef.current != null)
-
-      if (busy) {
+      if (shouldDeferChatAgentTurn(chatId)) {
         enqueueUserMessage(trimmed, chatId, hasAttachments ? attachments : undefined)
         if (hasAttachments) {
           useChatsStore.getState().clearComposerAttachments(chatId)
@@ -572,7 +716,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         return
       }
 
-      stopAgent()
+      stopAgent({ chatId })
       addMessage(
         {
           role: 'user',
@@ -589,10 +733,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
   const beginVoiceUserMessage = useCallback(() => {
     const chatId = useChatsStore.getState().activeChatId ?? useChatsStore.getState().ensureActiveChat()
-    stopAgent()
+    if (getOtherChatStreamBlocking(chatId)) {
+      useConversationStore.getState().setSpeechError(OTHER_CHAT_STREAM_MESSAGE)
+      return { messageId: null as string | null, chatId }
+    }
+    stopAgent({ chatId })
     useConversationStore.getState().setSpeechError(null)
     const messageId = addMessage({ role: 'user', content: '' }, chatId)
-    return { messageId, chatId }
+    return { messageId: messageId || null, chatId }
   }, [addMessage, stopAgent])
 
   const updateVoiceUserMessage = useCallback((messageId: string, content: string) => {
@@ -624,17 +772,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       updateMessageContent(messageId, trimmed)
       if (!chat) return
 
-      const { stage: currentStage } = useConversationStore.getState()
-      const busy = isAgentPipelineBusy(currentStage, streamControllerRef.current != null)
-      if (busy) {
-        enqueueUserMessage(trimmed, chat.id)
-        removeMessagesFrom(messageId)
+      if (shouldDeferChatAgentTurn(chat.id)) {
+        markPendingAgentReply(chat.id)
         return
       }
 
       await runAssistantReply(chat.id)
     },
-    [cancelVoiceUserMessage, enqueueUserMessage, removeMessagesFrom, runAssistantReply, updateMessageContent]
+    [cancelVoiceUserMessage, runAssistantReply, updateMessageContent]
   )
 
   const submitEditedUserMessage = useCallback(
@@ -655,6 +800,11 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       const snapshot = snapshotUserMessageEdit(chat.messages, messageId)
       if (!snapshot) return
 
+      if (getOtherChatStreamBlocking(chatId)) {
+        setError(OTHER_CHAT_STREAM_MESSAGE, chatId)
+        return
+      }
+
       const rollbackEdit = (): SubmitEditedUserMessageResult => {
         const current = useChatsStore.getState().chats.find((c) => c.id === chatId)
         if (current) {
@@ -665,7 +815,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
         return { rollbackToEdit: messageId }
       }
 
-      stopAgent()
+      stopAgent({ chatId })
       updateUserMessageContent(
         messageId,
         trimmed,
@@ -717,9 +867,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       }
 
       const chatId = chat.id
+      if (getOtherChatStreamBlocking(chatId)) {
+        setError(OTHER_CHAT_STREAM_MESSAGE, chatId)
+        return
+      }
+
       const removeFromId = findTurnTailRemoveId(chat.messages, messageId) ?? messageId
 
-      stopAgent()
+      stopAgent({ chatId })
       removeMessagesFrom(removeFromId)
       setBlurAnimateMessageId(null)
       await runAssistantReply(chatId)
@@ -731,24 +886,32 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     const chat = useChatsStore.getState().getActiveChat()
     if (!chat || chat.messages.length === 0) return
 
+    const chatId = chat.id
+    if (getOtherChatStreamBlocking(chatId)) {
+      setError(OTHER_CHAT_STREAM_MESSAGE, chatId)
+      return
+    }
+
     setError(null)
+    stopAgent({ chatId, force: true })
     const last = chat.messages[chat.messages.length - 1]
 
     if (last.role === 'user') {
-      await runAssistantReply(chat.id)
+      await runAssistantReply(chatId)
       return
     }
 
     if (last.role === 'assistant' || last.role === 'thinking') {
       await regenerateAssistantMessage(last.id)
     }
-  }, [regenerateAssistantMessage, runAssistantReply, setError])
+  }, [regenerateAssistantMessage, runAssistantReply, setError, stopAgent])
 
   const clearError = useCallback(() => setError(null), [setError])
 
-  const streamBusyForActiveChat =
-    streamActive && streamTargetChatIdRef.current === activeChatId
-  const agentBusy = isAgentPipelineBusy(stage, streamBusyForActiveChat)
+  const agentBusy =
+    activeChatId != null
+      ? isChatAgentBusy(activeChatId)
+      : isAgentPipelineBusy(stage, streamActive)
   const backgroundStreamChatId = getBackgroundStreamChatId(activeChatId)
 
   return {

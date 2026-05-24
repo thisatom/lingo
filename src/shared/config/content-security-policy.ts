@@ -3,7 +3,7 @@
  * Injected at build/dev time by `vite/inject-csp.ts` (mode-aware).
  */
 
-export type CspProfile = 'electron-main' | 'electron-welcome' | 'web-main'
+export type CspProfile = 'electron-main' | 'web-main'
 
 export type CspMode = 'development' | 'production'
 
@@ -46,8 +46,9 @@ function joinDirectives(parts: string[]): string {
   return parts.join('; ')
 }
 
+/** Vite HMR + @vitejs/plugin-react preamble need inline scripts in dev only. */
 function devScriptSrc(base: string[]): string {
-  return directive('script-src', [...base, "'unsafe-eval'"])
+  return directive('script-src', [...base, "'unsafe-eval'", "'unsafe-inline'"])
 }
 
 function devConnectSrc(base: string[]): string {
@@ -70,24 +71,6 @@ function electronMainCsp(mode: CspMode): string {
     directive('img-src', ["'self'", 'data:', 'blob:', 'https:']),
     connect,
     directive('media-src', ["'self'", 'blob:', 'data:', 'file:'])
-  ])
-}
-
-/** Welcome window — no speech APIs; OpenRouter not used from this page. */
-function electronWelcomeCsp(mode: CspMode): string {
-  const connect =
-    mode === 'development'
-      ? devConnectSrc(["'self'"])
-      : directive('connect-src', ["'self'"])
-
-  return joinDirectives([
-    directive('default-src', ["'self'"]),
-    mode === 'development' ? devScriptSrc(["'self'"]) : directive('script-src', ["'self'"]),
-    directive('worker-src', ["'self'"]),
-    directive('style-src', ["'self'", "'unsafe-inline'"]),
-    directive('font-src', ["'self'", 'data:']),
-    directive('img-src', ["'self'", 'data:', 'blob:']),
-    connect
   ])
 }
 
@@ -119,8 +102,6 @@ function webMainCsp(mode: CspMode, websearchOrigin: string | null): string {
 
 export function resolveCspProfileFromHtmlPath(filename: string): CspProfile | null {
   const base = filename.replace(/\\/g, '/')
-  if (base.endsWith('welcome-probe.html')) return null
-  if (base.endsWith('welcome.html')) return 'electron-welcome'
   if (base.endsWith('index.web.html')) return 'web-main'
   if (base.endsWith('index.html')) return 'electron-main'
   return null
@@ -134,8 +115,6 @@ export function buildContentSecurityPolicy(
   switch (profile) {
     case 'electron-main':
       return electronMainCsp(mode)
-    case 'electron-welcome':
-      return electronWelcomeCsp(mode)
     case 'web-main':
       return webMainCsp(mode, options.websearchOrigin ?? null)
     default:

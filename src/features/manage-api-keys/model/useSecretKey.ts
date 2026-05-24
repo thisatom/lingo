@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
 import type { SecretProviderId, SecretStatus } from '@/shared/types/ipc'
+import { notifySecretsChanged } from '@/shared/lib/secrets-changed'
 
 export function useSecretKey(provider: SecretProviderId) {
   const [status, setStatus] = useState<SecretStatus | null>(null)
@@ -35,6 +36,7 @@ export function useSecretKey(provider: SecretProviderId) {
       const next = await getLingo().secrets.set(provider, value)
       setStatus(next)
       setApiError(null)
+      notifySecretsChanged(provider)
       return next
     },
     [provider]
@@ -43,6 +45,7 @@ export function useSecretKey(provider: SecretProviderId) {
   const clear = useCallback(async () => {
     const next = await getLingo().secrets.clear(provider)
     setStatus(next)
+    notifySecretsChanged(provider)
     return next
   }, [provider])
 

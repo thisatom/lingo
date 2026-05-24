@@ -1,11 +1,15 @@
 import {
   isValidCustomApiBaseUrl,
+  normalizeCustomApiRootUrl,
   normalizeCustomModelId
 } from '@/shared/config/custom-llm'
+import { validateCustomProviderModelId } from '@/shared/lib/custom-llm-errors'
 import { parseCustomLlmProfileSource } from '@/shared/lib/custom-llm-profile'
 import {
   clampLlmMaxTokens,
+  isLlmMaxTokensUnlimited,
   llmMaxTokensRetryBudget,
+  LLM_MAX_TOKENS_UNLIMITED,
   normalizeLlmMaxTokens
 } from '@/shared/lib/llm-max-tokens'
 import type { ChatStreamRequest, CustomLlmConfig, LlmBackend } from '@/shared/types/ipc'
@@ -25,12 +29,12 @@ function resolveCustomFromSettings(settings: ChatStreamLlmSettings): CustomLlmCo
   const fromJson = parseCustomLlmProfileSource(settings.customLlmProfileJson)
   if (fromJson.ok) {
     return {
-      baseUrl: fromJson.data.baseUrl,
+      baseUrl: normalizeCustomApiRootUrl(fromJson.data.baseUrl),
       model: fromJson.data.model,
       completionExtras: fromJson.data.completionExtras
     }
   }
-  const baseUrl = settings.customApiBaseUrl.trim()
+  const baseUrl = normalizeCustomApiRootUrl(settings.customApiBaseUrl)
   const model = normalizeCustomModelId(settings.customModelId)
   if (!baseUrl || !model) return null
   return { baseUrl, model }
@@ -40,7 +44,11 @@ function completionTokenBudget(settings: ChatStreamLlmSettings): {
   maxTokens: number
   maxTokensRetry: number
 } {
-  const maxTokens = clampLlmMaxTokens(normalizeLlmMaxTokens(settings.llmMaxTokens))
+  const normalized = normalizeLlmMaxTokens(settings.llmMaxTokens)
+  if (isLlmMaxTokensUnlimited(normalized)) {
+    return { maxTokens: LLM_MAX_TOKENS_UNLIMITED, maxTokensRetry: LLM_MAX_TOKENS_UNLIMITED }
+  }
+  const maxTokens = clampLlmMaxTokens(normalized)
   return { maxTokens, maxTokensRetry: llmMaxTokensRetryBudget(maxTokens) }
 }
 
@@ -92,5 +100,7 @@ export function validateCustomLlmSettings(settings: ChatStreamLlmSettings): stri
   if (!isValidCustomApiBaseUrl(parsed.data.baseUrl)) {
     return 'Custom baseURL must be a valid http(s) URL (e.g. http://127.0.0.1:11434/v1).'
   }
+  const modelHint = validateCustomProviderModelId(parsed.data.baseUrl, parsed.data.model)
+  if (modelHint) return modelHint
   return null
 }

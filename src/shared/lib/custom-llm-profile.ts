@@ -1,7 +1,7 @@
 import {
   isValidCustomApiBaseUrl,
   isValidCustomModelId,
-  normalizeCustomApiBaseUrl,
+  normalizeCustomApiRootUrl,
   normalizeCustomModelId
 } from '@/shared/config/custom-llm'
 import { customLlmConfig } from '@/shared/config/custom-llm'
@@ -187,10 +187,7 @@ export function parseCustomLlmProfileSource(source: string): ParseCustomLlmProfi
         : ''
   const model = typeof parsed.model === 'string' ? parsed.model : ''
 
-  let baseUrl = normalizeCustomApiBaseUrl(baseURL)
-  if (baseUrl && !/\/v\d+$/i.test(baseUrl) && !/\/chat\/completions$/i.test(baseUrl)) {
-    baseUrl = `${baseUrl}/v1`
-  }
+  const baseUrl = normalizeCustomApiRootUrl(baseURL)
   const modelId = normalizeCustomModelId(model)
 
   if (!baseUrl) return { ok: false, error: 'Missing "baseURL".' }
@@ -231,7 +228,7 @@ export function profileFromLegacyFields(
   model: string
 ): CustomLlmProfile {
   return {
-    baseURL: normalizeCustomApiBaseUrl(baseUrl) || customLlmConfig.defaultBaseUrl,
+    baseURL: normalizeCustomApiRootUrl(baseUrl) || customLlmConfig.defaultBaseUrl,
     model: normalizeCustomModelId(model) || customLlmConfig.defaultModel
   }
 }
@@ -252,9 +249,7 @@ export function importCustomLlmProfileFromSnippet(code: string): CustomLlmSnippe
     extractConstObjectLiteral(trimmed, 'payload') ??
     extractConstObjectLiteral(trimmed, 'body')
 
-  const model =
-    (typeof payload?.model === 'string' ? payload.model : undefined) ??
-    extractQuotedProp(trimmed, 'model')
+  const model = extractModelFromSnippet(trimmed, payload)
 
   if (!baseURL && !model) return null
 
@@ -369,12 +364,16 @@ function extractBalancedBlock(source: string, openPos: number): string | null {
   return null
 }
 
-function parseLooseJsObject(block: string): Record<string, unknown> | null {
+function parseLooseJsObject(block: string, snippetSource?: string): Record<string, unknown> | null {
   let json = stripJsonComments(block)
     .replace(/\/\/[^\n]*/g, '')
     .replace(/\/\*[\s\S]*?\*\//g, '')
   json = json.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
   json = json.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, '"$1"')
+  const streamConst = snippetSource?.match(/\bconst\s+stream\s*=\s*(true|false)/i)?.[1]
+  if (streamConst) {
+    json = json.replace(/(:\s*)stream(\s*[,}\]])/gi, `$1${streamConst}$2`)
+  }
   json = json.replace(/,\s*([}\]])/g, '$1')
   try {
     const value = JSON.parse(json)
@@ -382,6 +381,18 @@ function parseLooseJsObject(block: string): Record<string, unknown> | null {
   } catch {
     return null
   }
+}
+
+function extractModelFromSnippet(
+  code: string,
+  payload: Record<string, unknown> | null
+): string | undefined {
+  if (payload && typeof payload.model === 'string' && payload.model.trim()) {
+    return payload.model.trim()
+  }
+  const jsonStyle = /"model"\s*:\s*"([^"]+)"/i.exec(code)?.[1]?.trim()
+  if (jsonStyle) return jsonStyle
+  return extractQuotedProp(code, 'model')
 }
 
 function extractConstObjectLiteral(
@@ -394,7 +405,7 @@ function extractConstObjectLiteral(
   const braceStart = match.index + match[0].length - 1
   const block = extractBalancedBlock(source, braceStart)
   if (!block) return null
-  return parseLooseJsObject(block)
+  return parseLooseJsObject(block, source)
 }
 
 function extractQuotedProp(code: string, key: string): string | undefined {

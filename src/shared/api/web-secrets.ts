@@ -3,6 +3,7 @@
  * Keys are persisted in localStorage as plain text — dev preview only, not production-safe.
  * Desktop Electron uses keytar in main (`electron/main/secrets.ts`).
  */
+import { isMaskedSecretDisplay, maskSecretForDisplay } from '@/shared/lib/secret-mask'
 import type { SecretProviderId, SecretStatus } from '@/shared/types/ipc'
 import { SECRET_PROVIDER_IDS } from '@/shared/types/secret-providers'
 import { openRouterConfig } from '@/shared/config/openrouter'
@@ -15,17 +16,12 @@ function storageKey(provider: SecretProviderId): string {
   return `${STORAGE_PREFIX}${provider}`
 }
 
-function maskKey(value: string): string {
-  if (value.length <= 8) return '••••••••'
-  return `${value.slice(0, 6)}…${value.slice(-4)}`
-}
-
 export async function getWebSecretStatus(provider: SecretProviderId): Promise<SecretStatus> {
   const value = localStorage.getItem(storageKey(provider))
   return {
     provider,
     isSet: Boolean(value),
-    masked: value ? maskKey(value) : undefined
+    masked: value ? maskSecretForDisplay(value) : undefined
   }
 }
 
@@ -35,6 +31,9 @@ export async function setWebSecret(
 ): Promise<SecretStatus> {
   const trimmed = value.trim()
   if (!trimmed) throw new Error('EMPTY_KEY')
+  if (isMaskedSecretDisplay(trimmed)) {
+    throw new Error('Enter the full API key, not the masked preview.')
+  }
   localStorage.setItem(storageKey(provider), trimmed)
   return getWebSecretStatus(provider)
 }

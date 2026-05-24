@@ -3,6 +3,7 @@ import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools
 import { registerIpcHandlers } from './ipc'
 import { warmOpenRouterConnection } from './openrouter-fetch'
 import { registerRendererScheme, setupRendererProtocol } from './renderer-protocol'
+import { setupSessionContentSecurityPolicy } from './session-csp'
 import { loadEnvBootstrap, warmSecretsCache } from './secrets'
 import { setupSingleInstanceApp, setupTitlebarOnce } from './window-manager'
 import { focusMainWindow, launchDesktopWindows } from './welcome-flow'
@@ -34,20 +35,23 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
     )
 
     await setupRendererProtocol()
+    setupSessionContentSecurityPolicy()
 
     setupTitlebarOnce()
     registerDevToolsShortcut()
     registerIpcHandlers()
 
-    try {
-      await loadEnvBootstrap()
-      await warmSecretsCache()
-      void warmOpenRouterConnection()
-    } catch (error) {
-      console.error('[lingo] Failed to load API key bootstrap:', error)
-    }
-
     void launchDesktopWindows()
+
+    void (async () => {
+      try {
+        await loadEnvBootstrap()
+        await warmSecretsCache()
+        void warmOpenRouterConnection()
+      } catch (error) {
+        console.error('[lingo] Failed to load API key bootstrap:', error)
+      }
+    })()
   })
 
   app.on('activate', () => {

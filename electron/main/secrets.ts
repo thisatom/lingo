@@ -2,19 +2,28 @@ import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import keytar from 'keytar'
+import {
+  isMaskedSecretDisplay,
+  maskSecretForDisplay,
+  normalizeBearerApiKey
+} from '../../src/shared/lib/secret-mask'
 import type { SecretProviderId, SecretStatus } from '../../src/shared/types/ipc'
 
 const SERVICE = 'Lingo'
 
-const secretCache = new Map<SecretProviderId, string | null>()
+/** Only non-empty secrets — never cache `null` (avoids stale miss after bootstrap / set). */
+const secretCache = new Map<SecretProviderId, string>()
+
+function rememberSecret(provider: SecretProviderId, value: string | null): void {
+  if (value) {
+    secretCache.set(provider, value)
+  } else {
+    secretCache.delete(provider)
+  }
+}
 
 function account(provider: SecretProviderId): string {
   return `lingo.${provider}`
-}
-
-function maskKey(value: string): string {
-  if (value.length <= 8) return '••••••••'
-  return `${value.slice(0, 6)}…${value.slice(-4)}`
 }
 
 function wrapKeytarError(action: string, error: unknown): Error {
@@ -22,17 +31,44 @@ function wrapKeytarError(action: string, error: unknown): Error {
   return new Error(`Failed to ${action} key (${detail})`)
 }
 
+async function readStoredSecret(provider: SecretProviderId): Promise<string | null> {
+  const value = await keytar.getPassword(SERVICE, account(provider))
+  if (!value) return null
+  if (isMaskedSecretDisplay(value)) {
+    console.warn(`[lingo] Removing invalid masked ${provider} key from secure storage`)
+    secretCache.delete(provider)
+    try {
+      await keytar.deletePassword(SERVICE, account(provider))
+    } catch {
+      // ignore
+    }
+    return null
+  }
+  return normalizeBearerApiKey(value)
+}
+
 export async function getSecretStatus(provider: SecretProviderId): Promise<SecretStatus> {
   try {
-    const value = await keytar.getPassword(SERVICE, account(provider))
+    const value = await readStoredSecret(provider)
     return {
       provider,
       isSet: Boolean(value),
-      masked: value ? maskKey(value) : undefined
+      masked: value ? maskSecretForDisplay(value) : undefined
     }
   } catch (error) {
     throw wrapKeytarError('read', error)
   }
+}
+
+const KEYTAR_TIMEOUT_MS = 8_000
+
+async function withKeytarTimeout<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  return Promise.race([
+    fn(),
+    new Promise<T>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${KEYTAR_TIMEOUT_MS}ms`)), KEYTAR_TIMEOUT_MS)
+    })
+  ])
 }
 
 export async function warmSecretsCache(): Promise<void> {
@@ -40,9 +76,12 @@ export async function warmSecretsCache(): Promise<void> {
   await Promise.all(
     providers.map(async (provider) => {
       try {
-        const value = await keytar.getPassword(SERVICE, account(provider))
-        secretCache.set(provider, value)
-      } catch {
+        const value = await withKeytarTimeout(`keytar read (${provider})`, () =>
+          readStoredSecret(provider)
+        )
+        rememberSecret(provider, value)
+      } catch (error) {
+        console.warn(`[lingo] Could not warm secret cache for ${provider}:`, error)
         secretCache.delete(provider)
       }
     })
@@ -50,12 +89,15 @@ export async function warmSecretsCache(): Promise<void> {
 }
 
 export async function setSecret(provider: SecretProviderId, value: string): Promise<SecretStatus> {
-  const trimmed = value.trim()
+  const trimmed = normalizeBearerApiKey(value)
   if (!trimmed) throw new Error('EMPTY_KEY')
+  if (isMaskedSecretDisplay(trimmed)) {
+    throw new Error('Enter the full API key, not the masked preview.')
+  }
 
   try {
     await keytar.setPassword(SERVICE, account(provider), trimmed)
-    secretCache.set(provider, trimmed)
+    rememberSecret(provider, trimmed)
     return getSecretStatus(provider)
   } catch (error) {
     throw wrapKeytarError('save', error)
@@ -65,7 +107,7 @@ export async function setSecret(provider: SecretProviderId, value: string): Prom
 export async function clearSecret(provider: SecretProviderId): Promise<SecretStatus> {
   try {
     await keytar.deletePassword(SERVICE, account(provider))
-    secretCache.set(provider, null)
+    secretCache.delete(provider)
     return getSecretStatus(provider)
   } catch (error) {
     throw wrapKeytarError('delete', error)
@@ -73,12 +115,15 @@ export async function clearSecret(provider: SecretProviderId): Promise<SecretSta
 }
 
 export async function getSecret(provider: SecretProviderId): Promise<string | null> {
-  if (secretCache.has(provider)) {
-    return secretCache.get(provider) ?? null
+  const cached = secretCache.get(provider)
+  if (cached) {
+    if (!isMaskedSecretDisplay(cached)) return normalizeBearerApiKey(cached)
+    secretCache.delete(provider)
   }
+
   try {
-    const value = await keytar.getPassword(SERVICE, account(provider))
-    secretCache.set(provider, value)
+    const value = await readStoredSecret(provider)
+    rememberSecret(provider, value)
     return value
   } catch (error) {
     throw wrapKeytarError('read', error)
@@ -99,6 +144,7 @@ async function migrateLegacySecretsFile(): Promise<void> {
       if (!existing) {
         await keytar.setPassword(SERVICE, account('openrouter'), openrouter)
       }
+      rememberSecret('openrouter', existing ?? openrouter)
     }
   } catch {
     // ignore corrupt legacy file
@@ -111,14 +157,60 @@ async function migrateLegacySecretsFile(): Promise<void> {
   }
 }
 
+function loadDevEnvFile(): void {
+  if (app.isPackaged) return
+  const file = path.join(process.cwd(), '.env')
+  if (!fs.existsSync(file)) return
+  try {
+    const text = fs.readFileSync(file, 'utf8')
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eq = trimmed.indexOf('=')
+      if (eq <= 0) continue
+      const name = trimmed.slice(0, eq).trim()
+      if (name !== 'LINGO_OPENROUTER_API_KEY') continue
+      let value = trimmed.slice(eq + 1).trim()
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1)
+      }
+      if (value && !process.env.LINGO_OPENROUTER_API_KEY) {
+        process.env.LINGO_OPENROUTER_API_KEY = value
+      }
+    }
+  } catch {
+    // ignore unreadable .env in dev
+  }
+}
+
 export async function loadEnvBootstrap(): Promise<void> {
-  await migrateLegacySecretsFile()
+  loadDevEnvFile()
+  try {
+    await withKeytarTimeout('legacy secrets migrate', () => migrateLegacySecretsFile())
+  } catch (error) {
+    console.warn('[lingo] Legacy secrets migrate skipped:', error)
+  }
 
   const key = process.env.LINGO_OPENROUTER_API_KEY?.trim()
   if (!key) return
 
-  const existing = await keytar.getPassword(SERVICE, account('openrouter'))
-  if (existing) return
+  try {
+    const existing = await withKeytarTimeout('keytar read (openrouter bootstrap)', () =>
+      keytar.getPassword(SERVICE, account('openrouter'))
+    )
+    if (existing) {
+      rememberSecret('openrouter', existing)
+      return
+    }
 
-  await keytar.setPassword(SERVICE, account('openrouter'), key)
+    await withKeytarTimeout('keytar write (openrouter bootstrap)', () =>
+      keytar.setPassword(SERVICE, account('openrouter'), key)
+    )
+    rememberSecret('openrouter', key)
+  } catch (error) {
+    console.warn('[lingo] OpenRouter env bootstrap skipped:', error)
+  }
 }

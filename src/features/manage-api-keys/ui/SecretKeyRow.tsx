@@ -1,6 +1,7 @@
 import { Eye, EyeOff } from '@/shared/ui/icons'
 import { useEffect, useRef, useState } from 'react'
 import { getLingo } from '@/shared/lib/lingo'
+import { isMaskedSecretDisplay } from '@/shared/lib/secret-mask'
 import { settingsInputClass } from '@/shared/lib/settings-control'
 import {
   settingsRowClass,
@@ -9,7 +10,7 @@ import {
   settingsRowTitleClass
 } from '@/shared/lib/settings-surface'
 import { Input } from '@/shared/ui/input'
-import type { SecretProviderId } from '@/shared/types/ipc'
+import type { SecretProviderId, SecretStatus } from '@/shared/types/ipc'
 import { useSecretKey } from '../model/useSecretKey'
 
 const AUTOSAVE_DELAY_MS = 650
@@ -33,6 +34,11 @@ export function SecretKeyRow({
   const timerRef = useRef<number | null>(null)
   const wasKeySetRef = useRef(false)
   const prevMaskedRef = useRef<string | undefined>(undefined)
+  const statusRef = useRef(status)
+  const editingRef = useRef(editingNewKey)
+
+  statusRef.current = status
+  editingRef.current = editingNewKey
 
   useEffect(() => {
     return () => {
@@ -56,33 +62,60 @@ export function SecretKeyRow({
     }
 
     wasKeySetRef.current = true
-    if (editingNewKey) return
+    if (editingRef.current) return
 
     const masked = status.masked ?? '••••••••'
     if (prevMaskedRef.current !== masked) {
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
       prevMaskedRef.current = masked
       setValue(masked)
     }
-  }, [status, onMessage, editingNewKey])
+  }, [status, onMessage])
 
   const id = `api-key-${providerId}`
+
+  const applySavedStatus = (saved: SecretStatus) => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    setEditingNewKey(false)
+    setShowSecret(false)
+    const masked = saved.masked ?? '••••••••'
+    prevMaskedRef.current = masked
+    setValue(masked)
+  }
 
   const schedule = (next: string) => {
     if (timerRef.current) window.clearTimeout(timerRef.current)
     timerRef.current = window.setTimeout(async () => {
       onMessage(null)
-      const masked = status?.masked ?? '••••••••'
-      if (status?.isSet && !editingNewKey && next === masked) return
+      const trimmed = next.trim()
+      const currentStatus = statusRef.current
+      const masked = currentStatus?.masked ?? '••••••••'
+
+      if (isMaskedSecretDisplay(trimmed)) {
+        if (currentStatus?.isSet && trimmed === masked) return
+        return
+      }
+
       try {
-        if (next.trim().length === 0) {
-          if (status?.isSet) {
-            await clear()
+        if (trimmed.length === 0) {
+          if (currentStatus?.isSet) {
+            const cleared = await clear()
+            applySavedStatus(cleared)
             onMessage('Key removed.')
           }
           setTestMessage(null)
           return
         }
-        await save(next)
+
+        const saved = await save(trimmed)
+        applySavedStatus(saved)
+
         if (providerId === 'openrouter') {
           setTestMessage('Checking key...')
           const result = await getLingo().secrets.validateOpenRouter()
@@ -98,6 +131,17 @@ export function SecretKeyRow({
     }, AUTOSAVE_DELAY_MS)
   }
 
+  const beginReplaceKey = () => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    setEditingNewKey(true)
+    setShowSecret(false)
+    setValue('')
+    setTestMessage(null)
+  }
+
   return (
     <div className={settingsRowClass}>
       <div className={settingsRowTextWrapClass}>
@@ -108,7 +152,7 @@ export function SecretKeyRow({
             : testMessage
               ? testMessage
               : status?.isSet
-                ? 'Configured. Clear the field to replace or remove.'
+                ? 'Configured. Click the field and paste a new key to replace.'
                 : 'Not configured.'}
         </p>
       </div>
@@ -118,9 +162,15 @@ export function SecretKeyRow({
           className={`${settingsInputClass} w-full pr-10`}
           placeholder={placeholder}
           value={value}
+          onFocus={() => {
+            const masked = status?.masked
+            if (status?.isSet && masked && value === masked && !editingNewKey) {
+              beginReplaceKey()
+            }
+          }}
           onChange={(e) => {
             const next = e.target.value
-            setEditingNewKey(true)
+            if (!editingNewKey) setEditingNewKey(true)
             setValue(next)
             schedule(next)
           }}

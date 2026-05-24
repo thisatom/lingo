@@ -57,6 +57,25 @@ const payload = { "model": "local-model", "stream": false };`
 })
 
 describe('importCustomLlmProfileFromSnippet', () => {
+  it('imports NVIDIA catalog snippet with stream variable in payload', async () => {
+    const { NVIDIA_AXIOS_SNIPPET } = await import('./nvidia-snippet.fixture')
+    const parsed = parseCustomLlmProfileSource(NVIDIA_AXIOS_SNIPPET)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.data.baseUrl).toBe('https://integrate.api.nvidia.com/v1')
+    expect(parsed.data.model).toBe('google/gemma-3n-e2b-it')
+    expect(parsed.data.completionExtras.temperature).toBe(0.2)
+    expect(parsed.data.completionExtras.stream).toBe(true)
+  })
+
+  it('maps stream: stream to false when snippet has const stream = false', async () => {
+    const { NVIDIA_AXIOS_SNIPPET_NO_STREAM } = await import('./nvidia-snippet.fixture')
+    const parsed = parseCustomLlmProfileSource(NVIDIA_AXIOS_SNIPPET_NO_STREAM)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.data.completionExtras.stream).toBe(false)
+  })
+
   it('imports axios NVIDIA-style snippet', () => {
     const snippet = `
 const invokeUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -80,7 +99,7 @@ axios.post(invokeUrl, payload, { headers });
     const parsed = parseCustomLlmProfileSource(imported!.profileJson)
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
-    expect(parsed.data.baseUrl).toBe('https://integrate.api.nvidia.com/v1/chat/completions')
+    expect(parsed.data.baseUrl).toBe('https://integrate.api.nvidia.com/v1')
     expect(parsed.data.model).toBe('google/gemma-3n-e2b-it')
     expect(parsed.data.completionExtras.temperature).toBe(0.2)
     expect(parsed.data.completionExtras.top_p).toBe(0.7)

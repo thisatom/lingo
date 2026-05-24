@@ -1,6 +1,7 @@
-/** Native / titlebar caption: `Lingo` or `Lingo - {segment}`. */
-export function formatWindowTitle(segment?: string | null): string {
-  const trimmed = segment?.trim()
-  if (!trimmed) return 'Lingo'
-  return `Lingo - ${trimmed}`
+export type WindowTitleContext = 'default' | 'settings'
+
+/** Native / titlebar caption — app name only (no chat snippet). */
+export function formatWindowTitle(context: WindowTitleContext = 'default'): string {
+  if (context === 'settings') return 'Lingo — Settings'
+  return 'Lingo'
 }

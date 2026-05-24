@@ -4,16 +4,16 @@ import { resolveOnboardingCompleted } from './onboarding-status'
 
 describe('resolveOnboardingCompleted', () => {
   beforeEach(() => {
+    const store = new Map<string, string>()
     vi.stubGlobal('localStorage', {
-      store: new Map<string, string>(),
       getItem(key: string) {
-        return this.store.get(key) ?? null
+        return store.get(key) ?? null
       },
       setItem(key: string, value: string) {
-        this.store.set(key, value)
+        store.set(key, value)
       },
       removeItem(key: string) {
-        this.store.delete(key)
+        store.delete(key)
       }
     })
   })

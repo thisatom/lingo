@@ -282,6 +282,15 @@
   overflow: hidden;
 }
 
+.cet-titlebar .cet-title {
+  color: #9a9a9a;
+  font-weight: 400;
+}
+
+.cet-titlebar.light .cet-title {
+  color: #525252;
+}
+
 .cet-titlebar {
   font-family: var(--font-sans);
   transition:

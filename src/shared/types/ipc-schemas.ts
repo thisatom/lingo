@@ -59,8 +59,8 @@ export const chatStreamRequestSchema = z.object({
   customLlm: customLlmConfigSchema.optional(),
   webSearch: z.boolean().optional(),
   modelAutoFallback: z.boolean().optional(),
-  maxTokens: z.number().int().min(1).max(128_000).optional(),
-  maxTokensRetry: z.number().int().min(1).max(128_000).optional()
+  maxTokens: z.number().int().min(0).max(128_000).optional(),
+  maxTokensRetry: z.number().int().min(0).max(128_000).optional()
 })
 
 export const chatCompleteRequestSchema = z.object({

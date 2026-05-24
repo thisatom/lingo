@@ -53,9 +53,9 @@ export interface ChatStreamRequest {
   webSearch?: boolean
   /** Try other free models when the selected one errors (no repeat attempts). */
   modelAutoFallback?: boolean
-  /** Max completion tokens for this request (from Settings → API). */
+  /** Max completion tokens for this request (from Settings → API). `0` = omit `max_tokens` (model default). */
   maxTokens?: number
-  /** Retry budget when the first answer looks truncated (defaults to ~1.5× maxTokens). */
+  /** Retry budget when truncated. `0` = same as unlimited. Defaults to ~1.5× maxTokens when set. */
   maxTokensRetry?: number
 }
 
@@ -194,9 +194,6 @@ export interface LingoApi {
     openReleasesPage: () => Promise<void>
     consumePendingNotice: () => Promise<PendingUpdateNotice | null>
     onUpdateAvailable: (handler: (info: AppUpdateInfo) => void) => () => void
-  }
-  welcome?: {
-    finish: () => Promise<void>
   }
   app?: {
     onPrepareShutdown: (handler: () => void | Promise<void>) => () => void

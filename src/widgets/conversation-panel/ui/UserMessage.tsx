@@ -46,6 +46,8 @@ interface UserMessageProps {
   onVoicePress?: () => void
   onVoiceStop?: () => void
   onRegisterEditSpeech?: (target: EditSpeechTarget | null) => void
+  /** Shown when Agent Speech capture has no transcript text yet. */
+  voiceCaptureLabel?: 'listening' | 'transcribing' | null
 }
 
 export function UserMessage({
@@ -66,7 +68,8 @@ export function UserMessage({
   isVoiceListening,
   onVoicePress,
   onVoiceStop,
-  onRegisterEditSpeech
+  onRegisterEditSpeech,
+  voiceCaptureLabel = null
 }: UserMessageProps) {
   const [draft, setDraft] = useState(content)
   const [editAttachments, setEditAttachments] = useState<MessageAttachment[]>([])
@@ -293,6 +296,10 @@ export function UserMessage({
           ) : null}
           {content.trim() ? (
             <MarkdownContent content={content} variant="agent" className={chatSelectableClass} />
+          ) : voiceCaptureLabel ? (
+            <p className="text-sm italic text-muted-foreground">
+              {voiceCaptureLabel === 'transcribing' ? 'Transcribing…' : 'Listening…'}
+            </p>
           ) : null}
         </MessageBodyClamp>
         <UserMessageActionButton

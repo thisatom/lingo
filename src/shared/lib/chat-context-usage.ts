@@ -1,5 +1,11 @@
 import { normalizeOpenRouterModelId, openRouterConfig } from '@/shared/config/openrouter'
-import { LLM_MAX_TOKENS_DEFAULT, normalizeLlmMaxTokens } from '@/shared/lib/llm-max-tokens'
+import {
+  isLlmMaxTokensUnlimited,
+  LLM_MAX_TOKENS_DEFAULT,
+  LLM_MAX_TOKENS_MAX,
+  LLM_MAX_TOKENS_MIN,
+  normalizeLlmMaxTokens
+} from '@/shared/lib/llm-max-tokens'
 import type { Message } from '@/entities/message/model/types'
 
 const MESSAGE_OVERHEAD_TOKENS = 4
@@ -33,6 +39,18 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
 export function getModelContextLimit(modelId: string): number {
   const key = normalizeOpenRouterModelId(modelId).toLowerCase()
   return MODEL_CONTEXT_LIMITS[key] ?? DEFAULT_CONTEXT_LIMIT
+}
+
+/** Token reserve for context meter / trimming when reply cap is unlimited. */
+export function resolveOutputTokenReserve(modelId: string, llmMaxTokens: number): number {
+  if (isLlmMaxTokensUnlimited(llmMaxTokens)) {
+    const limit = getModelContextLimit(modelId)
+    return Math.min(
+      LLM_MAX_TOKENS_MAX,
+      Math.max(LLM_MAX_TOKENS_MIN, Math.floor(limit * 0.5))
+    )
+  }
+  return normalizeLlmMaxTokens(llmMaxTokens)
 }
 
 export function estimateTextTokens(text: string): number {
@@ -69,6 +87,8 @@ export type ChatContextUsageDetails = {
   messageTokens: number
   systemReserveTokens: number
   outputReserveTokens: number
+  /** True when Settings → API uses “no limit” for `max_tokens`. */
+  replyBudgetUnlimited: boolean
   messageCount: number
 }
 
@@ -84,7 +104,8 @@ export function getChatContextUsageDetails(
     0
   )
   const systemReserveTokens = SYSTEM_PROMPT_RESERVE
-  const outputReserveTokens = reservedOutputTokens
+  const replyBudgetUnlimited = isLlmMaxTokensUnlimited(reservedOutputTokens)
+  const outputReserveTokens = resolveOutputTokenReserve(modelId, reservedOutputTokens)
   const usedTokens = systemReserveTokens + messageTokens + outputReserveTokens
   const percent =
     limitTokens <= 0 ? 0 : Math.min(100, Math.max(0, Math.round((usedTokens / limitTokens) * 100)))
@@ -96,6 +117,7 @@ export function getChatContextUsageDetails(
     messageTokens,
     systemReserveTokens,
     outputReserveTokens,
+    replyBudgetUnlimited,
     messageCount: forApi.length
   }
 }
@@ -110,7 +132,7 @@ export function trimMessagesForContext(
 
   const limit = getModelContextLimit(modelId)
   const targetTokens = Math.floor((limit * targetPercent) / 100)
-  const reservedOutput = normalizeLlmMaxTokens(reservedOutputTokens)
+  const reservedOutput = resolveOutputTokenReserve(modelId, reservedOutputTokens)
 
   let trimmed = [...messages]
   while (
@@ -157,7 +179,7 @@ export function trimMessagesToTokenBudgetWithMeta(
   }
 
   const limit = getModelContextLimit(modelId)
-  const reservedOutput = normalizeLlmMaxTokens(reservedOutputTokens)
+  const reservedOutput = resolveOutputTokenReserve(modelId, reservedOutputTokens)
   const inputBudget = Math.floor(
     (limit - reservedOutput - SYSTEM_PROMPT_RESERVE) * (1 - CONTEXT_SAFETY_MARGIN)
   )

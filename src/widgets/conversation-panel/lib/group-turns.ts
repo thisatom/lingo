@@ -1,4 +1,5 @@
 import type { Message } from '@/entities/message/model/types'
+import type { PipelineStage } from '@/entities/conversation/model/store'
 import { messageHasVisibleContent } from '@/shared/lib/chat-message-api'
 
 export type ConversationTurn = {
@@ -16,14 +17,31 @@ export function lastAssistantMessageId(messages: readonly Message[]): string | u
   return undefined
 }
 
+export function voiceCaptureLabelForUserMessage(
+  userId: string,
+  userContent: string,
+  liveVoiceUserMessageId: string | null | undefined,
+  stage: PipelineStage
+): 'listening' | 'transcribing' | null {
+  if (liveVoiceUserMessageId !== userId || userContent.trim()) return null
+  if (stage === 'transcribing') return 'transcribing'
+  return 'listening'
+}
+
 /** True while reasoning streams and the final answer for this turn has not started yet. */
 export function isThinkingMessageLive(
   turn: Pick<ConversationTurn, 'assistantMessages'>,
   messageId: string,
   agentBusy: boolean,
-  isLatestTurn: boolean
+  isLatestTurn: boolean,
+  pipelineStage: PipelineStage = 'idle',
+  pipelineStreamingAnswer = false
 ): boolean {
-  if (!agentBusy || !isLatestTurn) return false
+  const reasoningStage =
+    pipelineStage === 'thinking' ||
+    (pipelineStage === 'speaking' && !pipelineStreamingAnswer)
+
+  if (!agentBusy || !isLatestTurn || !reasoningStage) return false
 
   const index = turn.assistantMessages.findIndex((m) => m.id === messageId)
   if (index === -1 || turn.assistantMessages[index]?.role !== 'thinking') return false
@@ -33,7 +51,11 @@ export function isThinkingMessageLive(
     .some((message) => message.role === 'assistant')
 }
 
-export function groupMessagesIntoTurns(messages: readonly Message[]): ConversationTurn[] {
+export function groupMessagesIntoTurns(
+  messages: readonly Message[],
+  options?: { preserveEmptyUserMessageId?: string | null }
+): ConversationTurn[] {
+  const preserveId = options?.preserveEmptyUserMessageId ?? null
   const turns: ConversationTurn[] = []
   let user: Message | null = null
   let assistantMessages: Message[] = []
@@ -42,7 +64,13 @@ export function groupMessagesIntoTurns(messages: readonly Message[]): Conversati
     if (!user) return
 
     const visibleAssistants = assistantMessages.filter(messageHasVisibleContent)
-    if (!messageHasVisibleContent(user) && visibleAssistants.length === 0) {
+    const preserveEmptyUser =
+      preserveId != null && user.id === preserveId
+    if (
+      !messageHasVisibleContent(user) &&
+      visibleAssistants.length === 0 &&
+      !preserveEmptyUser
+    ) {
       user = null
       assistantMessages = []
       return

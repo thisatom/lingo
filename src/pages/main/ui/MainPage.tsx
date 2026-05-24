@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAiChat } from '@/features/ai-chat/model/useAiChat'
+import { useLlmChatReady } from '@/features/ai-chat/model/useLlmChatReady'
 import { useChatContextUsage } from '@/features/chat-context/model/useChatContextUsage'
 import { useChatComposerModeHotkey } from '@/features/chat-composer/model/useChatComposerModeHotkey'
-import { useOpenRouterKey } from '@/features/manage-api-keys/model/useOpenRouterKey'
-import { useLiveConversationLoop } from '@/features/voice-input/model/useLiveConversationLoop'
 import { useVoiceInput } from '@/features/voice-input/model/useVoiceInput'
+import { useLiveConversationLoop } from '@/features/voice-input/model/useLiveConversationLoop'
 import { useChatsStore } from '@/entities/chat/model/store'
 import {
   EMPTY_COMPOSER_ATTACHMENTS,
@@ -78,7 +78,7 @@ export function MainPage() {
   const setComposerDraft = useChatsStore((s) => s.setComposerDraft)
   const addComposerAttachments = useChatsStore((s) => s.addComposerAttachments)
   const removeComposerAttachment = useChatsStore((s) => s.removeComposerAttachment)
-  const { status } = useOpenRouterKey()
+  const { ready: llmChatReady, blockedReason: llmBlockedReason } = useLlmChatReady()
   const error = useConversationStore((s) => s.error)
   const speechError = useConversationStore((s) => s.speechError)
   const setSpeechError = useConversationStore((s) => s.setSpeechError)
@@ -126,6 +126,7 @@ export function MainPage() {
   )
 
   const voiceMessageIdRef = useRef('')
+  const [liveVoiceUserMessageId, setLiveVoiceUserMessageId] = useState<string | null>(null)
   const isLiveConversationActiveRef = useRef(false)
   const editSpeechTargetRef = useRef<EditSpeechTarget | null>(null)
 
@@ -146,7 +147,9 @@ export function MainPage() {
       },
       onConversationStart: () => {
         const { messageId } = beginVoiceUserMessage()
+        if (!messageId) return null
         voiceMessageIdRef.current = messageId
+        setLiveVoiceUserMessageId(messageId)
         return messageId
       },
       onConversationLive: (text: string) => {
@@ -156,6 +159,7 @@ export function MainPage() {
       },
       onConversationCommit: async (messageId: string) => {
         voiceMessageIdRef.current = ''
+        setLiveVoiceUserMessageId(null)
         const chat = useChatsStore.getState().getActiveChat()
         const trimmed =
           chat?.messages.find((m) => m.id === messageId)?.content.trim() ?? ''
@@ -170,6 +174,7 @@ export function MainPage() {
       },
       onConversationCancel: (messageId: string) => {
         voiceMessageIdRef.current = ''
+        setLiveVoiceUserMessageId(null)
         cancelVoiceUserMessage(messageId)
         if (isLiveConversationActiveRef.current) {
           scheduleAutoListenRef.current?.()
@@ -191,7 +196,7 @@ export function MainPage() {
   const startVoiceCapture = useCallback(async () => {
     const editTarget = editSpeechTargetRef.current
     if (editTarget) {
-      stopAgent()
+      stopAgent({ chatId: activeChatId ?? undefined, force: !activeChatId })
       if (activeChatId) {
         removeMessagesAfter(editTarget.messageId, activeChatId)
       }
@@ -275,7 +280,8 @@ export function MainPage() {
       cancelVoiceUserMessage(voiceMessageIdRef.current)
       voiceMessageIdRef.current = ''
     }
-    stopAgent()
+    setLiveVoiceUserMessageId(null)
+    stopAgent({ force: true })
     setSpeechError(null)
   }, [cancelVoiceUserMessage, liveConversation, setSpeechError, stopAgent, voice])
 
@@ -284,7 +290,7 @@ export function MainPage() {
   }, [stopAgentSpeechSession])
 
   const onVoicePress = useCallback(() => {
-    if (!status?.isSet || !voice.supported) return
+    if (!llmChatReady || !voice.supported) return
 
     if (chatComposerMode === 'text') {
       if (actionsDisabled && !editSpeechTargetRef.current) return
@@ -306,17 +312,20 @@ export function MainPage() {
     }
 
     if (actionsDisabled) return
-    liveConversation.startLiveConversation()
+    const chatId =
+      activeChatId ?? useChatsStore.getState().ensureActiveChat()
+    liveConversation.startLiveConversation(chatId)
     void startVoiceCapture()
   }, [
     actionsDisabled,
+    activeChatId,
     agentBusy,
     chatComposerMode,
     handleStopAgent,
     liveConversation,
     onVoiceStop,
     startVoiceCapture,
-    status?.isSet,
+    llmChatReady,
     stopAgentSpeechSession,
     voice
   ])
@@ -340,8 +349,28 @@ export function MainPage() {
     }
   }, [chatComposerMode, stopAgentSpeechSession])
 
+  const prevActiveChatIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevActiveChatIdRef.current
+    const next = activeChatId ?? null
+    if (prev && prev !== next) {
+      if (chatComposerMode === 'conversation' && liveConversation.isLiveConversationActive) {
+        stopAgentSpeechSession()
+      } else if (voice.isBusy) {
+        void voice.cancel()
+      }
+    }
+    prevActiveChatIdRef.current = next
+  }, [
+    activeChatId,
+    chatComposerMode,
+    liveConversation.isLiveConversationActive,
+    stopAgentSpeechSession,
+    voice
+  ])
+
   const onSend = useCallback(async () => {
-    if (!status?.isSet) return
+    if (!llmChatReady) return
     const text = draft
     const attachments = [...composerAttachments]
     if (activeChatId) setComposerDraft(activeChatId, '')
@@ -355,17 +384,13 @@ export function MainPage() {
     sendUserMessage,
     setComposerDraft,
     setSpeechError,
-    status?.isSet
+    llmChatReady
   ])
 
-  const prevAgentBusyRef = useRef(agentBusy)
   useEffect(() => {
-    const wasBusy = prevAgentBusyRef.current
-    prevAgentBusyRef.current = agentBusy
-    if (!activeChatId || agentBusy || !wasBusy) return
-    if (queuedMessages.length === 0) return
+    if (!activeChatId) return
     void flushQueuedMessages(activeChatId)
-  }, [activeChatId, agentBusy, flushQueuedMessages, queuedMessages.length])
+  }, [activeChatId, agentBusy, backgroundStreamChatId, flushQueuedMessages, queuedMessages.length])
 
   useEffect(() => {
     return () => {
@@ -402,6 +427,7 @@ export function MainPage() {
           isVoiceListening={voice.isRecording}
           onVoicePress={onVoicePress}
           onVoiceStop={onVoiceStop}
+          liveVoiceUserMessageId={liveVoiceUserMessageId}
           onRegisterEditSpeech={(target) => {
             editSpeechTargetRef.current = target
           }}
@@ -460,9 +486,10 @@ export function MainPage() {
               />
             )}
 
-            {voice.isRecording && (
+            {(voice.isRecording || voice.isTranscribing) && (
               <VoiceCaptureBar
-                active
+                active={voice.isRecording}
+                transcribing={voice.isTranscribing}
                 deviceId={microphoneDeviceId}
                 deviceLabel={microphoneLabel}
                 stream={voice.monitorStream}
@@ -490,7 +517,7 @@ export function MainPage() {
                 onAttachmentError={handleAttachmentError}
                 onSend={() => void onSend()}
                 onStop={handleStopAgent}
-                disabled={!status?.isSet}
+                disabled={!llmChatReady}
                 agentBusy={agentBusy}
                 voiceBusy={voiceBusy}
                 voiceSupported={voice.supported}
@@ -500,8 +527,8 @@ export function MainPage() {
                 voiceInteractionMode="toggle"
                 liveConversationActive={liveConversation.isLiveConversationActive}
                 placeholder={
-                  !status?.isSet
-                    ? 'Add API key in Settings…'
+                  !llmChatReady
+                    ? (llmBlockedReason ?? 'Add API key in Settings…')
                     : composerAttachments.length > 0
                       ? 'Ask about the image…'
                       : agentBusy

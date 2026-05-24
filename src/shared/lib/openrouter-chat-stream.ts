@@ -8,6 +8,10 @@ import { resolveChatCompletionsUrl } from '@/shared/config/custom-llm'
 import { customLlmConfig } from '@/shared/config/custom-llm'
 import { openRouterConfig } from '@/shared/config/openrouter'
 import { normalizeAlternatingChatPayloads } from '@/shared/lib/chat-api-alternation'
+import {
+  customEndpointRequiresApiKey,
+  formatCustomLlmHttpError
+} from '@/shared/lib/custom-llm-errors'
 import { mergeCustomCompletionBody } from '@/shared/lib/custom-llm-profile'
 import { assertOutboundHttpUrl } from '@/shared/lib/outbound-url-policy'
 import { openaiCompatibleHeaders } from '@/shared/lib/openai-compatible-headers'
@@ -86,22 +90,50 @@ function requestHeaders(request: OpenRouterStreamRequest, apiKey: string): Recor
   return openRouterHeaders(apiKey)
 }
 
-function maxTokensBudget(request: OpenRouterStreamRequest): number {
-  if (typeof request.maxTokens === 'number') return request.maxTokens
+function maxTokensBudget(request: OpenRouterStreamRequest): number | undefined {
+  if (request.maxTokens === 0) return undefined
+  if (typeof request.maxTokens === 'number' && request.maxTokens > 0) {
+    return request.maxTokens
+  }
   return isCustomBackend(request) ? customLlmConfig.maxTokens : openRouterConfig.maxTokens
 }
 
-function maxTokensRetryBudget(request: OpenRouterStreamRequest): number {
-  if (typeof request.maxTokensRetry === 'number') return request.maxTokensRetry
+function maxTokensRetryBudget(request: OpenRouterStreamRequest): number | undefined {
+  if (request.maxTokens === 0) return undefined
+  if (typeof request.maxTokensRetry === 'number') {
+    if (request.maxTokensRetry === 0) return undefined
+    return request.maxTokensRetry
+  }
+  const primary = maxTokensBudget(request)
+  if (primary === undefined) return undefined
   return isCustomBackend(request) ? customLlmConfig.maxTokensRetry : openRouterConfig.maxTokensRetry
+}
+
+function applyCompletionMaxTokens(
+  body: Record<string, unknown>,
+  request: OpenRouterStreamRequest,
+  kind: 'primary' | 'retry' = 'primary'
+): Record<string, unknown> {
+  const budget = kind === 'retry' ? maxTokensRetryBudget(request) : maxTokensBudget(request)
+  if (budget === undefined) {
+    const { max_tokens: _removed, ...rest } = body
+    return rest
+  }
+  return { ...body, max_tokens: budget }
 }
 
 function withCustomCompletionExtras(
   request: OpenRouterStreamRequest,
   body: Record<string, unknown>
 ): Record<string, unknown> {
-  if (!isCustomBackend(request)) return body
-  return mergeCustomCompletionBody(body, request.customLlm?.completionExtras)
+  const merged = isCustomBackend(request)
+    ? mergeCustomCompletionBody(body, request.customLlm?.completionExtras)
+    : body
+  if (request.maxTokens === 0) {
+    const { max_tokens: _removed, ...rest } = merged
+    return rest
+  }
+  return merged
 }
 
 export type OpenRouterFetch = (
@@ -222,14 +254,30 @@ function modelUsesNativeWebSearch(modelId: string): boolean {
 
 type CompletionResult = { text: string; finishReason: string | null }
 
-function parseApiError(errText: string, status: number): string {
+function parseApiError(
+  errText: string,
+  status: number,
+  customBackend: boolean
+): string {
   try {
-    const parsed = JSON.parse(errText) as { error?: { message?: string } }
-    if (parsed.error?.message) return parsed.error.message
+    const parsed = JSON.parse(errText) as {
+      error?: { message?: string }
+      detail?: string
+      title?: string
+    }
+    const message =
+      parsed.error?.message?.trim() ||
+      parsed.detail?.trim() ||
+      parsed.title?.trim() ||
+      ''
+    if (message) {
+      return customBackend ? formatCustomLlmHttpError(message, status) : message
+    }
   } catch {
     // ignore
   }
-  return errText || `API request failed (${status})`
+  const fallback = errText || `API request failed (${status})`
+  return customBackend ? formatCustomLlmHttpError(fallback, status) : fallback
 }
 
 async function fetchCompletion(
@@ -251,8 +299,9 @@ async function fetchCompletion(
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '')
-    const message = parseApiError(errText, response.status)
-    throw new Error(isCustomBackend(request) ? message : formatOpenRouterError(message))
+    const custom = isCustomBackend(request)
+    const message = parseApiError(errText, response.status, custom)
+    throw new Error(custom ? message : formatOpenRouterError(message))
   }
 
   const data = (await response.json()) as {
@@ -413,8 +462,9 @@ async function fetchCompletionStreaming(
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '')
-    const message = parseApiError(errText, response.status)
-    throw new Error(isCustomBackend(request) ? message : formatOpenRouterError(message))
+    const custom = isCustomBackend(request)
+    const message = parseApiError(errText, response.status, custom)
+    throw new Error(custom ? message : formatOpenRouterError(message))
   }
 
   const reader = response.body?.getReader()
@@ -523,7 +573,7 @@ async function streamCompletionWithIncompleteRetry(
   return fetchCompletionResilientStreaming(
     request,
     apiKey,
-    { ...body, messages: retryMessages, max_tokens: maxTokensRetryBudget(request) },
+    applyCompletionMaxTokens({ ...body, messages: retryMessages }, request, 'retry'),
     send,
     signal,
     fetchImpl
@@ -600,7 +650,7 @@ async function completeWithWebSearch(
     result = await fetchCompletionResilientStreaming(
       request,
       apiKey,
-      { ...body, messages: retryMessages, max_tokens: maxTokensRetryBudget(request) },
+      applyCompletionMaxTokens({ ...body, messages: retryMessages }, request, 'retry'),
       send,
       signal,
       fetchImpl
@@ -642,12 +692,17 @@ async function completeWithLocalWebSearch(
     lastUserMessage,
     results
   )
-  const body = withCustomCompletionExtras(request, {
-    model: userModelId.trim(),
-    messages: buildMessages(augmented, practiceLanguage, 'research'),
-    max_tokens: maxTokensBudget(request),
-    temperature: 0.3
-  })
+  const body = withCustomCompletionExtras(
+    request,
+    applyCompletionMaxTokens(
+      {
+        model: userModelId.trim(),
+        messages: buildMessages(augmented, practiceLanguage, 'research'),
+        temperature: 0.3
+      },
+      request
+    )
+  )
 
   const { text } = await streamCompletionWithIncompleteRetry(
     request,
@@ -676,12 +731,17 @@ async function tryNativeWebSearch(
   const researchMode =
     shouldForceWebSearch(lastUserMessage) || shouldUseResearchMode(lastUserMessage)
 
-  const body = withCustomCompletionExtras(request, {
-    model: userModelId.trim(),
-    messages: buildMessages(apiMessages, practiceLanguage, researchMode ? 'research' : 'practice'),
-    max_tokens: maxTokensBudget(request),
-    temperature: researchMode ? 0.3 : 0.7
-  })
+  const body = withCustomCompletionExtras(
+    request,
+    applyCompletionMaxTokens(
+      {
+        model: userModelId.trim(),
+        messages: buildMessages(apiMessages, practiceLanguage, researchMode ? 'research' : 'practice'),
+        temperature: researchMode ? 0.3 : 0.7
+      },
+      request
+    )
+  )
 
   attachWebCapabilities(body, userModelId)
   const provider = getWebSearchProvider(userModelId, { local: false })
@@ -767,12 +827,17 @@ async function completeTextChat(
     (shouldForceWebSearch(lastUserMessage) || shouldUseResearchMode(lastUserMessage))
   const promptMode: PromptMode = researchMode ? 'research' : 'practice'
 
-  const body = withCustomCompletionExtras(request, {
-    model: userModelId.trim(),
-    messages: buildMessages(apiMessages, practiceLanguage, promptMode),
-    max_tokens: maxTokensBudget(request),
-    temperature: researchMode ? 0.3 : 0.7
-  })
+  const body = withCustomCompletionExtras(
+    request,
+    applyCompletionMaxTokens(
+      {
+        model: userModelId.trim(),
+        messages: buildMessages(apiMessages, practiceLanguage, promptMode),
+        temperature: researchMode ? 0.3 : 0.7
+      },
+      request
+    )
+  )
 
   const { text } = await streamCompletionWithIncompleteRetry(
     request,
@@ -796,11 +861,17 @@ export async function streamOpenRouterChat(
 ): Promise<void> {
   const fetchImpl = options?.fetchImpl ?? fetch
   const apiKey = (await getApiKey()) ?? ''
-  if (!apiKey.trim() && !isCustomBackend(request)) {
+  const custom = isCustomBackend(request)
+  if (!apiKey.trim() && !custom) {
     throw new Error('NO_OPENROUTER_KEY')
   }
-
-  const custom = isCustomBackend(request)
+  if (
+    custom &&
+    !apiKey.trim() &&
+    customEndpointRequiresApiKey(request.customLlm?.baseUrl ?? '')
+  ) {
+    throw new Error('NO_CUSTOM_LLM_KEY')
+  }
   const primaryModelId = custom
     ? (request.customLlm?.model ?? request.model ?? '').trim()
     : (request.model ?? options?.defaultModel ?? openRouterConfig.defaultModel)
@@ -819,12 +890,17 @@ export async function streamOpenRouterChat(
     }
 
     if (hasImages && isVisionCapableModel(tryModelId)) {
-      const body = withCustomCompletionExtras(request, {
-        model: tryModelId.trim(),
-        messages: buildMessages(apiMessages, request.practiceLanguage, 'vision'),
-        max_tokens: maxTokensBudget(request),
-        temperature: 0.7
-      })
+      const body = withCustomCompletionExtras(
+        request,
+        applyCompletionMaxTokens(
+          {
+            model: tryModelId.trim(),
+            messages: buildMessages(apiMessages, request.practiceLanguage, 'vision'),
+            temperature: 0.7
+          },
+          request
+        )
+      )
 
       try {
         const lastUserMessage = getLastUserMessageContent(apiMessages)

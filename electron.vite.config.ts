@@ -79,9 +79,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'index.html'),
-          welcome: resolve(__dirname, 'welcome.html'),
-          'welcome-probe': resolve(__dirname, 'welcome-probe.html')
+          index: resolve(__dirname, 'index.html')
         }
       }
     },

@@ -1,65 +1,65 @@
 # Lingo
 
-**Lingo** — настольное приложение для тренировки разговорной речи на разных языках. Вы говорите в микрофон или печатаете текст, получаете ответ модели и при желании слушаете его вслух.
+**Lingo** is a desktop app for practicing conversational speech in different languages. Type or speak, get an AI reply, and optionally hear it read aloud.
 
-Версия **0.1.0** · Windows, macOS, Linux
+Version **0.1.0** · Windows, macOS, Linux
 
-## Скачать
+## Download
 
-Готовые установщики публикуются в [релизах на GitHub](https://github.com/thisatom/lingo/releases):
+Installers are published on [GitHub Releases](https://github.com/thisatom/lingo/releases):
 
-| Платформа | Файл |
-|-----------|------|
-| Windows (64-bit) | `Lingo-0.1.0-win-setup.exe` — установщик с выбором папки |
-| Linux (64-bit) | `Lingo-0.1.0-linux-x64.tar.gz` — распаковать и запустить `lingo` |
-| macOS (Intel / Apple Silicon) | `Lingo-0.1.0-mac-*.dmg` или `.zip` |
+| Platform | File |
+|----------|------|
+| Windows (64-bit) | `Lingo-0.1.0-win-setup.exe` — installer with folder picker |
+| Linux (64-bit) | `Lingo-0.1.0-linux-x64.tar.gz` — extract and run `./lingo` |
+| macOS (Intel / Apple Silicon) | `Lingo-0.1.0-mac-*.dmg` or `.zip` |
 
-В приложении: **Настройки → О программе** — проверка обновлений и переход на страницу загрузки.
+In the app: **Settings → About** — check for updates and open the download page.
 
-## Возможности
+## What you can do
 
-- **Диалог** — текст и голосовой ввод, ответы по мере генерации, вложения, поиск по чатам, история с автосохранением
-- **Облачные модели** — провайдер [OpenRouter](https://openrouter.ai/): каталог моделей, поиск в интернете, запасная бесплатная модель при сбое
-- **Свой сервер** — любой API, совместимый с OpenAI (Ollama, LM Studio, vLLM и др.); профиль в редакторе JSON, импорт фрагментов из axios или OpenAI SDK; ключ API хранится отдельно, не в JSON
-- **Голосовой ввод** — удержание кнопки микрофона; локальное распознавание (Whisper) или встроенное в браузер; шумоподавление в настройках
-- **Озвучивание** — синтез речи на стороне приложения (не в окне браузера); громкость и скорость в настройках
-- **Первый запуск** — приветственное окно (имя, тема, язык практики, ключ OpenRouter); после онбординга не показывается повторно
-- **Интерфейс** — тёмная и светлая тема, кастомная строка заголовка окна, компоненты на базе shadcn/ui
+- **Chat** — text and voice input, streaming replies, attachments, search across chats, auto-saved history
+- **Cloud models** — [OpenRouter](https://openrouter.ai/): model catalog, web search, automatic fallback to a free model on failure
+- **Your own server** — any OpenAI-compatible API (Ollama, LM Studio, vLLM, etc.); JSON profile editor, import snippets from axios or the OpenAI SDK; API keys stay in secure storage, not in JSON
+- **Voice input** — hold the mic button; local Whisper or browser speech recognition; noise suppression in settings
+- **Text-to-speech** — synthesis runs in the app process (not in a browser tab); volume and speed in settings
+- **First launch** — setup dialog in the main window (name, theme, language, OpenRouter key)
+- **UI** — dark and light themes, custom window title bar, [shadcn/ui](https://ui.shadcn.com/) components
 
-## Первый запуск
+## Quick start
 
-1. Установите приложение из релиза или соберите из исходников (см. ниже).
-2. Откроется **приветствие** — укажите имя, тему, язык практики и при желании ключ OpenRouter.
-3. Ключ можно пропустить и добавить позже: **Настройки → API**.
-4. На главном экране удерживайте **микрофон** и говорите или введите текст. В режиме диалога ответ можно прослушать.
+1. Install from a [release](https://github.com/thisatom/lingo/releases) or [build from source](#build-from-source) below.
+2. On first launch the main window opens; complete the setup dialog if it appears.
+3. You can **skip the OpenRouter key** during setup and add it later under **Settings → API**.
+4. Hold the **microphone** to speak or type in the composer. In conversation mode, replies can be spoken automatically.
 
-## Настройка моделей
+## API keys and models
 
-### OpenRouter (по умолчанию)
+### OpenRouter (default)
 
-1. **Настройки → API → Источник чата → OpenRouter**
-2. Введите ключ API — он сохраняется в **системном хранилище паролей** (Windows Credential Manager, macOS Keychain, Secret Service на Linux), не в файлах приложения и не в локальном хранилище браузера.
-3. Выберите модель из каталога или укажите идентификатор вручную.
+1. Open **Settings → API → Chat source → OpenRouter**.
+2. Paste your API key — it is stored in the **system credential store** (Windows Credential Manager, macOS Keychain, Linux Secret Service), not in app data files or browser storage.
+3. Pick a model from the catalog or enter a model ID manually.
 
-Подробнее: [`docs/OPENROUTER.md`](./docs/OPENROUTER.md), [`docs/API_KEYS.md`](./docs/API_KEYS.md).
+More detail: [`docs/OPENROUTER.md`](./docs/OPENROUTER.md), [`docs/API_KEYS.md`](./docs/API_KEYS.md).
 
-### Свой сервер моделей
+### Custom LLM endpoint
 
-1. **Настройки → API → Источник чата → Свой сервер**
-2. В профиле: базовый URL, модель, при необходимости параметры ответа (температура, потоковая выдача, режим размышления и т.д.).
-3. Ключ — поле **Ключ API для своего сервера**; для локальных установок (Ollama) часто не нужен.
-4. **Импорт фрагмента кода** — вставка примера из axios или OpenAI SDK: адрес и модель попадают в профиль, токен авторизации — в защищённое хранилище.
-5. **Сброс шаблона** — пример `http://127.0.0.1:11434/v1` и `llama3.2`.
+1. **Settings → API → Chat source → Custom server**.
+2. In the profile: base URL, model, and optional parameters (temperature, streaming, reasoning mode, etc.).
+3. Use **API key for custom server** when needed; local Ollama often needs no key.
+4. **Import code snippet** — paste an axios or OpenAI SDK example: URL and model go into the profile; auth tokens go to secure storage.
+5. **Reset template** — example `http://127.0.0.1:11434/v1` with `llama3.2`.
 
-Секреты в JSON профиля не сохраняются (поля `apiKey` / `api_key` удаляются при записи).
+Secrets are stripped from saved JSON (`apiKey` / `api_key` fields are removed on write).
 
-## Системные требования
+## System requirements
 
-- **Windows** 10/11 (64-bit), **macOS** 12+, **Linux** x64 с glibc (типичные дистрибутивы)
-- Для разработки: **Node.js** 20+, **npm** 10+
-- Микрофон — для голосового ввода; интернет — для облачных моделей и онлайн-озвучивания
+- **Windows** 10/11 (64-bit), **macOS** 12+, **Linux** x64 with glibc (common distros)
+- For development: **Node.js** 20+, **npm** 10+
+- Microphone for voice input; internet for cloud models and online TTS
 
-## Сборка из исходников
+## Build from source
 
 ```bash
 git clone https://github.com/thisatom/lingo.git
@@ -68,70 +68,69 @@ npm install
 npm run dev
 ```
 
-| Команда | Назначение |
-|---------|------------|
-| `npm run dev` | Запуск в режиме разработки (Electron + горячая перезагрузка интерфейса) |
-| `npm run dev:web` | Только интерфейс в браузере (без озвучивания и доступа к системному хранилищу ключей) |
-| `npm run build` | Продакшн-сборка приложения |
-| `npm run dist` | Установщик для текущей ОС → папка `release/` |
-| `npm run dist:win` | Установщик Windows (NSIS) |
-| `npm run dist:linux` | Архив tar.gz и распакованная папка для Linux |
-| `npm run dist:mac` | DMG и ZIP для macOS (только на macOS) |
-| `npm run typecheck` | Проверка типов TypeScript |
-| `npm run test` | Модульные тесты (Vitest) |
-| `npm run icons:png` | Конвертация `resources/icon.ico` в PNG |
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Development (Electron + hot reload) |
+| `npm run dev:web` | UI only in the browser (no TTS, no OS keychain — **not for real secrets**) |
+| `npm run build` | Production build |
+| `npm run dist` | Installer for the current OS → `release/` |
+| `npm run dist:win` | Windows NSIS installer |
+| `npm run dist:linux` | Linux tar.gz and unpacked folder |
+| `npm run dist:mac` | macOS DMG and ZIP (**macOS only**) |
+| `npm run typecheck` | TypeScript check |
+| `npm run test` | Unit tests (Vitest) |
+| `npm run icons:png` | Convert `resources/icon.ico` to PNG |
 
-**Замечания по сборке:**
+**Build notes**
 
-- Windows: `npm run dist:win` → `release/Lingo-<версия>-win-setup.exe`
-- Linux на Windows: собирается tar.gz; AppImage/deb удобнее через [CI Release builds](.github/workflows/release.yml) на Ubuntu
-- macOS: `npm run dist:mac` только на Mac; иначе — тег `v*` в GitHub Actions
+- Windows: `npm run dist:win` → `release/Lingo-<version>-win-setup.exe`
+- Linux on Windows: produces tar.gz; AppImage/deb are easier via [CI Release](.github/workflows/release.yml) on Ubuntu
+- macOS: run `npm run dist:mac` on a Mac, or push tag `v*` for GitHub Actions
 
-### Ключ только для разработки
+### Dev-only API key (optional)
 
-Файл `.env` в корне (не коммитить):
+Create `.env` in the project root (do not commit):
 
 ```env
 LINGO_OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Шаблон: [`docs/env.example.md`](./docs/env.example.md). В собранном приложении используйте **Настройки → API**.
+Template: [`docs/env.example.md`](./docs/env.example.md). In packaged builds, use **Settings → API** instead.
 
-## Структура проекта
+## Project layout
 
 ```
 lingo/
-├── electron/          # основной процесс: окна, обмен с интерфейсом, озвучивание, секреты
-├── src/               # интерфейс React (слои app → pages → widgets → features → entities → shared)
-├── docs/              # архитектура и контракты
-├── resources/         # иконки для сборки
-├── welcome.html       # точка входа приветственного окна
-└── index.html         # точка входа главного окна
+├── electron/          # Main process: windows, IPC, TTS, secrets
+├── src/               # React UI (app → pages → widgets → features → entities → shared)
+├── docs/              # Architecture and contracts
+├── resources/         # Build icons
+└── index.html         # Main window entry
 ```
 
-Импорты в `src/` идут только **сверху вниз** по слоям. См. [`docs/FSD.md`](./docs/FSD.md).
+Imports in `src/` follow [Feature-Sliced Design](https://feature-sliced.design/) — only top-down. See [`docs/FSD.md`](./docs/FSD.md).
 
-## Документация
+## Documentation
 
-| Документ | О чём |
-|----------|--------|
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Процессы Electron, строка заголовка, IPC |
-| [docs/STACK.md](./docs/STACK.md) | AI SDK, озвучивание, OpenRouter |
-| [docs/SPEECH_PIPELINE.md](./docs/SPEECH_PIPELINE.md) | Микрофон → текст → модель → голос |
-| [docs/UI.md](./docs/UI.md) | Компоненты и стили |
-| [docs/OPENROUTER.md](./docs/OPENROUTER.md) | Работа с OpenRouter |
-| [docs/API_KEYS.md](./docs/API_KEYS.md) | Хранение и смена ключей |
-| [docs/voice-input-architecture.md](./docs/voice-input-architecture.md) | Голосовой ввод |
-| [docs/env.example.md](./docs/env.example.md) | Переменные окружения для dev |
-| [AGENTS.md](./AGENTS.md) | Контекст для AI-ассистентов в редакторе |
+| Doc | Topic |
+|-----|--------|
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Electron processes, title bar, IPC |
+| [docs/STACK.md](./docs/STACK.md) | AI SDK, TTS, OpenRouter |
+| [docs/SPEECH_PIPELINE.md](./docs/SPEECH_PIPELINE.md) | Mic → STT → model → voice |
+| [docs/UI.md](./docs/UI.md) | Components and styling |
+| [docs/OPENROUTER.md](./docs/OPENROUTER.md) | OpenRouter usage |
+| [docs/API_KEYS.md](./docs/API_KEYS.md) | Storing and rotating keys |
+| [docs/voice-input-architecture.md](./docs/voice-input-architecture.md) | Voice input |
+| [docs/env.example.md](./docs/env.example.md) | Dev environment variables |
+| [AGENTS.md](./AGENTS.md) | Context for AI coding assistants |
 
-## Безопасность
+## Security
 
-- Не публикуйте `.env`, ключи API и файлы с секретами из каталога данных пользователя.
-- **Настольное приложение** — ключи в системном хранилище паролей; интерфейс изолирован от прямого доступа к диску и полным секретам.
-- **Режим `dev:web`** — только для разработки интерфейса: ключи в локальном хранилище браузера открытым текстом; не используйте боевые секреты.
-- Профиль своего LLM — без ключей в JSON; при импорте сниппета токен уходит в защищённое хранилище.
+- Do not commit `.env`, API keys, or secret files from user data directories.
+- **Desktop app** — keys in the OS credential store; the renderer has no direct filesystem or full-secret access.
+- **`dev:web`** — for UI development only: keys live in browser `localStorage` in plain text; do not use production secrets.
+- Custom LLM profiles never store keys in JSON; imported tokens go to secure storage.
 
-## Лицензия
+## License
 
-См. [LICENSE](./LICENSE).
+See [LICENSE](./LICENSE).

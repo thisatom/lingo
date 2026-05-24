@@ -3,8 +3,10 @@ import type { Message } from '@/entities/message/model/types'
 import {
   estimateChatContextTokens,
   getChatContextUsageDetails,
+  resolveOutputTokenReserve,
   trimMessagesToTokenBudget
 } from './chat-context-usage'
+import { LLM_MAX_TOKENS_UNLIMITED } from './llm-max-tokens'
 
 function msg(role: Message['role'], content: string, id: string): Message {
   return { id, role, content, createdAt: 0 }
@@ -25,6 +27,23 @@ describe('getChatContextUsageDetails', () => {
     const b = getChatContextUsageDetails(withoutThinking, 'openai/gpt-4o-mini', 1024)
     expect(a.messageTokens).toBe(b.messageTokens)
     expect(a.messageCount).toBe(2)
+  })
+
+  it('marks unlimited reply budget in settings', () => {
+    const usage = getChatContextUsageDetails(
+      [msg('user', 'hi', '1')],
+      'openai/gpt-4o-mini',
+      LLM_MAX_TOKENS_UNLIMITED
+    )
+    expect(usage.replyBudgetUnlimited).toBe(true)
+    expect(usage.outputReserveTokens).toBeGreaterThan(2048)
+  })
+})
+
+describe('resolveOutputTokenReserve', () => {
+  it('uses a large reserve from model context when unlimited', () => {
+    expect(resolveOutputTokenReserve('openai/gpt-4o-mini', LLM_MAX_TOKENS_UNLIMITED)).toBe(32_768)
+    expect(resolveOutputTokenReserve('test/tiny-context', LLM_MAX_TOKENS_UNLIMITED)).toBe(2_000)
   })
 })
 

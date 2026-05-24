@@ -37,6 +37,7 @@ export class StreamingSentenceTts {
   private synthInFlight = 0
   private synthWaiters: Array<() => void> = []
   private hasStartedSpeaking = false
+  private chunksSubmitted = 0
 
   constructor(options: StreamingSentenceTtsOptions) {
     this.locale = options.locale
@@ -60,7 +61,7 @@ export class StreamingSentenceTts {
       plain.length < this.plainText.length &&
       !plain.startsWith(this.plainText.slice(0, this.consumedLength))
     ) {
-      this.cancel()
+      this.restartFromPlain(plain)
       return
     }
 
@@ -86,6 +87,14 @@ export class StreamingSentenceTts {
     }
 
     await this.playChain
+
+    if (
+      !this.cancelled &&
+      this.chunksSubmitted > 0 &&
+      !this.hasStartedSpeaking
+    ) {
+      throw new Error('TTS_EMPTY')
+    }
   }
 
   cancel(): void {
@@ -95,6 +104,22 @@ export class StreamingSentenceTts {
     this.playChain = Promise.resolve()
     this.synthInFlight = 0
     this.drainSynthWaiters()
+  }
+
+  /** Answer replaced reasoning in the text stream — restart playback from the new text. */
+  private restartFromPlain(plain: string): void {
+    this.plainText = plain
+    this.consumedLength = 0
+    this.chunksSubmitted = 0
+    this.hasStartedSpeaking = false
+    resetTtsPlaybackQueue()
+    stopTtsPlayback()
+    this.playChain = Promise.resolve()
+    const { chunks, remainder } = takeSpeechChunks(plain, false)
+    this.consumedLength = plain.length - remainder.length
+    for (const chunk of chunks) {
+      this.scheduleChunk(chunk)
+    }
   }
 
   private drainSynthWaiters(): void {
@@ -139,6 +164,7 @@ export class StreamingSentenceTts {
     if (this.cancelled || text.length < 2) return
     if (!this.shouldContinue()) return
 
+    this.chunksSubmitted += 1
     const synthPromise = this.startSynth(text)
 
     void synthPromise.then((result) => {

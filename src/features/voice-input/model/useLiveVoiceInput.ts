@@ -12,7 +12,7 @@ export interface LiveVoiceHandlers {
   isEditSpeech?: () => boolean
   onTextDraft: (text: string) => void
   onConversationLive: (text: string) => void
-  onConversationStart: () => string
+  onConversationStart: () => string | null
   onConversationCommit: (messageId: string) => Promise<void>
   onConversationCancel: (messageId: string) => void
 }
@@ -63,7 +63,9 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
 
   const start = useCallback(async () => {
     if (handlers.mode === 'conversation') {
-      conversationMessageIdRef.current = handlers.onConversationStart()
+      const messageId = handlers.onConversationStart()
+      if (!messageId) return false
+      conversationMessageIdRef.current = messageId
     }
 
     if (useBrowser) return browser.start()

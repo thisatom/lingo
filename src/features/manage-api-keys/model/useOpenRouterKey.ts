@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
+import { notifySecretsChanged } from '@/shared/lib/secrets-changed'
 import type { SecretStatus } from '@/shared/types/ipc'
 
 export function useOpenRouterKey() {
@@ -34,12 +35,14 @@ export function useOpenRouterKey() {
     const next = await getLingo().secrets.set('openrouter', value)
     setStatus(next)
     setApiError(null)
+    notifySecretsChanged('openrouter')
     return next
   }, [])
 
   const clear = useCallback(async () => {
     const next = await getLingo().secrets.clear('openrouter')
     setStatus(next)
+    notifySecretsChanged('openrouter')
     return next
   }, [])
 

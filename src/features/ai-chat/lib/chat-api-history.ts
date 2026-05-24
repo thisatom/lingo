@@ -9,7 +9,7 @@ import { useSettingsStore } from '@/entities/settings/model/store'
 import { normalizeAlternatingChatMessages } from '@/shared/lib/chat-api-alternation'
 import { messageHasVisibleContent } from '@/shared/lib/chat-message-api'
 import { trimMessagesToTokenBudgetWithMeta } from '@/shared/lib/chat-context-usage'
-import { normalizeLlmMaxTokens } from '@/shared/lib/llm-max-tokens'
+import { resolveOutputTokenReserve } from '@/shared/lib/chat-context-usage'
 import { resolveMessagesForApi } from '@/shared/lib/resolve-chat-api-messages'
 import type { ChatMessagePayload } from '@/shared/types/ipc'
 
@@ -55,7 +55,7 @@ export async function getHistoryForApi(
   const { messages: trimmed, historyTruncated } = trimMessagesToTokenBudgetWithMeta(
     alternating,
     options.modelId,
-    normalizeLlmMaxTokens(options.maxTokens)
+    resolveOutputTokenReserve(options.modelId, options.maxTokens)
   )
   const signature = historySignature(chatId, trimmed)
   const cached = getCachedApiHistory(signature)

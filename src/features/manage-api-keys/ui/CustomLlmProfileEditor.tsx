@@ -3,6 +3,7 @@ import Editor, { type OnMount } from '@monaco-editor/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { getLingo } from '@/shared/lib/lingo'
+import { notifySecretsChanged } from '@/shared/lib/secrets-changed'
 import {
   defaultCustomLlmProfileJson,
   parseCustomLlmProfileSource,
@@ -47,6 +48,7 @@ export function CustomLlmProfileEditor() {
       if (parsed.importedApiKey) {
         try {
           await getLingo().secrets.set('custom-llm', parsed.importedApiKey)
+          notifySecretsChanged('custom-llm')
           setImportHint('API key from snippet saved to Custom endpoint key below.')
         } catch {
           setImportHint('Profile imported — paste the API key into Custom endpoint key below.')
@@ -108,7 +110,14 @@ export function CustomLlmProfileEditor() {
     }
     const profileJson = stringifyCustomLlmProfile(parsed.data.profile)
     setDraft(profileJson)
-    scheduleSave(pasted)
+    setCustomLlmProfileJson(profileJson)
+    setParseError(null)
+    await applyParsed(parsed)
+    setImportHint(
+      `Imported ${parsed.data.baseUrl} · model ${parsed.data.model}${
+        parsed.importedApiKey ? ' · API key saved below' : ''
+      }.`
+    )
   }
 
   return (

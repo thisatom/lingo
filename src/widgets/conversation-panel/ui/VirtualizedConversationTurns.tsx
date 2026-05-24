@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import type { PipelineStage } from '@/entities/conversation/model/store'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { estimateTurnHeightPx } from '@/widgets/conversation-panel/lib/estimate-turn-height'
 import {
   lastAssistantMessageId,
-  type ConversationTurn as Turn
+  type ConversationTurn as Turn,
+  voiceCaptureLabelForUserMessage
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { ConversationTurn } from './ConversationTurn'
 
@@ -20,6 +22,8 @@ type VirtualizedConversationTurnsProps = {
   actionsDisabled?: boolean
   agentBusy?: boolean
   pipelineStreamingAnswer?: boolean
+  /** Live thinking in thread only when pipeline is in `thinking`. */
+  stage: PipelineStage
   onStopAgent?: () => void
   voiceSupported?: boolean
   voiceBusy?: boolean
@@ -35,6 +39,7 @@ type VirtualizedConversationTurnsProps = {
     attachments?: MessageAttachment[]
   ) => Promise<SubmitEditedUserMessageResult>
   onAttachmentError?: (message: string) => void
+  liveVoiceUserMessageId?: string | null
 }
 
 export function VirtualizedConversationTurns({
@@ -45,6 +50,7 @@ export function VirtualizedConversationTurns({
   actionsDisabled,
   agentBusy,
   pipelineStreamingAnswer = false,
+  stage,
   onStopAgent,
   voiceSupported,
   voiceBusy,
@@ -55,7 +61,8 @@ export function VirtualizedConversationTurns({
   onEnterEdit,
   onExitEdit,
   onSubmitEdit,
-  onAttachmentError
+  onAttachmentError,
+  liveVoiceUserMessageId = null
 }: VirtualizedConversationTurnsProps) {
   const measureRafRef = useRef<number | null>(null)
 
@@ -129,8 +136,19 @@ export function VirtualizedConversationTurns({
               onExitEdit={onExitEdit}
               onSubmitEdit={onSubmitEdit}
               onAttachmentError={onAttachmentError}
+              liveVoiceUserMessageId={liveVoiceUserMessageId}
+              voiceCaptureLabel={voiceCaptureLabelForUserMessage(
+                turn.user.id,
+                turn.user.content,
+                liveVoiceUserMessageId,
+                stage
+              )}
               agentBusy={agentBusy}
               isLatestTurn={isLatestTurn}
+              pipelineStage={isLatestTurn ? stage : 'idle'}
+              pipelineStreamingAnswer={
+                agentBusy && isLatestTurn ? pipelineStreamingAnswer : false
+              }
               streamingAssistantMessageId={
                 agentBusy && isLatestTurn && pipelineStreamingAnswer
                   ? lastAssistantMessageId(turn.assistantMessages)

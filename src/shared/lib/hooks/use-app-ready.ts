@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 
-const MIN_SPLASH_MS = 450
-const HYDRATION_TIMEOUT_MS = 12_000
-
-function storesHydrated(): boolean {
-  return useChatsStore.persist.hasHydrated() && useSettingsStore.persist.hasHydrated()
-}
+/** Safety net if settings persist never finishes (corrupt storage, etc.). */
+const SETTINGS_HYDRATION_TIMEOUT_MS = 2_000
 
 export function hideAppSplash(): void {
   const el = document.getElementById('app-splash')
@@ -18,42 +13,34 @@ export function hideAppSplash(): void {
   }, 240)
 }
 
-/** False until persisted stores are ready and the startup shell was shown briefly. */
+/**
+ * True once settings are hydrated — enough to render the shell.
+ * Chat history may still load; conversation UI handles that separately.
+ */
 export function useAppReady(): boolean {
-  const [ready, setReady] = useState(false)
+  const [ready, setReady] = useState(() => useSettingsStore.persist.hasHydrated())
 
   useEffect(() => {
-    let cancelled = false
-    const startedAt = Date.now()
-
-    const tryReady = () => {
-      if (cancelled || !storesHydrated()) return
-
-      const wait = Math.max(0, MIN_SPLASH_MS - (Date.now() - startedAt))
-      window.setTimeout(() => {
-        if (cancelled) return
-        requestAnimationFrame(() => {
-          if (cancelled) return
-          setReady(true)
-        })
-      }, wait)
+    if (useSettingsStore.persist.hasHydrated()) {
+      setReady(true)
+      return
     }
 
-    tryReady()
-    const unsubChats = useChatsStore.persist.onFinishHydration(tryReady)
-    const unsubSettings = useSettingsStore.persist.onFinishHydration(tryReady)
+    let cancelled = false
+    const unsub = useSettingsStore.persist.onFinishHydration(() => {
+      if (!cancelled) setReady(true)
+    })
 
     const hydrationTimeout = window.setTimeout(() => {
-      if (cancelled || storesHydrated()) return
-      console.warn('[lingo] Persist hydration timed out; continuing startup')
+      if (cancelled || useSettingsStore.persist.hasHydrated()) return
+      console.warn('[lingo] Settings hydration timed out; continuing startup')
       setReady(true)
-    }, HYDRATION_TIMEOUT_MS)
+    }, SETTINGS_HYDRATION_TIMEOUT_MS)
 
     return () => {
       cancelled = true
       window.clearTimeout(hydrationTimeout)
-      unsubChats()
-      unsubSettings()
+      unsub()
     }
   }, [])
 

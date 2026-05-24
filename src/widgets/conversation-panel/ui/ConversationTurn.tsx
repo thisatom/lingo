@@ -1,4 +1,5 @@
 import type { MessageAttachment } from '@/entities/message/model/attachment'
+import type { PipelineStage } from '@/entities/conversation/model/store'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { cn } from '@/shared/lib/utils'
@@ -37,6 +38,11 @@ interface ConversationTurnProps {
   streamingAssistantMessageId?: string
   agentBusy?: boolean
   isLatestTurn?: boolean
+  /** Active pipeline stage for the latest turn only (gates live thinking UI). */
+  pipelineStage?: PipelineStage
+  pipelineStreamingAnswer?: boolean
+  liveVoiceUserMessageId?: string | null
+  voiceCaptureLabel?: 'listening' | 'transcribing' | null
 }
 
 export function ConversationTurn({
@@ -59,7 +65,10 @@ export function ConversationTurn({
   onAttachmentError,
   streamingAssistantMessageId,
   agentBusy = false,
-  isLatestTurn = false
+  isLatestTurn = false,
+  pipelineStage = 'idle',
+  pipelineStreamingAnswer = false,
+  voiceCaptureLabel = null
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
 
@@ -97,6 +106,7 @@ export function ConversationTurn({
             onSubmitEdit(turn.user.id, text, attachments)
           }
           onAttachmentError={onAttachmentError}
+          voiceCaptureLabel={voiceCaptureLabel}
         />
       </div>
 
@@ -109,7 +119,14 @@ export function ConversationTurn({
               <AgentThinkingMessage
                 message={message}
                 assistantMessages={turn.assistantMessages}
-                live={isThinkingMessageLive(turn, message.id, agentBusy, isLatestTurn)}
+                live={isThinkingMessageLive(
+                  turn,
+                  message.id,
+                  agentBusy,
+                  isLatestTurn,
+                  isLatestTurn ? pipelineStage : 'idle',
+                  isLatestTurn ? pipelineStreamingAnswer : false
+                )}
               />
             ) : (
               <AgentMessage

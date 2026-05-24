@@ -31,8 +31,6 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/shared/ui/select'
-import { Switch } from '@/shared/ui/switch'
-
 type OnboardingDialogProps = {
   open: boolean
   onCompleted: () => void
@@ -72,9 +70,6 @@ export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
     () => useSettingsStore.getState().practiceLanguage
   )
   const [modelId, setModelIdLocal] = useState(() => useSettingsStore.getState().modelId)
-  const [addressByName, setAddressByName] = useState(
-    () => useSettingsStore.getState().addressUserByName
-  )
   const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,7 +104,7 @@ export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
           appTheme,
           practiceLanguage,
           modelId,
-          addressUserByName: addressByName,
+          addressUserByName: useSettingsStore.getState().addressUserByName,
           apiKey
         },
         { skipApiKey }
@@ -211,20 +206,6 @@ export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
               </SelectContent>
             </Select>
           </Field>
-
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5 dark:border-[#242424] dark:bg-[#1c1c1c]">
-            <div className="min-w-0">
-              <p className="text-sm text-foreground">Address me by name</p>
-              <p className="text-xs text-muted-foreground">
-                The assistant will use your name in replies.
-              </p>
-            </div>
-            <Switch
-              id="onboarding-address-by-name"
-              checked={addressByName}
-              onCheckedChange={setAddressByName}
-            />
-          </div>
 
           <Field
             id="onboarding-api-key"

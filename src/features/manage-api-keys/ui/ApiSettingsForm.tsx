@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/shared/ui/select'
-import { LLM_MAX_TOKENS_PRESETS } from '@/shared/lib/llm-max-tokens'
+import { LLM_MAX_TOKENS_PRESETS, llmMaxTokensSelectValue } from '@/shared/lib/llm-max-tokens'
 import type { LlmBackend, SecretProviderId } from '@/shared/types/ipc'
 import { OpenRouterModelCombobox } from './OpenRouterModelCombobox'
 
@@ -135,12 +135,12 @@ export function ApiSettingsForm() {
               Max response tokens
             </Label>
             <p className={settingsRowDescriptionClass}>
-              Upper bound for each assistant reply (`max_tokens` in the API). Does not change the
-              model context window — only how long a single answer may be.
+              Upper bound for each assistant reply (`max_tokens` in the API). “No limit” omits the
+              field so the provider uses the model default. Does not change the context window.
             </p>
           </div>
           <Select
-            value={String(llmMaxTokens)}
+            value={llmMaxTokensSelectValue(llmMaxTokens)}
             onValueChange={(value) => setLlmMaxTokens(Number(value))}
           >
             <SelectTrigger

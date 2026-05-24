@@ -130,9 +130,6 @@ const lingo: LingoApi = {
       }
     }
   },
-  welcome: {
-    finish: () => ipcRenderer.invoke('lingo:welcome:finish')
-  },
   app: {
     onPrepareShutdown: (handler: () => void | Promise<void>) => {
       const listener = () => {
