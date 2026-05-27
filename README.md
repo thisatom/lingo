@@ -68,6 +68,36 @@ npm install
 npm run dev
 ```
 
+### Linux (Debian, Ubuntu, etc.)
+
+Install build tools and **libsecret** (for `keytar` / OS credential storage):
+
+```bash
+sudo apt update
+sudo apt install -y build-essential python3 libsecret-1-dev
+```
+
+Use **npm** (not `pnpm`) for the first install, and do not pass `--ignore-scripts` — Electron downloads its binary in `postinstall`.
+
+If `npm run dev` fails with **`Error: Electron uninstall`**, the Electron binary was not installed:
+
+```bash
+npm run electron:install
+# or manually:
+node node_modules/electron/install.js
+npm run dev
+```
+
+Behind a slow or filtered network, set a mirror before reinstalling:
+
+```bash
+export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+rm -rf node_modules/electron
+npm install
+```
+
+UI-only in the browser (no Electron): `npm run dev:web` — keys are not stored in the OS keychain.
+
 | Command | Purpose |
 |---------|---------|
 | `npm run dev` | Development (Electron + hot reload) |

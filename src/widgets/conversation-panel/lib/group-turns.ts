@@ -37,9 +37,7 @@ export function isThinkingMessageLive(
   pipelineStage: PipelineStage = 'idle',
   pipelineStreamingAnswer = false
 ): boolean {
-  const reasoningStage =
-    pipelineStage === 'thinking' ||
-    (pipelineStage === 'speaking' && !pipelineStreamingAnswer)
+  const reasoningStage = pipelineStage === 'thinking'
 
   if (!agentBusy || !isLatestTurn || !reasoningStage) return false
 

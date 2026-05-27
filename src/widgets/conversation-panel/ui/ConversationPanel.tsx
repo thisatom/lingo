@@ -153,8 +153,7 @@ export function ConversationPanel({
     messages[messages.length - 1].content.length > 0
   const thinkingLiveInChat = useMemo(() => {
     if (!agentBusy || pipelineStreamingAnswer) return false
-    const reasoningStage =
-      stage === 'thinking' || (stage === 'speaking' && !pipelineStreamingAnswer)
+    const reasoningStage = stage === 'thinking'
     if (!reasoningStage) return false
     const latestTurn = groupMessagesIntoTurns(messages).at(-1)
     return latestTurn?.assistantMessages.some((m) => m.role === 'thinking') ?? false

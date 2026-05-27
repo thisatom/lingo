@@ -88,5 +88,8 @@ lingo/
 
 ## Ссылки
 
+- [Контракт агента чата](docs/CHAT_AGENT.md)
+- [План стабилизации агента чата](docs/CHAT_AGENT_STABILITY_PLAN.md)
+- [Ручной QA агента](docs/CHAT_AGENT_MANUAL_QA.md)
 - [Feature-Sliced Design](https://feature-sliced.design/)
 - [@incanta/custom-electron-titlebar](https://www.npmjs.com/package/@incanta/custom-electron-titlebar)

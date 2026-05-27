@@ -31,3 +31,11 @@ alwaysApply: false
 
 Без валидного ключа OpenRouter — не стартовать чат; направить в settings.
 
+## Стабильность агента
+
+- Контракт: `docs/CHAT_AGENT.md`, план: `docs/CHAT_AGENT_STABILITY_PLAN.md`, QA: `docs/CHAT_AGENT_MANUAL_QA.md`
+- Логику хода не раздувать в `useAiChat` — выносить в `features/ai-chat/lib/` (`chat-agent-stop`, `chat-agent-policies`, `chat-agent-stream-turn`) с Vitest
+- `stop(force)` → `executeAgentStop` (session, queue, pending, idle)
+- TTS только `conversation` + `ttsEnabled` → `shouldPlayAgentTts`
+- PR: чеклист из `docs/CHAT_AGENT.md` § PR checklist
+

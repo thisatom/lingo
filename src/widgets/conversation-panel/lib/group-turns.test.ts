@@ -19,10 +19,9 @@ describe('isThinkingMessageLive', () => {
     expect(isThinkingMessageLive(liveTurn, 't1', true, true, 'thinking')).toBe(true)
   })
 
-  it('stays live during speaking until the answer stream starts', () => {
+  it('is false during speaking (TTS runs after the answer is complete)', () => {
     const liveTurn = { assistantMessages: [msg('t1', 'thinking')] }
-    expect(isThinkingMessageLive(liveTurn, 't1', true, true, 'speaking', false)).toBe(true)
-    expect(isThinkingMessageLive(liveTurn, 't1', true, true, 'speaking', true)).toBe(false)
+    expect(isThinkingMessageLive(liveTurn, 't1', true, true, 'speaking', false)).toBe(false)
   })
 
   it('is false during web search even with empty thinking placeholder', () => {

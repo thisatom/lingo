@@ -16,7 +16,8 @@
     "build:web": "vite build --config vite.config.ts",
     "preview": "electron-vite preview",
     "preview:web": "vite preview --config vite.config.ts",
-    "postinstall": "electron-rebuild -f -w keytar",
+    "postinstall": "node scripts/ensure-electron.mjs && electron-rebuild -f -w keytar",
+    "electron:install": "node scripts/ensure-electron.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
     "icons:png": "python scripts/icon-ico-to-png.py"

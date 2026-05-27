@@ -46,6 +46,8 @@ export function MainPage() {
     messages,
     stage,
     agentBusy,
+    agentPhase,
+    forceStopAgent,
     backgroundStreamChatId,
     queuedMessages,
     sendUserMessage,
@@ -224,9 +226,9 @@ export function MainPage() {
   const actionsDisabled = agentBusy || voiceBusy
   const liveConversation = useLiveConversationLoop({
     mode: chatComposerMode,
-    stage,
+    voiceStage: stage,
+    agentPhase,
     voiceBusy,
-    agentBusy,
     speechError,
     onStartListening: () => {
       void startVoiceCaptureRef.current?.()
@@ -281,9 +283,9 @@ export function MainPage() {
       voiceMessageIdRef.current = ''
     }
     setLiveVoiceUserMessageId(null)
-    stopAgent({ force: true })
+    forceStopAgent()
     setSpeechError(null)
-  }, [cancelVoiceUserMessage, liveConversation, setSpeechError, stopAgent, voice])
+  }, [cancelVoiceUserMessage, forceStopAgent, liveConversation, setSpeechError, voice])
 
   const handleStopAgent = useCallback(() => {
     stopAgentSpeechSession()

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en" class="dark lingo-web">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https: http:; connect-src 'self' https://openrouter.ai https://api.openrouter.ai https://*.openrouter.ai https://speech.platform.bing.com https://*.speech.platform.bing.com wss://speech.platform.bing.com wss://*.speech.platform.bing.com https://www.google.com https://*.google.com https://speech.googleapis.com wss://www.google.com wss://*.google.com http://localhost:3001 https:; media-src 'self' blob: data: https:" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#121212" />
+    <meta name="msapplication-TileColor" content="#121212" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" type="image/png" href="./icon.png" />
+    <title>Lingo</title>
+    <script src="./init-theme.js"></script>
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background-color: #121212;
+        color: #d1d1d1;
+      }
+      html:not(.dark) body,
+      html:not(.dark) #root {
+        background-color: #f5f5f5;
+        color: #171717;
+      }
+      html.lingo-web body {
+        padding-top: 0;
+      }
+      #root {
+        min-height: 100%;
+      }
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483646;
+        background: #121212;
+      }
+      html:not(.dark) #app-splash {
+        background: #f5f5f5;
+      }
+      #app-splash.app-splash--hide {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.22s ease-out;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index.web-jgkr8dmo.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BilyEWL8.css">
+  </head>
+  <body>
+    <div id="app-splash" aria-busy="true" aria-label="Loading"></div>
+    <div id="root"></div>
+  </body>
+</html>

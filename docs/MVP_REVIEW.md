@@ -267,6 +267,22 @@
 
 ---
 
+## Agent stability (чат)
+
+**Статус:** в работе (фаза 0–1 по [CHAT_AGENT_STABILITY_PLAN.md](./CHAT_AGENT_STABILITY_PLAN.md)).
+
+| ID | Приоритет | Задача | Статус |
+|----|-----------|--------|--------|
+| AG-1 | P1 | Контракт поведения | ✅ `docs/CHAT_AGENT.md` |
+| AG-2 | P1 | Ручной QA чеклист | ✅ `docs/CHAT_AGENT_MANUAL_QA.md` |
+| AG-3 | P0 | Vitest: Stop / session / queue / stream done | ✅ `chat-agent-{policies,stream-turn,stop}.test.ts` |
+| AG-4 | P1 | Выделить `ChatAgentController`, упростить `useAiChat` | 🔄 фаза 2 (runTurn в controller) |
+| AG-5 | P2 | Playwright smoke (send + stop) | ⏳ фаза 4 |
+
+**DoD:** сценарии из `CHAT_AGENT.md` + зелёный `npm test` + обязательные пункты `CHAT_AGENT_MANUAL_QA.md`.
+
+---
+
 ## Рекомендуемый порядок исправлений (post-review)
 
 1. P0 SSRF guards (link preview + custom LLM URL policy)  
@@ -284,6 +300,7 @@
 - [README.md](../README.md) — запуск и обзор продукта  
 - [API_KEYS.md](./API_KEYS.md) — модель ключей  
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — процессы (требует обновления)  
-- [SPEECH_PIPELINE.md](./SPEECH_PIPELINE.md) — STT/TTS  
+- [SPEECH_PIPELINE.md](./SPEECH_PIPELINE.md) — STT/TTS
+- [CHAT_AGENT_STABILITY_PLAN.md](./CHAT_AGENT_STABILITY_PLAN.md) — план стабилизации агента чата (DoD, фазы, тесты)  
 
 *Этот файл — живой backlog MVP review. При исправлении пункта — помечать в PR ссылкой на ID (например `MVP-6`).*

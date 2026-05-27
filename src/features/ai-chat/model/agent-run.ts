@@ -14,3 +14,13 @@ export function cancelAgentRun(): number {
 export function isAgentRunActive(runId: number): boolean {
   return runId === generation
 }
+
+/** Vitest: isolate generation between specs that call `cancelAgentRun`. */
+export function resetAgentRunGeneration(): void {
+  generation = 0
+}
+
+/** Vitest: assert run id vs global generation when debugging flaky integration tests. */
+export function getAgentRunGeneration(): number {
+  return generation
+}

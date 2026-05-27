@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChatsStore } from '@/entities/chat/model/store'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
-import { isChatAgentBusy } from '@/features/ai-chat/lib/chat-agent-busy'
+import type { AgentTurnPhase } from '@/features/ai-chat/lib/chat-agent-transitions'
+import {
+  getAgentSessionSnapshot,
+  isAgentSessionBusy
+} from '@/features/ai-chat/lib/agent-session-snapshot'
 import { isPlaybackOnlyConversationError } from '@/features/ai-chat/lib/post-reply'
 import { useConversationStore } from '@/entities/conversation/model/store'
 
@@ -9,18 +13,20 @@ const AUTO_LISTEN_DELAY_MS = 500
 
 interface Options {
   mode: ChatComposerMode
-  stage: string
+  /** Voice capture stages (not agent LLM). */
+  voiceStage: string
+  /** Agent turn phase for the active chat (from `AgentSessionSnapshot`). */
+  agentPhase: AgentTurnPhase
   voiceBusy: boolean
-  agentBusy: boolean
   speechError: string | null
   onStartListening: () => void
 }
 
 export function useLiveConversationLoop({
   mode,
-  stage,
+  voiceStage,
+  agentPhase,
   voiceBusy,
-  agentBusy,
   speechError,
   onStartListening
 }: Options) {
@@ -30,12 +36,12 @@ export function useLiveConversationLoop({
   const [isLiveConversationActive, setIsLiveConversationActive] = useState(false)
   const autoListenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const voiceBusyRef = useRef(voiceBusy)
-  const agentBusyRef = useRef(agentBusy)
+  const agentPhaseRef = useRef(agentPhase)
   const speechErrorRef = useRef(speechError)
   const modeRef = useRef(mode)
 
   voiceBusyRef.current = voiceBusy
-  agentBusyRef.current = agentBusy
+  agentPhaseRef.current = agentPhase
   speechErrorRef.current = speechError
   modeRef.current = mode
 
@@ -63,8 +69,8 @@ export function useLiveConversationLoop({
 
   const scheduleAutoListen = useCallback(() => {
     if (modeRef.current !== 'conversation' || !activeRef.current) return
-    if (stage === 'listening' || stage === 'transcribing') return
-    if (stage !== 'idle' || voiceBusy || agentBusy || speechError) return
+    if (voiceStage === 'listening' || voiceStage === 'transcribing') return
+    if (agentPhase !== 'idle' || voiceBusy || speechError) return
 
     const sessionChatId = sessionChatIdRef.current
     const activeChatId = useChatsStore.getState().activeChatId
@@ -85,17 +91,18 @@ export function useLiveConversationLoop({
         return
       }
 
-      const { stage: currentStage, error: pipelineError } =
+      const { stage: currentVoiceStage, error: pipelineError } =
         useConversationStore.getState()
       const pipelineBlocksListen =
         pipelineError != null && !isPlaybackOnlyConversationError(pipelineError)
       if (
-        currentStage !== 'idle' ||
+        currentVoiceStage === 'listening' ||
+        currentVoiceStage === 'transcribing' ||
         speechErrorRef.current ||
         pipelineBlocksListen ||
         voiceBusyRef.current ||
-        agentBusyRef.current ||
-        isChatAgentBusy(currentActiveChatId)
+        agentPhaseRef.current !== 'idle' ||
+        isAgentSessionBusy(getAgentSessionSnapshot(currentActiveChatId))
       ) {
         return
       }
@@ -103,12 +110,12 @@ export function useLiveConversationLoop({
       onStartListening()
     }, AUTO_LISTEN_DELAY_MS)
   }, [
-    agentBusy,
+    agentPhase,
     clearAutoListenTimer,
     onStartListening,
     speechError,
-    stage,
-    voiceBusy
+    voiceBusy,
+    voiceStage
   ])
 
   useEffect(() => {
