@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  endAgentTurnStreamBinding,
   getBackgroundStreamChatId,
   isAgentStreamActiveForChat,
   setAgentStreamSession
@@ -19,6 +20,26 @@ describe('agent-stream-session', () => {
     expect(isAgentStreamActiveForChat('chat-a')).toBe(true)
     expect(isAgentStreamActiveForChat('chat-b')).toBe(false)
     setAgentStreamSession(null, false)
+    expect(isAgentStreamActiveForChat('chat-a')).toBe(false)
+  })
+
+  it('endAgentTurnStreamBinding clears global stream when turn owned the binding', () => {
+    const session = {
+      streamTarget: 'chat-a' as string | null,
+      getStreamTargetChatId() {
+        return this.streamTarget
+      },
+      setStreamController() {},
+      setStreamTargetChatId(chatId: string | null) {
+        this.streamTarget = chatId
+      },
+      setStreamActive() {}
+    }
+    setAgentStreamSession('chat-a', true)
+
+    endAgentTurnStreamBinding('chat-a', session)
+
+    expect(session.streamTarget).toBeNull()
     expect(isAgentStreamActiveForChat('chat-a')).toBe(false)
   })
 })

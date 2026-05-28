@@ -1,6 +1,9 @@
 import type { WebContents } from 'electron'
 import { resolveChatCompletionsUrl } from '@/shared/config/custom-llm'
-import { buildChatStreamLlmFields } from '@/shared/lib/resolve-chat-stream-llm'
+import {
+  buildChatStreamLlmFields,
+  resolveChatStreamWebSearch
+} from '@/shared/lib/resolve-chat-stream-llm'
 import { assertOutboundHttpUrl } from '@/shared/lib/outbound-url-policy'
 import type { ChatStreamRequest } from '@/shared/types/ipc'
 import { readPersistedLlmSnapshot } from './persisted-llm-settings'
@@ -11,18 +14,18 @@ export async function sanitizeChatStreamRequest(
   webContents: WebContents
 ): Promise<ChatStreamRequest> {
   const snapshot = await readPersistedLlmSnapshot(webContents)
-  const { webSearch, messages, practiceLanguage } = request
+  const { messages, practiceLanguage, webSearch: perTurnWebSearch } = request
 
   if (!snapshot) {
     return {
       messages,
       practiceLanguage,
-      webSearch,
+      webSearch: perTurnWebSearch === true,
       llmBackend: 'openrouter'
     }
   }
 
-  const llmFields = buildChatStreamLlmFields({
+  const llmSettings = {
     llmBackend: snapshot.llmBackend,
     modelId: snapshot.modelId,
     customApiBaseUrl: snapshot.customApiBaseUrl,
@@ -31,7 +34,8 @@ export async function sanitizeChatStreamRequest(
     webSearchEnabled: snapshot.webSearchEnabled,
     modelAutoFallback: snapshot.modelAutoFallback,
     llmMaxTokens: snapshot.llmMaxTokens
-  })
+  }
+  const llmFields = buildChatStreamLlmFields(llmSettings)
 
   if (llmFields.llmBackend === 'custom' && llmFields.customLlm?.baseUrl) {
     const target = resolveChatCompletionsUrl(llmFields.customLlm.baseUrl)
@@ -41,7 +45,7 @@ export async function sanitizeChatStreamRequest(
   return {
     messages,
     practiceLanguage,
-    webSearch,
-    ...llmFields
+    ...llmFields,
+    webSearch: resolveChatStreamWebSearch(llmSettings, perTurnWebSearch)
   }
 }

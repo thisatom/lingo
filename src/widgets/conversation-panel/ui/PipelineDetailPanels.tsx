@@ -1,53 +1,55 @@
 import type { PipelineSearchTarget } from '@/entities/conversation/model/store'
+import { hostFromUrl } from '@/shared/lib/web-search-targets'
 import { cn } from '@/shared/lib/utils'
-
-function hostLabel(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
-}
+import { Loader2Icon } from '@/shared/ui/icons'
 
 export function SearchTargetList({
   targets,
+  activeUrl = null,
   className
 }: {
   targets: readonly PipelineSearchTarget[]
+  activeUrl?: string | null
   className?: string
 }) {
   if (targets.length === 0) return null
 
-  return (
-    <ul className={cn('mt-2 space-y-1.5', className)}>
-      {targets.map((target) => {
-        const label = target.url ? hostLabel(target.url) : target.title
-        const sub = target.title && target.url && target.title !== label ? target.title : null
+  const activeHost = activeUrl ? hostFromUrl(activeUrl) : null
 
-        if (target.url) {
-          return (
-            <li key={`${target.url}-${target.title}`} className="min-w-0 text-[13px] leading-snug">
-              <a
-                href={target.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-foreground/80 underline-offset-2 hover:text-foreground hover:underline"
-              >
-                {label}
-              </a>
-              {sub ? (
-                <span className="mt-0.5 block truncate text-muted-foreground">{sub}</span>
-              ) : null}
-            </li>
-          )
-        }
+  return (
+    <ul className={cn('mt-2 space-y-1', className)}>
+      {targets.map((target) => {
+        const host = target.url ? hostFromUrl(target.url) : target.title
+        const isActive = Boolean(activeHost && target.url && hostFromUrl(target.url) === activeHost)
+        const sub =
+          target.title && target.url && target.title !== host && !target.title.includes(host)
+            ? target.title
+            : null
 
         return (
           <li
-            key={target.title}
-            className="min-w-0 text-[13px] leading-snug text-muted-foreground"
+            key={`${target.url}-${target.title}`}
+            className={cn(
+              'flex min-w-0 items-start gap-2 text-[13px] leading-snug',
+              isActive ? 'text-foreground' : 'text-muted-foreground'
+            )}
           >
-            {target.title}
+            {isActive ? (
+              <Loader2Icon className="mt-0.5 size-3.5 shrink-0 animate-spin opacity-80" />
+            ) : (
+              <span
+                className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/45"
+                aria-hidden
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              {target.url ? (
+                <span className={cn(isActive && 'font-medium text-foreground')}>{host}</span>
+              ) : (
+                <span>{target.title}</span>
+              )}
+              {sub ? <span className="mt-0.5 block truncate text-[12px] opacity-80">{sub}</span> : null}
+            </div>
           </li>
         )
       })}

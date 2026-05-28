@@ -1,6 +1,7 @@
 import type { ChatContentPart, ChatMessagePayload } from '@/shared/types/ipc'
 import { isOpenRouterCreditError } from '@/shared/lib/openrouter-errors'
 import type { LocalWebSearchResult } from '@/shared/lib/local-web-search'
+import type { LocalWebSearchProgress } from '@/shared/lib/local-web-search-progress'
 import {
   isLocalWebSearchRegistered,
   searchWebLocal
@@ -30,7 +31,7 @@ export function formatLocalWebSearchBlock(query: string, results: LocalWebSearch
   }
 
   return [
-    `**Web research (websearch-mcp)** for "${query}" — page excerpts (not link lists):`,
+    `**Web research** for "${query}" — page excerpts (not link lists):`,
     '',
     lines.join('\n\n'),
     '',
@@ -53,14 +54,15 @@ const MAX_LOCAL_SEARCH_CACHE = 16
 const localSearchBlockCache = new Map<string, string>()
 
 export async function fetchLocalWebSearchResults(
-  query: string
+  query: string,
+  progress?: LocalWebSearchProgress
 ): Promise<LocalWebSearchResult[]> {
   if (!isLocalWebSearchRegistered()) {
     throw new Error(
       'Local web search is not available in this environment. Use the desktop app or browser build with network access.'
     )
   }
-  return searchWebLocal(query)
+  return searchWebLocal(query, progress)
 }
 
 export function substituteMessagesWithLocalWebSearchResults(

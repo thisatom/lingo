@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { copyToClipboard } from '@/shared/lib/copy-to-clipboard'
 import { sidebarMenuItemClass, sidebarMenuSurfaceClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from '@/shared/lib/utils'
-import { chatSelectableClass } from '@/widgets/conversation-panel/ui/agent-layout'
+import { chatNonSelectableClass } from '@/widgets/conversation-panel/ui/agent-layout'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -16,7 +16,8 @@ interface UserQuestionContextMenuProps {
   prompt: string
   chatId: string | null
   className?: string
-  onDoubleClick?: React.MouseEventHandler<HTMLDivElement>
+  activateDisabled?: boolean
+  onActivate?: () => void
 }
 
 export function UserQuestionContextMenu({
@@ -24,20 +25,38 @@ export function UserQuestionContextMenu({
   prompt,
   chatId,
   className,
-  onDoubleClick
+  activateDisabled = false,
+  onActivate
 }: UserQuestionContextMenuProps) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
-          className={cn('min-w-0', chatSelectableClass, className)}
+          role={onActivate && !activateDisabled ? 'button' : undefined}
+          tabIndex={onActivate && !activateDisabled ? 0 : undefined}
+          className={cn(
+            'min-w-0',
+            chatNonSelectableClass,
+            className,
+            onActivate && !activateDisabled && 'cursor-pointer'
+          )}
           data-user-question-block
-          onDoubleClick={onDoubleClick}
+          onClick={() => {
+            if (activateDisabled) return
+            onActivate?.()
+          }}
+          onKeyDown={(event) => {
+            if (activateDisabled || !onActivate) return
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onActivate()
+            }
+          }}
         >
           {children}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className={cn('w-52 p-1', sidebarMenuSurfaceClass)}>
+      <ContextMenuContent className={cn('w-52', sidebarMenuSurfaceClass)}>
         <ContextMenuItem
           className={sidebarMenuItemClass}
           disabled={!prompt.trim()}
@@ -45,7 +64,7 @@ export function UserQuestionContextMenu({
         >
           Copy prompt
         </ContextMenuItem>
-        <ContextMenuSeparator className="my-1 bg-border/60" />
+        <ContextMenuSeparator className="bg-border/60" />
         <ContextMenuItem
           className={sidebarMenuItemClass}
           disabled={!chatId}

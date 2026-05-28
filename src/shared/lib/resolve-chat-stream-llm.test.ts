@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { LLM_MAX_TOKENS_UNLIMITED } from '@/shared/lib/llm-max-tokens'
-import { buildChatStreamLlmFields } from './resolve-chat-stream-llm'
+import { buildChatStreamLlmFields, resolveChatStreamWebSearch } from './resolve-chat-stream-llm'
+
+describe('resolveChatStreamWebSearch', () => {
+  const base = {
+    webSearchEnabled: true,
+    llmBackend: 'openrouter' as const
+  }
+
+  it('requires settings on and per-turn approval (any backend)', () => {
+    expect(resolveChatStreamWebSearch(base, true)).toBe(true)
+    expect(resolveChatStreamWebSearch(base, false)).toBe(false)
+    expect(resolveChatStreamWebSearch({ ...base, llmBackend: 'custom' }, true)).toBe(true)
+  })
+
+  it('trusts per-turn true from renderer even when persisted web search is off', () => {
+    expect(resolveChatStreamWebSearch({ ...base, webSearchEnabled: false }, true)).toBe(true)
+  })
+
+  it('falls back to persisted setting when per-turn is omitted', () => {
+    expect(resolveChatStreamWebSearch({ ...base, webSearchEnabled: true }, undefined)).toBe(true)
+    expect(resolveChatStreamWebSearch({ ...base, webSearchEnabled: false }, undefined)).toBe(false)
+  })
+})
 
 describe('buildChatStreamLlmFields', () => {
   it('builds distinct custom endpoints from settings snapshots (main-trusted routing)', () => {

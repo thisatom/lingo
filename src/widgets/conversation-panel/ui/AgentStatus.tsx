@@ -1,9 +1,7 @@
-import { useSettingsStore } from '@/entities/settings/model/store'
 import type { PipelineStage } from '@/entities/conversation/model/store'
 import { SpeakingTtsLevel } from '@/features/text-to-speech/ui/SpeakingTtsLevel'
-import { isLocalWebSearchRegistered } from '@/shared/lib/local-web-search-runtime'
-import { getWebSearchProvider } from '@/shared/lib/web-search-provider'
 import { useConversationStore } from '@/entities/conversation/model/store'
+import { hostFromUrl, isBrowsableSearchTarget } from '@/shared/lib/web-search-targets'
 import { cn } from '@/shared/lib/utils'
 import { ShinyText } from '@/shared/ui/shiny-text'
 import { agentMessageClass } from './agent-layout'
@@ -21,32 +19,35 @@ interface AgentStatusProps {
 }
 
 export function AgentStatus({ stage }: AgentStatusProps) {
-  const modelId = useSettingsStore((s) => s.modelId)
   const pipelineSearchTargets = useConversationStore((s) => s.pipelineSearchTargets)
+  const pipelineSearchActiveUrl = useConversationStore((s) => s.pipelineSearchActiveUrl)
 
   if (stage === 'searching') {
-    const local = isLocalWebSearchRegistered()
-    const provider = getWebSearchProvider(modelId, { local })
-    const targets =
-      pipelineSearchTargets.length > 0
-        ? pipelineSearchTargets
-        : [{ title: provider.label, url: provider.href }]
+    const targets = pipelineSearchTargets.filter(isBrowsableSearchTarget)
+    const activeHost = pipelineSearchActiveUrl ? hostFromUrl(pipelineSearchActiveUrl) : null
+    const statusLine = activeHost
+      ? `Reading ${activeHost}…`
+      : targets.length > 0
+        ? 'Reviewing pages…'
+        : 'Finding pages…'
 
     return (
       <div
         className={agentMessageClass}
         role="status"
         aria-live="polite"
-        aria-label={local ? 'Researching the web' : `Searching web via ${provider.label}`}
+        aria-label="Searching the web"
       >
         <ShinyText
-          text={local ? 'Researching the web' : 'Searching web'}
+          text="Searching the web"
           className="text-[13px] leading-[1.5] font-normal"
           speed={2.2}
           spread={110}
         />
-        <p className="mt-1 text-[12px] text-muted-foreground">Looking on:</p>
-        <SearchTargetList targets={targets} />
+        <p className="mt-1.5 text-[12px] text-muted-foreground">{statusLine}</p>
+        {targets.length > 0 ? (
+          <SearchTargetList targets={targets} activeUrl={pipelineSearchActiveUrl} />
+        ) : null}
       </div>
     )
   }

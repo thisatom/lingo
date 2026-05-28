@@ -25,7 +25,7 @@ import {
   buildAgentStopContext,
   buildAgentTurnSession,
   createGlobalStageIdleCallback,
-  type AgentChatSessionRefs
+  getSharedAgentChatSessionRefs
 } from '@/features/ai-chat/model/agent-chat-session'
 import {
   beginVoiceUserMessageAction,
@@ -40,8 +40,6 @@ import {
   type ChatAgentUserActionsDeps
 } from '@/features/ai-chat/model/chat-agent-user-actions'
 import type { SubmitEditedUserMessageResult } from './submit-edited-user-message'
-import type { ChatStreamController } from '@/shared/types/ipc'
-import type { StreamingSentenceTts } from '@/features/text-to-speech/model/streamingSentenceTts'
 
 export type { SubmitEditedUserMessageResult } from './submit-edited-user-message'
 export type StopAgentOptions = AgentStopOptions
@@ -72,20 +70,10 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     setPipelineErrorForChat(chatId, error)
   }, [])
 
-  const streamControllerRef = useRef<ChatStreamController | null>(null)
-  const streamTargetChatIdRef = useRef<string | null>(null)
-  const streamingTtsRef = useRef<StreamingSentenceTts | null>(null)
+  const sessionRefs = getSharedAgentChatSessionRefs()
+  const prevActiveChatIdRef = useRef<string | null>(null)
   const optionsRef = useRef(options)
   optionsRef.current = options
-
-  const sessionRefs = useMemo<AgentChatSessionRefs>(
-    () => ({
-      streamControllerRef,
-      streamTargetChatIdRef,
-      streamingTtsRef
-    }),
-    []
-  )
 
   const buildSession = useCallback(
     (): AgentTurnSession => buildAgentTurnSession(sessionRefs),
@@ -164,6 +152,14 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   const messages = activeChat?.messages ?? EMPTY_MESSAGES
   const activeChatId = activeChat?.id ?? null
 
+  useEffect(() => {
+    const previous = prevActiveChatIdRef.current
+    if (previous && previous !== activeChatId) {
+      chatAgentController.stop({ chatId: previous, force: true }, buildStopContext())
+    }
+    prevActiveChatIdRef.current = activeChatId
+  }, [activeChatId, buildStopContext])
+
   const agentSession = useMemo(
     () => getAgentSessionSnapshotForView(activeChatId, stage),
     [activeChatId, stage]
@@ -217,18 +213,20 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   )
 
   const updateVoiceUserMessage = useCallback(
-    (messageId: string, content: string) =>
-      updateVoiceUserMessageAction(userActionsDeps, messageId, content),
+    (messageId: string, content: string, chatId: string) =>
+      updateVoiceUserMessageAction(userActionsDeps, messageId, content, chatId),
     [userActionsDeps]
   )
 
   const cancelVoiceUserMessage = useCallback(
-    (messageId: string) => cancelVoiceUserMessageAction(userActionsDeps, messageId),
+    (messageId: string, chatId: string) =>
+      cancelVoiceUserMessageAction(userActionsDeps, messageId, chatId),
     [userActionsDeps]
   )
 
   const commitVoiceUserMessage = useCallback(
-    (messageId: string) => commitVoiceUserMessageAction(userActionsDeps, messageId),
+    (messageId: string, chatId: string) =>
+      commitVoiceUserMessageAction(userActionsDeps, messageId, chatId),
     [userActionsDeps]
   )
 

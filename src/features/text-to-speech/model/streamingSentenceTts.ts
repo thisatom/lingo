@@ -90,6 +90,7 @@ export class StreamingSentenceTts {
 
     if (
       !this.cancelled &&
+      isAgentRunActive(this.runId) &&
       this.chunksSubmitted > 0 &&
       !this.hasStartedSpeaking
     ) {

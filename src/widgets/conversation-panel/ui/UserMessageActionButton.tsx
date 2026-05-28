@@ -49,8 +49,8 @@ export function UserMessageActionButton({
         'text-muted-foreground/55 hover:bg-accent hover:text-muted-foreground',
         disabled && 'pointer-events-none opacity-0'
       )}
-      tooltip="Edit message"
-      aria-label="Edit message"
+      tooltip="Return to this point"
+      aria-label="Return to this point"
       disabled={disabled}
       onClick={(event) => {
         event.stopPropagation()

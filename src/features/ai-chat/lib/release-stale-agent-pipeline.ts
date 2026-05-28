@@ -13,3 +13,9 @@ export function releaseStaleAgentPipelineStage(chatId: string): void {
     setPipelineStageForChat(chatId, 'idle')
   }
 }
+
+/** After a turn ends: drop busy pipeline state unless a new stream already started on this chat. */
+export function finalizeAgentTurnPipeline(chatId: string): void {
+  if (isAgentStreamActiveForChat(chatId)) return
+  setPipelineStageForChat(chatId, 'idle')
+}

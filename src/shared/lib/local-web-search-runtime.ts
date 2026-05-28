@@ -1,6 +1,10 @@
 import type { LocalWebSearchResult } from '@/shared/lib/local-web-search'
+import type { LocalWebSearchProgress } from '@/shared/lib/local-web-search-progress'
 
-export type LocalWebSearchFn = (query: string) => Promise<LocalWebSearchResult[]>
+export type LocalWebSearchFn = (
+  query: string,
+  progress?: LocalWebSearchProgress
+) => Promise<LocalWebSearchResult[]>
 
 let localWebSearchFn: LocalWebSearchFn | null = null
 
@@ -12,9 +16,12 @@ export function isLocalWebSearchRegistered(): boolean {
   return localWebSearchFn != null
 }
 
-export async function searchWebLocal(query: string): Promise<LocalWebSearchResult[]> {
+export async function searchWebLocal(
+  query: string,
+  progress?: LocalWebSearchProgress
+): Promise<LocalWebSearchResult[]> {
   if (!localWebSearchFn) return []
   const trimmed = query.trim()
   if (!trimmed) return []
-  return localWebSearchFn(trimmed)
+  return localWebSearchFn(trimmed, progress)
 }

@@ -19,18 +19,22 @@ import {
   removeAgentTurnTail,
   removeAgentTurnTailUnlessPersisted
 } from '@/features/ai-chat/lib/agent-turn-cleanup'
-import { setAgentStreamSession } from '@/features/ai-chat/lib/agent-stream-session'
+import {
+  endAgentTurnStreamBinding,
+  setAgentStreamSession
+} from '@/features/ai-chat/lib/agent-stream-session'
 import { getOtherChatStreamBlocking } from '@/features/ai-chat/lib/agent-stream-guard'
 import {
   clearPipelineDetailForChat,
   isViewingChat,
   setPipelineErrorForChat,
+  setPipelineSearchActiveUrlForChat,
   setPipelineSearchTargetsForChat,
   setPipelineStageForChat,
   setPipelineStreamingAnswerForChat
 } from '@/features/ai-chat/lib/pipeline-stage'
 import { reconcileTurnMessagesFromStore } from '@/features/ai-chat/lib/reconcile-turn-messages'
-import { releaseStaleAgentPipelineStage } from '@/features/ai-chat/lib/release-stale-agent-pipeline'
+import { finalizeAgentTurnPipeline } from '@/features/ai-chat/lib/release-stale-agent-pipeline'
 import {
   beginAgentRun as defaultBeginAgentRun,
   isAgentRunActive as defaultIsAgentRunActive
@@ -47,7 +51,14 @@ import {
   validateCustomLlmSettings
 } from '@/shared/lib/resolve-chat-stream-llm'
 import { messagesHaveImages } from '@/shared/lib/vision-models'
-import { shouldRunWebSearch } from '@/shared/lib/web-search-intent'
+import {
+  resolveWebSearchForChatTurn,
+  threadHasUserAttachments
+} from '@/shared/lib/web-search-turn'
+import {
+  isBrowsableSearchTarget,
+  type WebSearchSource
+} from '@/shared/lib/web-search-targets'
 import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
 import { formatQueuePreview } from '@/entities/message-queue/lib/format-queue-preview'
 import { useConversationStore } from '@/entities/conversation/model/store'
@@ -112,6 +123,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
   const removeMessagesFrom = useChatsStore.getState().removeMessagesFrom
   const removeMessage = useChatsStore.getState().removeMessage
   const updateMessageContent = useChatsStore.getState().updateMessageContent
+  const updateMessageSearchSources = useChatsStore.getState().updateMessageSearchSources
 
   const customError = validateCustomLlmSettings(llmSettings)
   if (customError) {
@@ -151,17 +163,11 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     modelId: activeModelId,
     maxTokens: llmSettings.llmMaxTokens
   })
-  const hasImagesInThread = messagesHaveImages(history)
-  const lastUserText =
-    [...(useChatsStore.getState().chats.find((c) => c.id === targetChatId)?.messages ?? [])]
-      .reverse()
-      .find((m) => m.role === 'user')
-      ?.content.trim() ?? ''
-  const webSearchForTurn =
-    llmSettings.webSearchEnabled &&
-    llmSettings.llmBackend === 'openrouter' &&
-    !hasImagesInThread &&
-    shouldRunWebSearch(lastUserText)
+  const chatMessages =
+    useChatsStore.getState().chats.find((c) => c.id === targetChatId)?.messages ?? []
+  const hasImagesInThread =
+    messagesHaveImages(history) || threadHasUserAttachments(chatMessages)
+  const webSearchForTurn = resolveWebSearchForChatTurn(llmSettings, chatMessages)
 
   if (webSearchForTurn) {
     setPipelineStageForChat(targetChatId, 'searching')
@@ -206,9 +212,12 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
 
   const thinkingSync = createStreamContentSync(syncThinkingToChat)
   const streamSync = createStreamContentSync(syncAssistantText)
+  let turnSearchSources: WebSearchSource[] = []
 
-  if (!webSearchForTurn) {
-    ensureThinkingPlaceholder()
+  const persistTurnSearchSources = () => {
+    if (!assistantMessageId || turnSearchSources.length === 0) return
+    updateMessageSearchSources(assistantMessageId, turnSearchSources, targetChatId)
+    turnSearchSources = []
   }
 
   try {
@@ -226,10 +235,20 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
         },
         onSearchTargets: ({ targets }) => {
           if (!isAgentRunActive(runId)) return
-          setPipelineSearchTargetsForChat(targetChatId, targets)
+          const browsable = targets.filter(isBrowsableSearchTarget)
+          turnSearchSources = browsable
+          setPipelineSearchTargetsForChat(targetChatId, browsable)
+          if (assistantMessageId && browsable.length > 0) {
+            updateMessageSearchSources(assistantMessageId, browsable, targetChatId)
+          }
+        },
+        onSearchVisiting: ({ url }) => {
+          if (!isAgentRunActive(runId)) return
+          setPipelineSearchActiveUrlForChat(targetChatId, url)
         },
         onThinkingDelta: ({ text }) => {
           if (!isAgentRunActive(runId)) return
+          setPipelineSearchActiveUrlForChat(targetChatId, null)
           hasThinkingStream = true
           finalThinkingText = text
           setPipelineStageForChat(targetChatId, 'thinking')
@@ -238,6 +257,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
         },
         onTextDelta: ({ text }) => {
           if (!isAgentRunActive(runId)) return
+          setPipelineSearchActiveUrlForChat(targetChatId, null)
           const effects = applyTextDeltaToTurn(
             { finalText, finalThinkingText, hasThinkingStream },
             text,
@@ -258,6 +278,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
             clearPipelineDetailForChat(targetChatId)
             streamSync.push(text)
           }
+          persistTurnSearchSources()
         },
         onDone: ({ text }) => {
           if (!isAgentRunActive(runId)) return
@@ -281,6 +302,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
           if (effects.flushAnswerText) {
             streamSync.flushNow(effects.flushAnswerText)
           }
+          persistTurnSearchSources()
         }
       }
     )
@@ -313,6 +335,14 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
       streamSync.flushNow(finalText)
     }
 
+    endAgentTurnStreamBinding(targetChatId, session)
+    setPipelineSearchActiveUrlForChat(targetChatId, null)
+    setPipelineStreamingAnswerForChat(targetChatId, false)
+    persistTurnSearchSources()
+    if (isAgentRunActive(runId)) {
+      setPipelineStageForChat(targetChatId, 'idle')
+    }
+
     if (!isAgentRunActive(runId)) {
       if (!hasPersistedAssistantTurn(targetChatId, assistantMessageId, finalText)) {
         removeAgentTurnTailUnlessPersisted(
@@ -322,11 +352,9 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
           assistantMessageId,
           finalText
         )
-        setPipelineStageForChat(targetChatId, 'idle')
-        return false
       }
       setPipelineStageForChat(targetChatId, 'idle')
-      return true
+      return hasPersistedAssistantTurn(targetChatId, assistantMessageId, finalText)
     }
 
     if (!finalText.trim() && assistantMessageId) {
@@ -355,10 +383,22 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     }
 
     useChatsStore.getState().notifyChatReplyReady(targetChatId)
-    setPipelineStreamingAnswerForChat(targetChatId, false)
 
     const hasQueued = useMessageQueueStore.getState().getQueue(targetChatId).length > 0
     const isViewingTargetChat = isViewingChat(targetChatId)
+
+    const completeTurnAfterReply = async (): Promise<void> => {
+      if (!isAgentRunActive(runId)) {
+        finalizeAgentTurnPipeline(targetChatId)
+        return
+      }
+      if (hasQueued) {
+        await processNextInQueue(targetChatId)
+        return
+      }
+      finishAgentTurnForChat(targetChatId, agentSpeechMode, onLiveConversationTurnComplete)
+      await tryRunPendingAgentReply(targetChatId)
+    }
 
     const playAnswerTts = async (): Promise<void> => {
       if (!playTts || !finalText.trim() || !isViewingTargetChat) return
@@ -381,23 +421,11 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
         if (session.getStreamingTts() === tts) {
           session.setStreamingTts(null)
         }
-        if (!isAgentRunActive(runId)) {
-          releaseStaleAgentPipelineStage(targetChatId)
-        }
       }
     }
 
     if (!isViewingTargetChat) {
-      if (isAgentRunActive(runId)) {
-        if (hasQueued) {
-          await processNextInQueue(targetChatId)
-        } else {
-          finishAgentTurnForChat(targetChatId, agentSpeechMode, onLiveConversationTurnComplete)
-          await tryRunPendingAgentReply(targetChatId)
-        }
-      } else {
-        releaseStaleAgentPipelineStage(targetChatId)
-      }
+      await completeTurnAfterReply()
       return true
     }
 
@@ -410,17 +438,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     }
 
     await playAnswerTts()
-
-    if (isAgentRunActive(runId)) {
-      if (hasQueued) {
-        await processNextInQueue(targetChatId)
-      } else {
-        finishAgentTurnForChat(targetChatId, agentSpeechMode, onLiveConversationTurnComplete)
-        await tryRunPendingAgentReply(targetChatId)
-      }
-    } else {
-      releaseStaleAgentPipelineStage(targetChatId)
-    }
+    await completeTurnAfterReply()
     return true
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Request failed'
@@ -486,14 +504,16 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
   } finally {
     thinkingSync.cancel()
     streamSync.cancel()
-    session.setStreamController(null)
-    if (session.getStreamTargetChatId() === targetChatId) {
-      session.setStreamTargetChatId(null)
+    endAgentTurnStreamBinding(targetChatId, session)
+
+    if (isAgentRunActive(runId)) {
+      const tts = session.getStreamingTts()
+      if (tts) {
+        tts.cancel()
+        session.setStreamingTts(null)
+      }
     }
-    session.setStreamActive(false)
-    setAgentStreamSession(null, false)
-    releaseStaleAgentPipelineStage(targetChatId)
-    session.getStreamingTts()?.cancel()
-    session.setStreamingTts(null)
+
+    finalizeAgentTurnPipeline(targetChatId)
   }
 }

@@ -2,7 +2,12 @@ import * as React from "react"
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@/shared/ui/icons"
 import { Select as SelectPrimitive } from "radix-ui"
 
-import { menuSurfaceBorderClass } from '@/shared/lib/sidebar-filter-menu-styles'
+import {
+  menuContentPaddingClass,
+  menuItemHighlightClass,
+  menuItemPaddingClass,
+  menuSurfaceBorderClass
+} from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from "@/shared/lib/utils"
 import { CustomScrollArea } from "@/shared/ui/custom-scroll-area"
 
@@ -103,7 +108,7 @@ function SelectContent({
         >
           <SelectPrimitive.Viewport
             className={cn(
-              "p-1",
+              menuContentPaddingClass,
               position === "popper" &&
                 "w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
             )}
@@ -142,14 +147,17 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none focus:bg-menu-hover focus:text-popover-foreground data-[highlighted]:bg-menu-hover data-[highlighted]:text-popover-foreground dark:focus:bg-[#252525] dark:data-[highlighted]:bg-[#252525] data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+        'relative flex w-full cursor-default items-center gap-2 rounded-sm pr-8 text-sm outline-hidden select-none',
+        menuItemPaddingClass,
+        menuItemHighlightClass,
+        '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4 [&_svg:not([class*=\'text-\'])]:text-muted-foreground *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2',
         className
       )}
       {...props}
     >
       <span
         data-slot="select-item-indicator"
-        className="absolute right-2 flex size-3.5 items-center justify-center"
+        className="absolute right-[3px] flex size-3.5 items-center justify-center"
       >
         <SelectPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
@@ -182,7 +190,7 @@ function SelectScrollUpButton({
     <SelectPrimitive.ScrollUpButton
       data-slot="select-scroll-up-button"
       className={cn(
-        "flex cursor-default items-center justify-center py-1",
+        "flex cursor-default items-center justify-center py-[3px]",
         className
       )}
       {...props}
@@ -200,7 +208,7 @@ function SelectScrollDownButton({
     <SelectPrimitive.ScrollDownButton
       data-slot="select-scroll-down-button"
       className={cn(
-        "flex cursor-default items-center justify-center py-1",
+        "flex cursor-default items-center justify-center py-[3px]",
         className
       )}
       {...props}

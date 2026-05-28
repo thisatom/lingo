@@ -1,3 +1,4 @@
+import { findOrphanAssistantTailIds } from '@/entities/chat/lib/prune-orphan-assistant-tail'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useMessageQueueStore } from '@/entities/message-queue/model/store'
 import { useConversationStore } from '@/entities/conversation/model/store'
@@ -9,6 +10,11 @@ import {
   OTHER_CHAT_STREAM_MESSAGE,
   shouldDeferChatAgentTurn
 } from '@/features/ai-chat/lib/agent-stream-guard'
+import {
+  isPendingComposerChatId,
+  PENDING_COMPOSER_CHAT_ID,
+  PENDING_VOICE_MESSAGE_ID
+} from '@/entities/chat/lib/pending-composer'
 import { markPendingAgentReply } from '@/features/ai-chat/lib/pending-agent-reply'
 import {
   setActiveChatPipelineStage,
@@ -45,19 +51,29 @@ export async function sendUserMessageAction(
   const hasAttachments = (attachments?.length ?? 0) > 0
   if (!trimmed && !hasAttachments) return
 
-  const chatId = useChatsStore.getState().activeChatId ?? useChatsStore.getState().ensureActiveChat()
+  const store = useChatsStore.getState()
+  const chatId = store.activeChatId ?? store.ensureActiveChat()
 
   useConversationStore.getState().setSpeechError(null)
 
   if (shouldDeferChatAgentTurn(chatId)) {
     deps.enqueueUserMessage(trimmed, chatId, hasAttachments ? attachments : undefined)
+    store.clearComposerDraft(chatId)
     if (hasAttachments) {
-      useChatsStore.getState().clearComposerAttachments(chatId)
+      store.clearComposerAttachments(chatId)
     }
     return
   }
 
   deps.stopAgent({ chatId })
+
+  const chat = store.chats.find((c) => c.id === chatId)
+  if (chat) {
+    for (const messageId of findOrphanAssistantTailIds(chat.messages)) {
+      store.removeMessage(messageId, chatId)
+    }
+  }
+
   deps.addMessage(
     {
       role: 'user',
@@ -66,7 +82,8 @@ export async function sendUserMessageAction(
     },
     chatId
   )
-  useChatsStore.getState().clearComposerAttachments(chatId)
+  store.clearComposerDraft(chatId)
+  store.clearComposerAttachments(chatId)
   await deps.runAssistantReply(chatId)
 }
 
@@ -74,7 +91,8 @@ export async function sendQueuedMessageNowAction(
   deps: ChatAgentUserActionsDeps,
   queueItemId: string
 ): Promise<void> {
-  const chatId = useChatsStore.getState().activeChatId
+  const chatId =
+    useChatsStore.getState().activeChatId ?? useChatsStore.getState().ensureActiveChat()
   if (!chatId) return
 
   const item = useMessageQueueStore.getState().getQueue(chatId).find((m) => m.id === queueItemId)
@@ -94,17 +112,32 @@ export async function sendQueuedMessageNowAction(
   await deps.runAssistantReply(chatId)
 }
 
+function resolveExistingActiveChatId(): string | null {
+  const { chats, activeChatId } = useChatsStore.getState()
+  if (activeChatId && chats.some((c) => c.id === activeChatId)) {
+    return activeChatId
+  }
+  return null
+}
+
 export function beginVoiceUserMessageAction(deps: ChatAgentUserActionsDeps): {
   messageId: string | null
   chatId: string
 } {
-  const chatId = useChatsStore.getState().activeChatId ?? useChatsStore.getState().ensureActiveChat()
-  if (getOtherChatStreamBlocking(chatId)) {
+  const chatId = resolveExistingActiveChatId()
+  const guardChatId = chatId ?? PENDING_COMPOSER_CHAT_ID
+  if (getOtherChatStreamBlocking(guardChatId)) {
     useConversationStore.getState().setSpeechError(OTHER_CHAT_STREAM_MESSAGE)
-    return { messageId: null, chatId }
+    return { messageId: null, chatId: guardChatId }
   }
-  deps.stopAgent({ chatId })
+  deps.stopAgent({ chatId: chatId ?? undefined, force: !chatId })
   useConversationStore.getState().setSpeechError(null)
+
+  if (!chatId) {
+    setActiveChatPipelineStage('listening')
+    return { messageId: PENDING_VOICE_MESSAGE_ID, chatId: PENDING_COMPOSER_CHAT_ID }
+  }
+
   const messageId = deps.addMessage({ role: 'user', content: '' }, chatId)
   return { messageId: messageId || null, chatId }
 }
@@ -112,44 +145,81 @@ export function beginVoiceUserMessageAction(deps: ChatAgentUserActionsDeps): {
 export function updateVoiceUserMessageAction(
   deps: ChatAgentUserActionsDeps,
   messageId: string,
-  content: string
+  content: string,
+  chatId: string
 ): void {
-  deps.updateMessageContent(messageId, content, undefined, { allowEmptyUser: true })
+  if (isPendingComposerChatId(chatId)) {
+    useChatsStore.getState().setComposerDraft(PENDING_COMPOSER_CHAT_ID, content)
+    setActiveChatPipelineStage('listening')
+    return
+  }
+  deps.updateMessageContent(messageId, content, chatId, { allowEmptyUser: true })
 }
 
 export function cancelVoiceUserMessageAction(
   deps: ChatAgentUserActionsDeps,
-  messageId: string
+  messageId: string,
+  chatId: string
 ): void {
   if (!messageId) return
-  deps.removeMessagesFrom(messageId)
-  setActiveChatPipelineStage('idle')
+  if (isPendingComposerChatId(chatId)) {
+    useChatsStore.getState().setComposerDraft(PENDING_COMPOSER_CHAT_ID, '')
+    setActiveChatPipelineStage('idle')
+    return
+  }
+  deps.removeMessagesFrom(messageId, chatId)
+  setPipelineStageForChat(chatId, 'idle')
 }
 
 export async function commitVoiceUserMessageAction(
   deps: ChatAgentUserActionsDeps,
-  messageId: string
-): Promise<void> {
-  if (!messageId) return
+  messageId: string,
+  chatId: string
+): Promise<string | null> {
+  if (!messageId) return null
 
-  const chat = useChatsStore.getState().getActiveChat()
+  if (isPendingComposerChatId(chatId)) {
+    const trimmed = useChatsStore.getState().getComposerDraft(PENDING_COMPOSER_CHAT_ID).trim()
+    if (!trimmed) {
+      cancelVoiceUserMessageAction(deps, messageId, chatId)
+      return null
+    }
+
+    const store = useChatsStore.getState()
+    const realChatId = store.ensureActiveChat()
+    store.clearComposerDraft(realChatId)
+
+    if (shouldDeferChatAgentTurn(realChatId)) {
+      markPendingAgentReply(realChatId)
+      deps.addMessage({ role: 'user', content: trimmed }, realChatId)
+      return realChatId
+    }
+
+    deps.stopAgent({ chatId: realChatId })
+    deps.addMessage({ role: 'user', content: trimmed }, realChatId)
+    await deps.runAssistantReply(realChatId)
+    return realChatId
+  }
+
+  const chat = useChatsStore.getState().chats.find((c) => c.id === chatId)
   const message = chat?.messages.find((m) => m.id === messageId)
   const trimmed = message?.content.trim() ?? ''
 
   if (!trimmed) {
-    cancelVoiceUserMessageAction(deps, messageId)
-    return
+    cancelVoiceUserMessageAction(deps, messageId, chatId)
+    return null
   }
 
-  deps.updateMessageContent(messageId, trimmed)
-  if (!chat) return
+  deps.updateMessageContent(messageId, trimmed, chatId)
+  if (!chat) return null
 
-  if (shouldDeferChatAgentTurn(chat.id)) {
-    markPendingAgentReply(chat.id)
-    return
+  if (shouldDeferChatAgentTurn(chatId)) {
+    markPendingAgentReply(chatId)
+    return chatId
   }
 
-  await deps.runAssistantReply(chat.id)
+  await deps.runAssistantReply(chatId)
+  return chatId
 }
 
 export async function submitEditedUserMessageAction(
@@ -186,11 +256,15 @@ export async function submitEditedUserMessageAction(
   }
 
   deps.stopAgent({ chatId })
-  deps.updateUserMessageContent(
-    messageId,
-    trimmed,
-    editAttachments.length > 0 ? editAttachments : undefined
-  )
+
+  const chatBeforeEdit = useChatsStore.getState().chats.find((c) => c.id === chatId)
+  if (chatBeforeEdit) {
+    for (const orphanId of findOrphanAssistantTailIds(chatBeforeEdit.messages)) {
+      useChatsStore.getState().removeMessage(orphanId, chatId)
+    }
+  }
+
+  deps.updateUserMessageContent(messageId, trimmed, editAttachments)
   deps.removeMessagesAfter(messageId, chatId)
   deps.setBlurAnimateMessageId(null)
   deps.setError(null, chatId)
@@ -233,7 +307,7 @@ export async function regenerateAssistantMessageAction(
   const removeFromId = findTurnTailRemoveId(chat.messages, messageId) ?? messageId
 
   deps.stopAgent({ chatId })
-  deps.removeMessagesFrom(removeFromId)
+  deps.removeMessagesFrom(removeFromId, chatId)
   deps.setBlurAnimateMessageId(null)
   await deps.runAssistantReply(chatId)
 }

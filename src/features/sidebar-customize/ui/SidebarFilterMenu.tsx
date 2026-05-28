@@ -108,7 +108,8 @@ export function SidebarFilterMenu() {
         side="top"
         align="start"
         sideOffset={6}
-        className={cn('w-max min-w-[11.5rem] p-1', sidebarMenuSurfaceClass)}
+        scrollAreaClassName="max-h-[min(var(--radix-dropdown-menu-content-available-height),22rem)]"
+        className={cn('w-max min-w-[11.5rem]', sidebarMenuSurfaceClass)}
       >
         <DropdownMenuLabel className={sidebarMenuLabelClass}>Sort by</DropdownMenuLabel>
 
@@ -125,7 +126,7 @@ export function SidebarFilterMenu() {
           )
         })}
 
-        <DropdownMenuSeparator className="my-1 bg-border/60" />
+        <DropdownMenuSeparator className="bg-border/60" />
 
         <DropdownMenuLabel className={sidebarMenuLabelClass}>Group by</DropdownMenuLabel>
 

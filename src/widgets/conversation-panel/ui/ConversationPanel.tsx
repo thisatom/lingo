@@ -199,12 +199,12 @@ export function ConversationPanel({
   const handleAtBottomChange = useCallback(
     (value: boolean) => {
       if (isRestoringScrollRef.current) return
-      if (!value) pinToBottomRef.current = false
+      if (!value && !agentBusy) pinToBottomRef.current = false
       if (atBottomRef.current === value) return
       atBottomRef.current = value
       onAtBottomChange?.(value)
     },
-    [onAtBottomChange]
+    [agentBusy, onAtBottomChange]
   )
 
   const enableScrollSave = useCallback(() => {
@@ -267,13 +267,13 @@ export function ConversationPanel({
 
   const syncFollowFromViewport = useCallback(
     (viewport: HTMLDivElement) => {
-      if (isRestoringScrollRef.current) return
+      if (isRestoringScrollRef.current || agentBusy) return
       const nearBottom = isViewportNearChatBottom(viewport)
       if (!nearBottom) {
         pinToBottomRef.current = false
       }
     },
-    []
+    [agentBusy]
   )
 
   const handleViewportScroll = useCallback(
@@ -337,13 +337,34 @@ export function ConversationPanel({
 
   const handleSubmitEditedUserMessage = useCallback(
     async (messageId: string, text: string, attachments?: MessageAttachment[]) => {
+      followBottom()
       const result = await onSubmitEditedUserMessage(messageId, text, attachments)
       if (result?.rollbackToEdit) {
         setEditingUserMessageId(result.rollbackToEdit)
       }
     },
-    [onSubmitEditedUserMessage]
+    [followBottom, onSubmitEditedUserMessage]
   )
+
+  const stickToBottomIfFollowing = useCallback(() => {
+    const viewport = viewportRef.current
+    if (
+      !shouldStickToBottom(
+        {
+          pinToBottom: pinToBottomRef.current,
+          isRestoring: isRestoringScrollRef.current,
+          agentReplyActive: agentBusy
+        },
+        viewport
+      )
+    ) {
+      return
+    }
+    if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
+    else scrollToLatest('instant')
+    pinToBottomRef.current = true
+    atBottomRef.current = true
+  }, [agentBusy, onAtBottomChange, scrollToLatest])
 
   useEffect(() => {
     const prevChatId = prevRestoreChatIdRef.current
@@ -602,26 +623,13 @@ export function ConversationPanel({
     if (!content) return
 
     const onContentResize = () => {
-      if (
-        !shouldStickToBottom(
-          {
-            pinToBottom: pinToBottomRef.current,
-            isRestoring: isRestoringScrollRef.current
-          },
-          viewport
-        )
-      ) {
-        return
-      }
-      stickChatViewportToBottom(viewport, onAtBottomChange)
-      pinToBottomRef.current = true
-      atBottomRef.current = true
+      stickToBottomIfFollowing()
     }
 
     const observer = new ResizeObserver(onContentResize)
     observer.observe(content)
     return () => observer.disconnect()
-  }, [activeChatId, hasVisibleMessages, onAtBottomChange])
+  }, [activeChatId, hasVisibleMessages, stickToBottomIfFollowing])
 
   useLayoutEffect(() => {
     const messagesGrew = messages.length > prevMessagesLengthRef.current
@@ -649,7 +657,12 @@ export function ConversationPanel({
 
     const viewport = viewportRef.current
 
-    if (userJustSent) {
+    const contentChanged =
+      tailChanged || messagesGrew || statusAppeared || agentJustStarted
+
+    if (!contentChanged) return
+
+    if (userJustSent || agentJustStarted || statusAppeared) {
       pinToBottomRef.current = true
       if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
       else scrollToLatest('instant')
@@ -657,37 +670,14 @@ export function ConversationPanel({
       return
     }
 
-    if (agentJustStarted || statusAppeared) {
-      if (viewport && isViewportNearChatBottom(viewport)) {
-        pinToBottomRef.current = true
-      }
-    }
-
-    const stick = shouldStickToBottom(
-      {
-        pinToBottom: pinToBottomRef.current,
-        isRestoring: isRestoringScrollRef.current
-      },
-      viewport
-    )
-
-    if (!stick) return
-
-    const contentChanged =
-      tailChanged || messagesGrew || statusAppeared || agentJustStarted
-
-    if (!contentChanged) return
-
-    if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
-    else scrollToLatest('instant')
-    pinToBottomRef.current = true
-    atBottomRef.current = true
+    stickToBottomIfFollowing()
   }, [
     agentBusy,
     messages.length,
     showStatus,
     tailScrollSignature,
     scrollToLatest,
+    stickToBottomIfFollowing,
     onAtBottomChange
   ])
 
@@ -714,7 +704,7 @@ export function ConversationPanel({
         >
           <div
             data-chat-scroll-content
-            className={cn('relative', turns.length > 0 && 'space-y-5')}
+            className={cn('relative select-none', turns.length > 0 && 'space-y-5')}
             style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
           >
             {useVirtualizedTurns ? (
@@ -741,6 +731,7 @@ export function ConversationPanel({
                 }
                 onAttachmentError={onAttachmentError}
                 liveVoiceUserMessageId={liveVoiceUserMessageId}
+                onTailContentChange={stickToBottomIfFollowing}
               />
             ) : (
               turns.map((turn, turnIndex) => {

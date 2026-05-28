@@ -5,6 +5,7 @@ import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-spe
 import { cn } from '@/shared/lib/utils'
 import {
   isThinkingMessageLive,
+  shouldShowThinkingInTurn,
   type ConversationTurn as Turn
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { AgentMessage } from './AgentMessage'
@@ -83,7 +84,7 @@ export function ConversationTurn({
           'w-full min-w-0 max-w-full bg-background',
           isEditing ? 'relative' : 'sticky top-0 pb-px'
         )}
-        style={isEditing ? undefined : { zIndex: turnIndex }}
+        style={isEditing ? undefined : { zIndex: 20 + turnIndex }}
       >
         <UserMessage
           messageId={turn.user.id}
@@ -110,27 +111,43 @@ export function ConversationTurn({
         />
       </div>
 
-      {turn.assistantMessages.map((message) => {
+      {turn.assistantMessages.map((message, messageIndex) => {
         const isAnswerStream = message.id === streamingAssistantMessageId
+        const thinkingLive = isThinkingMessageLive(
+          turn,
+          message.id,
+          agentBusy,
+          isLatestTurn,
+          isLatestTurn ? pipelineStage : 'idle',
+          isLatestTurn ? pipelineStreamingAnswer : false
+        )
+
+        if (
+          message.role === 'thinking' &&
+          !shouldShowThinkingInTurn(turn, message, messageIndex, {
+            agentBusy,
+            isLatestTurn
+          })
+        ) {
+          return null
+        }
+
+        if (message.role === 'thinking' && !message.content.trim() && !thinkingLive) {
+          return null
+        }
 
         return (
-          <article key={message.id} className="mt-1.5 min-w-0 max-w-full">
+          <article key={message.id} className="relative z-0 mt-1.5 min-w-0 max-w-full">
             {message.role === 'thinking' ? (
               <AgentThinkingMessage
                 message={message}
                 assistantMessages={turn.assistantMessages}
-                live={isThinkingMessageLive(
-                  turn,
-                  message.id,
-                  agentBusy,
-                  isLatestTurn,
-                  isLatestTurn ? pipelineStage : 'idle',
-                  isLatestTurn ? pipelineStreamingAnswer : false
-                )}
+                live={thinkingLive}
               />
             ) : (
               <AgentMessage
                 content={message.content}
+                searchSources={message.searchSources}
                 parseThrottleMs={isAnswerStream ? 120 : undefined}
               />
             )}

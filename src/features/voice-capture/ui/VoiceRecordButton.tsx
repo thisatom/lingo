@@ -1,5 +1,5 @@
 import { Mic, Square } from '@/shared/ui/icons'
-import { Button } from '@/shared/ui/button'
+import { Button, type ButtonProps } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 import { TooltipWrap } from '@/shared/ui/tooltip-wrap'
 
@@ -16,6 +16,7 @@ interface VoiceRecordButtonProps {
   highlight?: boolean
   /** `toggle`: tap to start / tap to stop (conversation loop). `hold`: push-to-talk. */
   interactionMode?: VoiceInteractionMode
+  size?: ButtonProps['size']
 }
 
 export function VoiceRecordButton({
@@ -27,7 +28,8 @@ export function VoiceRecordButton({
   variant,
   label: labelOverride,
   highlight = false,
-  interactionMode = 'hold'
+  interactionMode = 'hold',
+  size = 'icon'
 }: VoiceRecordButtonProps) {
   const isToggle = interactionMode === 'toggle'
   const label =
@@ -44,7 +46,7 @@ export function VoiceRecordButton({
     <Button
       type="button"
       variant={isListening ? 'destructive' : (variant ?? 'secondary')}
-      size="icon"
+      size={size}
       className={cn(
         'shrink-0',
         isListening && 'animate-pulse',

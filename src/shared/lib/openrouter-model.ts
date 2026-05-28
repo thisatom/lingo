@@ -4,6 +4,7 @@ import {
   openRouterConfig
 } from '@/shared/config/openrouter'
 import { isOpenRouterFreeRouter } from '@/shared/config/openrouter-free-models'
+import { stripAssistantRoleMarkup } from '@/shared/lib/strip-assistant-role-markup'
 
 export function withOnlineVariant(modelId: string): string {
   const base = normalizeOpenRouterModelId(modelId)
@@ -24,12 +25,13 @@ export function extractAssistantText(message: {
   content?: string | Array<{ type?: string; text?: string }> | null
 }): string {
   if (!message.content) return ''
-  if (typeof message.content === 'string') return message.content
-  if (Array.isArray(message.content)) {
-    return message.content
+  let raw = ''
+  if (typeof message.content === 'string') raw = message.content
+  else if (Array.isArray(message.content)) {
+    raw = message.content
       .filter((part) => part.type === 'text' && part.text)
       .map((part) => part.text)
       .join('')
   }
-  return ''
+  return stripAssistantRoleMarkup(raw)
 }

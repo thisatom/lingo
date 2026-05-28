@@ -285,17 +285,15 @@ export function UserMessage({
         prompt={content}
         chatId={chatId}
         className={userMessageBubbleClass}
-        onDoubleClick={() => {
-          if (disabled) return
-          onEnterEdit()
-        }}
+        activateDisabled={disabled}
+        onActivate={onEnterEdit}
       >
         <MessageBodyClamp bodyClassName="pr-8">
           {attachments && attachments.length > 0 ? (
             <UserMessageAttachments attachments={attachments} />
           ) : null}
           {content.trim() ? (
-            <MarkdownContent content={content} variant="agent" className={chatSelectableClass} />
+            <MarkdownContent content={content} variant="agent" />
           ) : voiceCaptureLabel ? (
             <p className="text-sm italic text-muted-foreground">
               {voiceCaptureLabel === 'transcribing' ? 'Transcribing…' : 'Listening…'}

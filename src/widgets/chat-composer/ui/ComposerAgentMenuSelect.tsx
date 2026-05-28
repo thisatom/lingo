@@ -103,14 +103,18 @@ export function ComposerAgentMenuSelect({
           )
         })}
 
-        <DropdownMenuSeparator className="my-1 bg-border/60" />
+        <DropdownMenuSeparator className="bg-border/60" />
 
         {llmBackend === 'custom' ? (
           <DropdownMenuItem
-            className={cn(sidebarMenuItemClass, 'cursor-default focus:bg-transparent')}
+            disabled
+            className={cn(
+              sidebarMenuItemClass,
+              'cursor-default text-muted-foreground data-[disabled]:cursor-default data-[disabled]:opacity-100'
+            )}
             onSelect={(e) => e.preventDefault()}
           >
-            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap leading-normal text-muted-foreground">
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap leading-normal">
               {modelId.trim() ? `Custom · ${modelId}` : 'Custom model (Settings → API)'}
             </span>
           </DropdownMenuItem>
@@ -120,8 +124,11 @@ export function ComposerAgentMenuSelect({
               <span className="min-w-0 flex-1 truncate">Models</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent
-              sideOffset={4}
-              className={cn('min-w-[14rem]', sidebarMenuSurfaceClass)}
+              side="right"
+              align="start"
+              sideOffset={6}
+              collisionPadding={16}
+              className={cn('min-w-[14rem] max-h-[min(16rem,var(--radix-dropdown-menu-content-available-height))]', sidebarMenuSurfaceClass)}
             >
               <div
                 className={cn(
@@ -139,7 +146,7 @@ export function ComposerAgentMenuSelect({
                   onCheckedChange={onModelAutoFallbackChange}
                 />
               </div>
-              <DropdownMenuSeparator className="my-1 bg-border/60" />
+              <DropdownMenuSeparator className="bg-border/60" />
               {modelIds.map((id) => {
                 const isSelected = id === modelId
                 return (

@@ -12,6 +12,17 @@ export type AgentChatSessionRefs = {
   setStreamActive?: (active: boolean) => void
 }
 
+const sharedSessionRefs: AgentChatSessionRefs = {
+  streamControllerRef: { current: null },
+  streamTargetChatIdRef: { current: null },
+  streamingTtsRef: { current: null }
+}
+
+/** Single in-flight stream/TTS session for the renderer agent (desktop + web). */
+export function getSharedAgentChatSessionRefs(): AgentChatSessionRefs {
+  return sharedSessionRefs
+}
+
 export type AgentStopContextCallbacks = {
   setBlurAnimateMessageId: (id: string | null) => void
   setGlobalStageIdle: () => void
@@ -65,4 +76,15 @@ export function createGlobalStageIdleCallback(
     setStage('idle')
     useConversationStore.getState().clearPipelineDetail()
   }
+}
+
+export function buildDefaultAgentStopContext(): AgentStopContext {
+  return buildAgentStopContext(getSharedAgentChatSessionRefs(), {
+    setBlurAnimateMessageId: (id) => {
+      useConversationStore.getState().setBlurAnimateMessageId(id)
+    },
+    setGlobalStageIdle: createGlobalStageIdleCallback((stage) => {
+      useConversationStore.getState().setStage(stage)
+    })
+  })
 }

@@ -34,6 +34,13 @@ describe('agent-session-snapshot', () => {
     expect(isAgentSessionBusy(getAgentSessionSnapshot(chatA))).toBe(true)
   })
 
+  it('is not busy during speaking (TTS) when stream is inactive', () => {
+    setPipelineStageForChat(chatA, 'speaking')
+    const snapshot = getAgentSessionSnapshot(chatA)
+    expect(snapshot.phase).toBe('speaking')
+    expect(isAgentSessionBusy(snapshot)).toBe(false)
+  })
+
   it('view snapshot is idle for active chat while another chat streams', () => {
     setAgentStreamSession(chatA, true)
     setPipelineStageForChat(chatA, 'thinking')

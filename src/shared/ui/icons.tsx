@@ -41,6 +41,10 @@ export const Mic = icon('mic')
 export const MoreHorizontal = icon('ellipsis')
 export const PanelLeft = icon('layout-sidebar-left')
 export const PanelLeftIcon = PanelLeft
+/** Primary sidebar visible — collapse/hide action */
+export const PanelLeftClose = icon('layout-sidebar-left-off')
+/** Primary sidebar hidden — expand/show action */
+export const PanelLeftOpen = PanelLeft
 export const Paperclip = icon('attach')
 export const Pencil = icon('edit')
 export const Pin = icon('pinned')

@@ -18,7 +18,7 @@ const AT_BOTTOM_THRESHOLD_PX = CHAT_SCROLL_BOTTOM_THRESHOLD_PX
 const EDGE_FADE_THRESHOLD_PX = 6
 const EDGE_FADE_HEIGHT_PX = 28
 
-type ScrollVariant = 'chat' | 'sidebar' | 'menu'
+type ScrollVariant = 'chat' | 'sidebar' | 'menu' | 'thinking'
 
 const VARIANT_CONFIG: Record<
   ScrollVariant,
@@ -49,6 +49,15 @@ const VARIANT_CONFIG: Record<
   },
   menu: {
     zIndex: 50,
+    thumbIdleOpacity: 0.38,
+    thumbHoverOpacity: 0.82,
+    scrollbarWidth: 5,
+    scrollbarRight: 2,
+    edgeFades: false
+  },
+  /** Nested in chat turns — must stay below sticky question headers. */
+  thinking: {
+    zIndex: 1,
     thumbIdleOpacity: 0.38,
     thumbHoverOpacity: 0.82,
     scrollbarWidth: 5,
@@ -135,6 +144,8 @@ export function CustomScrollArea({
   const [edgeFade, setEdgeFade] = useState({ top: false, bottom: false })
 
   const isMenu = variant === 'menu'
+  const isThinking = variant === 'thinking'
+  const isNestedPanel = isMenu || isThinking
   const isChat = variant === 'chat'
 
   const thumbOpacity =
@@ -142,7 +153,7 @@ export function CustomScrollArea({
       ? 0
       : thumbHovered
         ? config.thumbHoverOpacity
-        : isMenu && !scrollbarVisible
+        : isNestedPanel && !scrollbarVisible
           ? 0.35
           : config.thumbIdleOpacity
 
@@ -176,11 +187,11 @@ export function CustomScrollArea({
         ? prev
         : next
     )
-    if (isMenu && next.canScroll) {
+    if (isNestedPanel && next.canScroll) {
       setScrollbarVisible(true)
     }
     syncEdgeFade()
-  }, [isMenu, syncEdgeFade])
+  }, [isNestedPanel, syncEdgeFade])
 
   const scheduleSyncMetrics = useCallback(() => {
     if (metricsRafRef.current != null) return
@@ -467,16 +478,16 @@ export function CustomScrollArea({
       ref={rootRef}
       className={cn(
         'relative min-h-0',
-        isMenu ? cn('overflow-hidden', className) : cn('h-full min-h-0', className)
+        isNestedPanel ? cn('overflow-hidden', className) : cn('h-full min-h-0', className)
       )}
       onMouseEnter={revealScrollbar}
-      onMouseLeave={isMenu ? undefined : scheduleHideScrollbar}
+      onMouseLeave={isNestedPanel ? undefined : scheduleHideScrollbar}
     >
       <div
         ref={viewportRef}
         className={cn(
           'min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          isMenu ? cn(className) : 'h-full min-h-0'
+          isNestedPanel ? cn(className) : 'h-full min-h-0'
         )}
         onScroll={handleViewportScroll}
       >

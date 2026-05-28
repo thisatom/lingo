@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   looksCutOffMidSentence,
+  mergeContinuationAnswer,
   shouldRetryIncompleteCompletion
 } from './completion-quality'
 
@@ -32,5 +33,31 @@ describe('shouldRetryIncompleteCompletion', () => {
         requireSubstantive: false
       })
     ).toBe(false)
+  })
+
+  it('skips heuristic retry for custom backends (only length)', () => {
+    const cut = 'a'.repeat(150)
+    expect(
+      shouldRetryIncompleteCompletion({
+        answer: cut,
+        finishReason: 'stop',
+        userMessage: 'hi',
+        customBackend: true
+      })
+    ).toBe(false)
+    expect(
+      shouldRetryIncompleteCompletion({
+        answer: cut,
+        finishReason: 'length',
+        userMessage: 'hi',
+        customBackend: true
+      })
+    ).toBe(true)
+  })
+})
+
+describe('mergeContinuationAnswer', () => {
+  it('concatenates prefix and continuation', () => {
+    expect(mergeContinuationAnswer('part one', 'part two')).toBe('part onepart two')
   })
 })

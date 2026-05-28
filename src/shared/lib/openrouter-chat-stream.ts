@@ -17,6 +17,7 @@ import { assertOutboundHttpUrl } from '@/shared/lib/outbound-url-policy'
 import { openaiCompatibleHeaders } from '@/shared/lib/openai-compatible-headers'
 import {
   buildCompletionRetryUserMessage,
+  mergeContinuationAnswer,
   shouldRetryIncompleteCompletion
 } from '@/shared/lib/completion-quality'
 import {
@@ -25,7 +26,6 @@ import {
   looksTruncatedOrRefusal,
   shouldForceWebSearch,
   shouldRetryWebSearchAnswer,
-  shouldRunWebSearch,
   shouldUseResearchMode
 } from '@/shared/lib/web-search-intent'
 import {
@@ -34,16 +34,20 @@ import {
 } from '@/shared/lib/openrouter-errors'
 import { openRouterHeaders } from '@/shared/lib/openrouter-headers'
 import { extractAssistantText } from '@/shared/lib/openrouter-model'
+import { stripAssistantRoleMarkup } from '@/shared/lib/strip-assistant-role-markup'
 import {
   isLocalWebSearchRegistered
 } from '@/shared/lib/local-web-search-runtime'
-import { getWebSearchProvider } from '@/shared/lib/web-search-provider'
+import { buildDirectLocalSearchReply } from '@/shared/lib/local-search-direct-reply'
+import { detectLocalSearchIntent } from '@/shared/lib/local-search-intent'
+import { localeForPracticeLanguage } from '@/shared/lib/local-web-search'
+import { performLocalWebSearch } from '@/shared/lib/local-web-search'
 import {
-  fetchLocalWebSearchResults,
   isWebSearchApiError,
   isWebSearchResultFailure,
   substituteMessagesWithLocalWebSearchResults
 } from '@/shared/lib/web-search-messages'
+import { mapResultsToSearchTargets } from '@/shared/lib/web-search-targets'
 import {
   isVisionApiError,
   substituteMessagesWithOcr
@@ -513,7 +517,7 @@ async function fetchCompletionStreaming(
 
       const delta = extractStreamDelta(chunk)
       if (delta) {
-        text += delta
+        text = stripAssistantRoleMarkup(text + delta)
         send({ type: 'text-delta', delta, text })
       }
 
@@ -526,7 +530,10 @@ async function fetchCompletionStreaming(
     throw new Error('Model returned an empty response')
   }
 
-  return { text, finishReason }
+  return {
+    text: stripAssistantRoleMarkup(text),
+    finishReason
+  }
 }
 
 type ChatCompletionMessage = {
@@ -558,26 +565,53 @@ async function streamCompletionWithIncompleteRetry(
       answer: result.text,
       finishReason: result.finishReason,
       userMessage: lastUserMessage,
-      requireSubstantive: options.requireSubstantive
+      requireSubstantive: options.requireSubstantive,
+      customBackend: isCustomBackend(request)
     })
   ) {
     return result
   }
 
+  const answerPrefix = result.text
   const retryMessages: ChatCompletionMessage[] = [
     ...(body.messages as ChatCompletionMessage[]),
     { role: 'assistant', content: result.text },
     { role: 'user', content: buildCompletionRetryUserMessage(lastUserMessage) }
   ]
 
-  return fetchCompletionResilientStreaming(
+  const continuation = await fetchCompletionResilientStreaming(
     request,
     apiKey,
     applyCompletionMaxTokens({ ...body, messages: retryMessages }, request, 'retry'),
-    send,
+    (event) => {
+      if (event.type === 'text-delta') {
+        send({
+          type: 'text-delta',
+          delta: event.delta,
+          text: mergeContinuationAnswer(answerPrefix, event.text)
+        })
+        return
+      }
+      if (event.type === 'done') {
+        send({
+          type: 'done',
+          text: mergeContinuationAnswer(answerPrefix, event.text)
+        })
+        return
+      }
+      if (event.type === 'thinking-delta') {
+        return
+      }
+      send(event)
+    },
     signal,
     fetchImpl
   )
+
+  return {
+    text: mergeContinuationAnswer(answerPrefix, continuation.text),
+    finishReason: continuation.finishReason
+  }
 }
 
 async function fetchCompletionResilientStreaming(
@@ -676,15 +710,29 @@ async function completeWithLocalWebSearch(
   signal: AbortSignal | undefined,
   fetchImpl: OpenRouterFetch
 ): Promise<void> {
-  const results = await fetchLocalWebSearchResults(lastUserMessage)
-  const targets = results
-    .filter((result) => result.url || result.title)
-    .map((result) => ({
-      title: result.title.trim() || result.url,
-      url: result.url
-    }))
-  if (targets.length > 0) {
-    send({ type: 'search-targets', targets })
+  const emitTargets = (hits: Parameters<typeof mapResultsToSearchTargets>[0]) => {
+    const targets = mapResultsToSearchTargets(hits)
+    if (targets.length > 0) {
+      send({ type: 'search-targets', targets })
+    }
+  }
+
+  const searchLocale = localeForPracticeLanguage(practiceLanguage)
+  const results = await performLocalWebSearch(lastUserMessage, {
+    locale: searchLocale,
+    onInitialResults: (hits) => emitTargets(hits),
+    onVisitingUrl: (url) => send({ type: 'search-visiting', url })
+  })
+
+  emitTargets(results)
+
+  const intent = detectLocalSearchIntent(lastUserMessage)
+  const locale = practiceLanguage?.trim() || 'en'
+  const directReply = buildDirectLocalSearchReply(intent, results, locale)
+  if (directReply && (intent.type === 'time' || intent.type === 'date')) {
+    send({ type: 'text-delta', delta: directReply, text: directReply })
+    send({ type: 'done', text: directReply })
+    return
   }
 
   const augmented = substituteMessagesWithLocalWebSearchResults(
@@ -744,11 +792,6 @@ async function tryNativeWebSearch(
   )
 
   attachWebCapabilities(body, userModelId)
-  const provider = getWebSearchProvider(userModelId, { local: false })
-  send({
-    type: 'search-targets',
-    targets: [{ title: provider.label, url: provider.href }]
-  })
   await completeWithWebSearch(request, apiKey, body, send, lastUserMessage, signal, fetchImpl)
 }
 
@@ -764,16 +807,12 @@ async function completeTextChat(
   fetchImpl: OpenRouterFetch
 ): Promise<void> {
   const lastUserMessage = getLastUserMessageContent(apiMessages)
-  const webSearchEnabled =
-    !isCustomBackend(request) &&
-    webSearchRequested &&
-    !messagesHaveImages(apiMessages) &&
-    shouldRunWebSearch(lastUserMessage)
+  const webSearchEnabled = request.webSearch === true && !messagesHaveImages(apiMessages)
 
   if (webSearchEnabled) {
     send({ type: 'searching' })
 
-    if (isLocalWebSearchRegistered()) {
+    if (isLocalWebSearchRegistered() || isCustomBackend(request)) {
       await completeWithLocalWebSearch(
         request,
         apiKey,

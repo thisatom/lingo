@@ -28,6 +28,8 @@ interface ConversationState {
   pipelineThinkingText: string
   /** Sites being fetched during web search. */
   pipelineSearchTargets: PipelineSearchTarget[]
+  /** Page currently being read during web search. */
+  pipelineSearchActiveUrl: string | null
   /** True once the final answer tokens start streaming (after reasoning). */
   pipelineStreamingAnswer: boolean
   setStage: (stage: PipelineStage) => void
@@ -37,6 +39,7 @@ interface ConversationState {
   setQueueAheadPreview: (preview: string | null) => void
   setPipelineThinkingText: (text: string) => void
   setPipelineSearchTargets: (targets: PipelineSearchTarget[]) => void
+  setPipelineSearchActiveUrl: (url: string | null) => void
   setPipelineStreamingAnswer: (streaming: boolean) => void
   clearPipelineDetail: () => void
   markBlurAnimationDone: (id: string) => void
@@ -52,14 +55,21 @@ export const useConversationStore = create<ConversationState>((set) => ({
   queueAheadPreview: null,
   pipelineThinkingText: '',
   pipelineSearchTargets: [],
+  pipelineSearchActiveUrl: null,
   pipelineStreamingAnswer: false,
   setStage: (stage) => set({ stage }),
   setQueueAheadPreview: (queueAheadPreview) => set({ queueAheadPreview }),
   setPipelineThinkingText: (pipelineThinkingText) => set({ pipelineThinkingText }),
   setPipelineSearchTargets: (pipelineSearchTargets) => set({ pipelineSearchTargets }),
+  setPipelineSearchActiveUrl: (pipelineSearchActiveUrl) => set({ pipelineSearchActiveUrl }),
   setPipelineStreamingAnswer: (pipelineStreamingAnswer) => set({ pipelineStreamingAnswer }),
   clearPipelineDetail: () =>
-    set({ pipelineThinkingText: '', pipelineSearchTargets: [], pipelineStreamingAnswer: false }),
+    set({
+      pipelineThinkingText: '',
+      pipelineSearchTargets: [],
+      pipelineSearchActiveUrl: null,
+      pipelineStreamingAnswer: false
+    }),
   setError: (error) =>
     set((state) => ({
       error,
@@ -85,6 +95,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
       queueAheadPreview: null,
       pipelineThinkingText: '',
       pipelineSearchTargets: [],
+      pipelineSearchActiveUrl: null,
       pipelineStreamingAnswer: false
     })
 }))

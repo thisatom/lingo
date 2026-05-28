@@ -47,5 +47,8 @@ export function getAgentSessionSnapshotForView(
 }
 
 export function isAgentSessionBusy(snapshot: AgentSessionSnapshot): boolean {
-  return snapshot.streamActive || isBusyAgentPhase(snapshot.phase)
+  if (snapshot.streamActive) return true
+  // TTS playback uses `speaking` stage for status UI only — turn is done for send/stop busy state.
+  if (snapshot.phase === 'speaking') return false
+  return isBusyAgentPhase(snapshot.phase)
 }

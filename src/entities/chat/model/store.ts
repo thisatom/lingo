@@ -12,10 +12,15 @@ import {
   EMPTY_COMPOSER_ATTACHMENTS,
   type MessageAttachment
 } from '@/entities/message/model/attachment'
-import type { Message } from '@/entities/message/model/types'
+import type { Message, MessageSearchSource } from '@/entities/message/model/types'
 import { notifyActiveChatChange } from '@/entities/chat/model/active-chat-effects'
 import { notifyChatDeleted } from '@/entities/chat/model/chat-delete-effects'
 import { useMessageQueueStore } from '@/entities/message-queue/model/store'
+import {
+  composerDraftSlotsForChat,
+  omitPendingComposerFromRecord,
+  PENDING_COMPOSER_CHAT_ID
+} from '@/entities/chat/lib/pending-composer'
 import { sortChatsForSidebar } from '@/shared/lib/chat-sidebar'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import type { Chat } from './types'
@@ -31,7 +36,7 @@ interface ChatsState {
   chatHistoryPast: string[]
   chatHistoryFuture: string[]
   chatScrollByChatId: ChatScrollByChatId
-  createChat: () => string
+  createChat: (options?: { adoptPendingComposer?: boolean }) => string
   forkChat: (sourceChatId: string) => string
   selectChat: (id: string) => void
   goBackInChatHistory: () => void
@@ -60,8 +65,15 @@ interface ChatsState {
     targetChatId?: string,
     options?: { allowEmptyUser?: boolean; attachments?: MessageAttachment[] }
   ) => void
+  updateMessageSearchSources: (
+    messageId: string,
+    searchSources: MessageSearchSource[],
+    targetChatId?: string
+  ) => void
   getComposerDraft: (chatId: string) => string
   setComposerDraft: (chatId: string, draft: string) => void
+  /** Clears composer text for a chat and the pre-chat pending slot. */
+  clearComposerDraft: (chatId: string) => void
   getComposerAttachments: (chatId: string) => MessageAttachment[]
   addComposerAttachments: (chatId: string, items: MessageAttachment[]) => void
   removeComposerAttachment: (chatId: string, attachmentId: string) => void
@@ -70,7 +82,12 @@ interface ChatsState {
   clearChatScrollPosition: (chatId: string) => void
   setChatMessages: (chatId: string, messages: Message[]) => void
   getActiveChat: () => Chat | null
+  /** Align `activeChatId` with an existing chat; never creates one. */
+  reconcileActiveChat: () => string | null
+  /** Select or create the chat that should receive the next user message. */
   ensureActiveChat: () => string
+  /** Move pre-chat composer state onto `chatId` after the first chat is created. */
+  adoptPendingComposer: (chatId: string) => void
   resortChats: () => void
   resetChats: () => void
 }
@@ -149,7 +166,7 @@ export const useChatsStore = create<ChatsState>()(
       chatHistoryFuture: [],
       chatScrollByChatId: {},
 
-      createChat: () => {
+      createChat: (options) => {
         const chat = newChat()
         set((state) => {
           const chatHistoryPast = state.activeChatId
@@ -162,6 +179,9 @@ export const useChatsStore = create<ChatsState>()(
             chatHistoryFuture: []
           }
         })
+        if (options?.adoptPendingComposer !== false) {
+          get().adoptPendingComposer(chat.id)
+        }
         notifyActiveChatChange()
         return chat.id
       },
@@ -307,10 +327,9 @@ export const useChatsStore = create<ChatsState>()(
             (chatId) => chatId !== id
           )
           if (chats.length === 0) {
-            const chat = newChat()
             return {
-              chats: [chat],
-              activeChatId: chat.id,
+              chats: [],
+              activeChatId: null,
               composerDraftByChatId,
               chatHistoryPast: [],
               chatHistoryFuture: [],
@@ -405,6 +424,8 @@ export const useChatsStore = create<ChatsState>()(
         const chatId = targetChatId ?? get().activeChatId
         if (!chatId) return
 
+        invalidateChatApiHistoryCache(chatId)
+
         set((state) => ({
           chats: withSortedChats(
             state.chats.map((c) => {
@@ -443,6 +464,8 @@ export const useChatsStore = create<ChatsState>()(
       removeMessagesAfter: (messageId, targetChatId) => {
         const chatId = targetChatId ?? get().activeChatId
         if (!chatId) return
+
+        invalidateChatApiHistoryCache(chatId)
 
         set((state) => ({
           chats: withSortedChats(
@@ -533,6 +556,30 @@ export const useChatsStore = create<ChatsState>()(
             invalidateChatApiHistoryCache(chatId)
           }
         }
+      },
+
+      updateMessageSearchSources: (messageId, searchSources, targetChatId) => {
+        const chatId = targetChatId ?? get().activeChatId
+        if (!chatId || searchSources.length === 0) return
+
+        set((state) => ({
+          chats: withSortedChats(
+            state.chats.map((c) => {
+              if (c.id !== chatId) return c
+              const index = c.messages.findIndex((m) => m.id === messageId)
+              if (index === -1) return c
+              const message = c.messages[index]
+              if (message.role !== 'assistant') return c
+              return {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === messageId ? { ...m, searchSources: [...searchSources] } : m
+                ),
+                updatedAt: Date.now()
+              }
+            })
+          )
+        }))
       },
 
       getComposerDraft: (chatId) => get().composerDraftByChatId?.[chatId] ?? '',
@@ -626,7 +673,7 @@ export const useChatsStore = create<ChatsState>()(
         return chats.find((c) => c.id === activeChatId) ?? null
       },
 
-      ensureActiveChat: () => {
+      reconcileActiveChat: () => {
         const { chats, activeChatId } = get()
         if (activeChatId && chats.some((c) => c.id === activeChatId)) {
           return activeChatId
@@ -634,9 +681,57 @@ export const useChatsStore = create<ChatsState>()(
         if (chats.length > 0) {
           const id = chats[0].id
           set({ activeChatId: id })
+          notifyActiveChatChange()
           return id
         }
-        return get().createChat()
+        if (activeChatId !== null) {
+          set({ activeChatId: null })
+          notifyActiveChatChange()
+        }
+        return null
+      },
+
+      ensureActiveChat: () => {
+        const existing = get().reconcileActiveChat()
+        if (existing) return existing
+        return get().createChat({ adoptPendingComposer: false })
+      },
+
+      clearComposerDraft: (chatId) => {
+        set((state) => {
+          const composerDraftByChatId = { ...(state.composerDraftByChatId ?? {}) }
+          for (const slotId of composerDraftSlotsForChat(chatId)) {
+            composerDraftByChatId[slotId] = ''
+          }
+          return { composerDraftByChatId }
+        })
+      },
+
+      adoptPendingComposer: (chatId) => {
+        set((state) => {
+          const pendingDraft = state.composerDraftByChatId[PENDING_COMPOSER_CHAT_ID] ?? ''
+          const pendingAttachments =
+            state.composerAttachmentsByChatId[PENDING_COMPOSER_CHAT_ID] ?? []
+          const { [PENDING_COMPOSER_CHAT_ID]: _draft, ...composerDraftByChatId } =
+            state.composerDraftByChatId
+          const { [PENDING_COMPOSER_CHAT_ID]: _att, ...composerAttachmentsByChatId } =
+            state.composerAttachmentsByChatId
+
+          const nextDrafts = { ...composerDraftByChatId }
+          if (pendingDraft.trim()) {
+            nextDrafts[chatId] = pendingDraft
+          }
+
+          const nextAttachments = { ...composerAttachmentsByChatId }
+          if (pendingAttachments.length > 0) {
+            nextAttachments[chatId] = pendingAttachments
+          }
+
+          return {
+            composerDraftByChatId: nextDrafts,
+            composerAttachmentsByChatId: nextAttachments
+          }
+        })
       },
 
       resortChats: () => {
@@ -665,8 +760,10 @@ export const useChatsStore = create<ChatsState>()(
       partialize: (state): PersistedChatsState => ({
         chats: chatsForPersist(state.chats),
         activeChatId: state.activeChatId,
-        composerDraftByChatId: state.composerDraftByChatId,
-        composerAttachmentsByChatId: state.composerAttachmentsByChatId,
+        composerDraftByChatId: omitPendingComposerFromRecord(state.composerDraftByChatId),
+        composerAttachmentsByChatId: omitPendingComposerFromRecord(
+          state.composerAttachmentsByChatId
+        ),
         chatHistoryPast: state.chatHistoryPast,
         chatHistoryFuture: state.chatHistoryFuture,
         chatScrollByChatId: state.chatScrollByChatId
@@ -713,7 +810,7 @@ export const useChatsStore = create<ChatsState>()(
           state.chatHistoryFuture = state.chatHistoryFuture ?? []
           state.chatScrollByChatId = state.chatScrollByChatId ?? {}
         }
-        state?.ensureActiveChat()
+        state?.reconcileActiveChat()
       }
     }
   )

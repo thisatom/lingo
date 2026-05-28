@@ -14,6 +14,12 @@ describe('shouldStickToBottom', () => {
     expect(shouldStickToBottom({ pinToBottom: true, isRestoring: false })).toBe(true)
   })
 
+  it('follows during an active agent reply', () => {
+    expect(
+      shouldStickToBottom({ pinToBottom: false, isRestoring: false, agentReplyActive: true })
+    ).toBe(true)
+  })
+
   it('follows near bottom only with a viewport', () => {
     const viewport = {
       scrollHeight: 1000,

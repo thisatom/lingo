@@ -51,7 +51,7 @@ function ThinkingReasoningScroll({
       style={{ maxHeight: THINKING_SCROLL_MAX_HEIGHT }}
     >
       <CustomScrollArea
-        variant="menu"
+        variant="thinking"
         className="min-h-0 max-h-[7.5rem]"
         onViewportRef={(el) => {
           viewportRef.current = el

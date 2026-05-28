@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, PanelLeft, Search } from '@/shared/ui/icons'
+import { ArrowLeft, ArrowRight, PanelLeftClose, Search } from '@/shared/ui/icons'
 import { sidebarChromeIconButtonClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 import { EMPTY_CHAT_HISTORY, useChatsStore } from '@/entities/chat/model/store'
@@ -28,9 +28,10 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
         size="icon"
         className={sidebarChromeIconButtonClass}
         tooltip="Hide sidebar"
+        aria-label="Hide sidebar"
         onClick={toggleSidebarPanel}
       >
-        <PanelLeft className="size-4 shrink-0" />
+        <PanelLeftClose className="size-4 shrink-0" />
       </TooltipIconButton>
 
       <TooltipIconButton

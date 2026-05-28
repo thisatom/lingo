@@ -18,11 +18,12 @@ const TIME_CITY_PATTERNS = [
   /(?:какое\s+)?время\s+(?:в|in)\s+(.+)/i,
   /(?:what\s+)?time\s+is\s+it\s+(?:in|в)\s+(.+)/i,
   /сколько\s+времени\s+(?:в|in)?\s*(.+)/i,
+  /сколько\s+(?:сейчас\s+)?врем(?:я|ени)\s+(?:в|in)\s+(.+)/i,
   /time\s+in\s+(.+)/i
 ]
 
 const TIME_NOW_PATTERNS =
-  /^(?:какое\s+)?время\??$|^(?:what(?:'s|\s+is)\s+)?the\s+time\??$|^сколько\s+времени\??$|^what\s+time\s+is\s+it\??$/i
+  /^(?:какое\s+)?время\??$|^(?:what(?:'s|\s+is)\s+)?the\s+time\??$|^сколько\s+(?:сейчас\s+)?времени\??$|^сколько\s+сейчас\s+время\??$|^what\s+time\s+is\s+it\??$|^(?:который|какой)\s+час\??$/i
 
 const DATE_PATTERNS =
   /какой\s+(?:сегодня\s+)?день|какое\s+(?:сегодня\s+)?число|какая\s+(?:сегодня\s+)?дата|what(?:'s|\s+is)\s+(?:the\s+)?date|what\s+day\s+is\s+it|today'?s\s+date/i

@@ -509,6 +509,10 @@ export const useSettingsStore = create<SettingsState>()(
             typeof saved.modelAutoFallback === 'boolean'
               ? saved.modelAutoFallback
               : current.modelAutoFallback,
+          webSearchEnabled:
+            typeof saved.webSearchEnabled === 'boolean'
+              ? saved.webSearchEnabled
+              : current.webSearchEnabled,
           llmMaxTokens: normalizeLlmMaxTokens(saved.llmMaxTokens ?? current.llmMaxTokens),
           ttsSpeechRate: isTtsSpeechRate(saved.ttsSpeechRate)
             ? saved.ttsSpeechRate

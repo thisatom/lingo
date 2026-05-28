@@ -24,6 +24,7 @@ export function clearPipelineDetailForChat(chatId: string): void {
   patchChatPipeline(chatId, {
     pipelineThinkingText: '',
     pipelineSearchTargets: [],
+    pipelineSearchActiveUrl: null,
     pipelineStreamingAnswer: false
   })
   if (isViewingChat(chatId)) {
@@ -96,5 +97,15 @@ export function setPipelineSearchTargetsForChat(
   patchChatPipeline(chatId, { pipelineSearchTargets: targets })
   if (isViewingChat(chatId)) {
     useConversationStore.getState().setPipelineSearchTargets(targets)
+  }
+}
+
+export function setPipelineSearchActiveUrlForChat(
+  chatId: string,
+  url: string | null
+): void {
+  patchChatPipeline(chatId, { pipelineSearchActiveUrl: url })
+  if (isViewingChat(chatId)) {
+    useConversationStore.getState().setPipelineSearchActiveUrl(url)
   }
 }

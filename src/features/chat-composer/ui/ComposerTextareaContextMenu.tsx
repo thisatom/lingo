@@ -81,7 +81,7 @@ export function ComposerTextareaContextMenu({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className={cn('w-52 p-1', sidebarMenuSurfaceClass)}>
+      <ContextMenuContent className={cn('w-52', sidebarMenuSurfaceClass)}>
         <ContextMenuItem className={sidebarMenuItemClass} onSelect={() => runCommand('cut')}>
           <span className="min-w-0 flex-1">Cut</span>
           <CtrlXShortcut />
@@ -94,7 +94,7 @@ export function ComposerTextareaContextMenu({
           <span className="min-w-0 flex-1">Paste</span>
           <CtrlVShortcut />
         </ContextMenuItem>
-        <ContextMenuSeparator className="my-1 bg-border/60" />
+        <ContextMenuSeparator className="bg-border/60" />
         <ContextMenuItem className={sidebarMenuItemClass} onSelect={handleSelectAll}>
           <span className="min-w-0 flex-1">Select All</span>
           <CtrlAShortcut />

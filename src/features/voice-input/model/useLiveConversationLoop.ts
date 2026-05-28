@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { PENDING_COMPOSER_CHAT_ID } from '@/entities/chat/lib/pending-composer'
 import { useChatsStore } from '@/entities/chat/model/store'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
 import type { AgentTurnPhase } from '@/features/ai-chat/lib/chat-agent-transitions'
@@ -67,6 +68,11 @@ export function useLiveConversationLoop({
     setIsLiveConversationActive(true)
   }, [])
 
+  const syncSessionChatId = useCallback((chatId: string) => {
+    if (!activeRef.current) return
+    sessionChatIdRef.current = chatId
+  }, [])
+
   const scheduleAutoListen = useCallback(() => {
     if (modeRef.current !== 'conversation' || !activeRef.current) return
     if (voiceStage === 'listening' || voiceStage === 'transcribing') return
@@ -74,7 +80,13 @@ export function useLiveConversationLoop({
 
     const sessionChatId = sessionChatIdRef.current
     const activeChatId = useChatsStore.getState().activeChatId
-    if (!sessionChatId || !activeChatId || sessionChatId !== activeChatId) return
+    if (!sessionChatId) return
+
+    const sessionMatchesView =
+      sessionChatId === PENDING_COMPOSER_CHAT_ID
+        ? activeChatId == null
+        : sessionChatId === activeChatId
+    if (!sessionMatchesView) return
 
     clearAutoListenTimer()
     const generation = listenGenerationRef.current
@@ -83,13 +95,15 @@ export function useLiveConversationLoop({
       if (generation !== listenGenerationRef.current) return
       if (modeRef.current !== 'conversation' || !activeRef.current) return
 
+      const currentSessionChatId = sessionChatIdRef.current
       const currentActiveChatId = useChatsStore.getState().activeChatId
-      if (
-        !sessionChatIdRef.current ||
-        currentActiveChatId !== sessionChatIdRef.current
-      ) {
-        return
-      }
+      if (!currentSessionChatId) return
+
+      const stillMatchesView =
+        currentSessionChatId === PENDING_COMPOSER_CHAT_ID
+          ? currentActiveChatId == null
+          : currentSessionChatId === currentActiveChatId
+      if (!stillMatchesView) return
 
       const { stage: currentVoiceStage, error: pipelineError } =
         useConversationStore.getState()
@@ -135,6 +149,7 @@ export function useLiveConversationLoop({
     isLiveConversationActive,
     startLiveConversation,
     stopLiveConversation,
-    scheduleAutoListen
+    scheduleAutoListen,
+    syncSessionChatId
   }
 }

@@ -4,7 +4,10 @@ import { useConversationStore } from '@/entities/conversation/model/store'
 import { beginAgentRun, cancelAgentRun, isAgentRunActive } from '@/features/ai-chat/model/agent-run'
 import { setAgentStreamSession } from '@/features/ai-chat/lib/agent-stream-session'
 import { setPipelineStageForChat } from '@/features/ai-chat/lib/pipeline-stage'
-import { releaseStaleAgentPipelineStage } from '@/features/ai-chat/lib/release-stale-agent-pipeline'
+import {
+  finalizeAgentTurnPipeline,
+  releaseStaleAgentPipelineStage
+} from '@/features/ai-chat/lib/release-stale-agent-pipeline'
 
 describe('releaseStaleAgentPipelineStage', () => {
   it('clears speaking when no stream is active for the chat', () => {
@@ -53,5 +56,35 @@ describe('releaseStaleAgentPipelineStage', () => {
     releaseStaleAgentPipelineStage(chatId)
 
     expect(useConversationStore.getState().stage).toBe('idle')
+  })
+})
+
+describe('finalizeAgentTurnPipeline', () => {
+  it('forces idle after turn ends when no stream is active', () => {
+    const chatId = 'chat-finalize'
+    useChatsStore.setState({
+      chats: [{ id: chatId, title: 'Test', messages: [], createdAt: 0, updatedAt: 0 }],
+      activeChatId: chatId
+    })
+    setPipelineStageForChat(chatId, 'speaking')
+    setAgentStreamSession(null, false)
+
+    finalizeAgentTurnPipeline(chatId)
+
+    expect(useConversationStore.getState().stage).toBe('idle')
+  })
+
+  it('does not clear while a new stream started on the same chat', () => {
+    const chatId = 'chat-finalize-stream'
+    useChatsStore.setState({
+      chats: [{ id: chatId, title: 'Test', messages: [], createdAt: 0, updatedAt: 0 }],
+      activeChatId: chatId
+    })
+    setPipelineStageForChat(chatId, 'thinking')
+    setAgentStreamSession(chatId, true)
+
+    finalizeAgentTurnPipeline(chatId)
+
+    expect(useConversationStore.getState().stage).toBe('thinking')
   })
 })

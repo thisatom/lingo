@@ -1,4 +1,4 @@
-import { PanelLeft } from '@/shared/ui/icons'
+import { PanelLeftOpen } from '@/shared/ui/icons'
 import { sidebarChromeIconButtonClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
@@ -14,9 +14,10 @@ export function SidebarExpandButton() {
       size="icon"
       className={sidebarChromeIconButtonClass}
       tooltip="Show sidebar"
+      aria-label="Show sidebar"
       onClick={toggleSidebarPanel}
     >
-      <PanelLeft className="size-4 shrink-0" />
+      <PanelLeftOpen className="size-4 shrink-0" />
     </TooltipIconButton>
   )
 }

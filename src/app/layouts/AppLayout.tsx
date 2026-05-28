@@ -18,19 +18,19 @@ export function AppLayout() {
   useWindowTitle()
   useNewChatHotkey()
   const appReady = useAppReady()
-  const ensureActiveChat = useChatsStore((s) => s.ensureActiveChat)
+  const reconcileActiveChat = useChatsStore((s) => s.reconcileActiveChat)
   const sidebarPanelRef = usePanelRef()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   useEffect(() => {
     if (useChatsStore.persist.hasHydrated()) {
-      ensureActiveChat()
+      reconcileActiveChat()
       return
     }
     return useChatsStore.persist.onFinishHydration(() => {
-      ensureActiveChat()
+      reconcileActiveChat()
     })
-  }, [ensureActiveChat])
+  }, [reconcileActiveChat])
 
   const toggleSidebarPanel = useCallback(() => {
     const panel = sidebarPanelRef.current

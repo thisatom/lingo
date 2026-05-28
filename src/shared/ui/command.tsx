@@ -2,7 +2,12 @@ import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { SearchIcon } from '@/shared/ui/icons'
 
-import { sidebarMenuSurfaceClass } from '@/shared/lib/sidebar-filter-menu-styles'
+import {
+  menuCommandItemClass,
+  menuContentPaddingClass,
+  menuLabelClass,
+  sidebarMenuSurfaceClass
+} from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from '@/shared/lib/utils'
 import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
 import {
@@ -121,7 +126,9 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        'overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground',
+        'overflow-hidden text-foreground',
+        menuContentPaddingClass,
+        '[&_[cmdk-group-heading]]:p-[3px] [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:leading-normal [&_[cmdk-group-heading]]:text-muted-foreground',
         className
       )}
       {...props}
@@ -150,7 +157,8 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        'relative flex h-7 min-h-7 cursor-pointer items-center gap-2 rounded-sm px-2 py-0 text-sm text-foreground outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 data-[selected=true]:bg-menu-hover data-[selected=true]:text-popover-foreground dark:data-[selected=true]:bg-[#252525] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4 [&_svg:not([class*="text-"])]:text-muted-foreground',
+        menuCommandItemClass,
+        'data-[disabled=true]:pointer-events-none data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 data-[disabled=true]:data-[selected=true]:bg-transparent dark:data-[disabled=true]:data-[selected=true]:bg-transparent [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4 [&_svg:not([class*="text-"])]:text-muted-foreground',
         className
       )}
       {...props}

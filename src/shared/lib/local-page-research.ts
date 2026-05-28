@@ -1,9 +1,10 @@
 import { extractTextFromHtml } from '@/shared/lib/html-to-text'
 import type { LocalWebSearchResult } from '@/shared/lib/local-web-search'
+import type { LocalWebSearchProgress } from '@/shared/lib/local-web-search-progress'
 
-const MAX_PAGES_TO_FETCH = 4
-const MAX_HTML_BYTES = 400_000
-const PAGE_FETCH_TIMEOUT_MS = 12_000
+const MAX_PAGES_TO_FETCH = 2
+const MAX_HTML_BYTES = 280_000
+const PAGE_FETCH_TIMEOUT_MS = 7_000
 const MAX_CONTENT_PER_PAGE = 3200
 const SEARCH_USER_AGENT =
   'Mozilla/5.0 (compatible; Lingo/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -50,7 +51,7 @@ function shouldFetchPage(result: LocalWebSearchResult): boolean {
   }
 
   const snippet = result.snippet.trim()
-  if (snippet.length >= 900) return false
+  if (snippet.length >= 420) return false
 
   return true
 }
@@ -129,7 +130,8 @@ async function fetchPageContent(url: string): Promise<string | null> {
 
 /** Fetches and parses top search hits; fills `pageContent` (no links in the prompt). */
 export async function enrichSearchResultsWithPageContent(
-  results: LocalWebSearchResult[]
+  results: LocalWebSearchResult[],
+  progress?: LocalWebSearchProgress
 ): Promise<LocalWebSearchResult[]> {
   const candidates = results
     .map((result, index) => ({ result, index, url: resolveResultUrl(result.url) }))
@@ -142,6 +144,7 @@ export async function enrichSearchResultsWithPageContent(
 
   const fetched = await Promise.all(
     candidates.map(async ({ result, index, url }) => {
+      progress?.onVisitingUrl?.(url)
       const pageContent = await fetchPageContent(url)
       return { index, pageContent, url }
     })

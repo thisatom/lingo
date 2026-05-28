@@ -41,14 +41,14 @@ export function ComposerFileInput({ existingCount, disabled, onAdd, onError }: P
       <TooltipIconButton
         type="button"
         variant="ghost"
-        size="icon"
+        size="iconSm"
         className={composerToolbarIconClass}
         disabled={disabled}
         tooltip="Attach image or file (paste image with Ctrl+V)"
         aria-label="Attach image or file"
         onClick={() => inputRef.current?.click()}
       >
-        <Paperclip className="size-4" />
+        <Paperclip />
       </TooltipIconButton>
     </>
   )

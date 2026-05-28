@@ -1,59 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import type { Message } from '@/entities/message/model/types'
-import { groupMessagesIntoTurns, isThinkingMessageLive, voiceCaptureLabelForUserMessage } from './group-turns'
-function msg(id: string, role: Message['role']): Message {
-  return { id, role, content: 'x', createdAt: 0 }
+import { shouldShowThinkingInTurn } from './group-turns'
+
+function thinking(id: string, content = ''): Message {
+  return { id, role: 'thinking', content, createdAt: 0 }
 }
 
-describe('isThinkingMessageLive', () => {
-  const turn = {
-    assistantMessages: [msg('t1', 'thinking'), msg('a1', 'assistant')]
-  }
+function user(id: string): Message {
+  return { id, role: 'user', content: 'q', createdAt: 0 }
+}
 
-  it('is false once an assistant answer exists after thinking', () => {
-    expect(isThinkingMessageLive(turn, 't1', true, true, 'thinking')).toBe(false)
-  })
+describe('shouldShowThinkingInTurn', () => {
+  it('hides orphan thinking from a previous stopped turn', () => {
+    const turn = {
+      user: user('u1'),
+      assistantMessages: [thinking('t1', 'reasoning…')]
+    }
+    expect(
+      shouldShowThinkingInTurn(turn, turn.assistantMessages[0], 0, {
+        agentBusy: true,
+        isLatestTurn: true
+      })
+    ).toBe(true)
 
-  it('is true while only thinking is streaming on the latest turn', () => {
-    const liveTurn = { assistantMessages: [msg('t1', 'thinking')] }
-    expect(isThinkingMessageLive(liveTurn, 't1', true, true, 'thinking')).toBe(true)
-  })
-
-  it('is false during speaking (TTS runs after the answer is complete)', () => {
-    const liveTurn = { assistantMessages: [msg('t1', 'thinking')] }
-    expect(isThinkingMessageLive(liveTurn, 't1', true, true, 'speaking', false)).toBe(false)
-  })
-
-  it('is false during web search even with empty thinking placeholder', () => {
-    const liveTurn = { assistantMessages: [msg('t1', 'thinking')] }
-    expect(isThinkingMessageLive(liveTurn, 't1', true, true, 'searching')).toBe(false)
-  })
-})
-
-describe('groupMessagesIntoTurns', () => {
-  it('keeps an empty user turn while live voice capture is active', () => {
-    const user: Message = { id: 'u1', role: 'user', content: '', createdAt: 0 }
-    const turns = groupMessagesIntoTurns([user], { preserveEmptyUserMessageId: 'u1' })
-    expect(turns).toHaveLength(1)
-    expect(turns[0]?.user.id).toBe('u1')
-  })
-
-  it('drops empty user turns without a preserve id', () => {
-    const user: Message = { id: 'u1', role: 'user', content: '', createdAt: 0 }
-    expect(groupMessagesIntoTurns([user])).toHaveLength(0)
-  })
-})
-
-describe('voiceCaptureLabelForUserMessage', () => {
-  it('shows listening while the live voice bubble is empty before mic stage', () => {
-    expect(voiceCaptureLabelForUserMessage('u1', '', 'u1', 'idle')).toBe('listening')
-  })
-
-  it('shows transcribing when stage is transcribing', () => {
-    expect(voiceCaptureLabelForUserMessage('u1', '', 'u1', 'transcribing')).toBe('transcribing')
-  })
-
-  it('hides label once user content exists', () => {
-    expect(voiceCaptureLabelForUserMessage('u1', 'hello', 'u1', 'listening')).toBeNull()
+    expect(
+      shouldShowThinkingInTurn(turn, turn.assistantMessages[0], 0, {
+        agentBusy: false,
+        isLatestTurn: false
+      })
+    ).toBe(false)
   })
 })

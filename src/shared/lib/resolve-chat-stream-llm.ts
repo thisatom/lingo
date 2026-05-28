@@ -52,6 +52,19 @@ function completionTokenBudget(settings: ChatStreamLlmSettings): {
   return { maxTokens, maxTokensRetry: llmMaxTokensRetryBudget(maxTokens) }
 }
 
+/**
+ * Per-turn web search for main-process sanitize.
+ * Trusts the renderer's per-turn flag (live UI state); persisted snapshot is fallback only.
+ */
+export function resolveChatStreamWebSearch(
+  settings: Pick<ChatStreamLlmSettings, 'webSearchEnabled'>,
+  perTurnRequested: boolean | undefined
+): boolean {
+  if (perTurnRequested === false) return false
+  if (perTurnRequested === true) return true
+  return settings.webSearchEnabled
+}
+
 export function buildChatStreamLlmFields(
   settings: ChatStreamLlmSettings
 ): Pick<
@@ -67,7 +80,7 @@ export function buildChatStreamLlmFields(
         llmBackend: 'custom',
         model: '',
         customLlm: { baseUrl: '', model: '' },
-        webSearch: false,
+        webSearch: settings.webSearchEnabled,
         modelAutoFallback: false,
         ...tokens
       }
@@ -76,7 +89,7 @@ export function buildChatStreamLlmFields(
       llmBackend: 'custom',
       model: customLlm.model,
       customLlm,
-      webSearch: false,
+      webSearch: settings.webSearchEnabled,
       modelAutoFallback: false,
       ...tokens
     }

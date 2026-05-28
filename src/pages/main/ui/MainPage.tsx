@@ -5,7 +5,15 @@ import { useChatContextUsage } from '@/features/chat-context/model/useChatContex
 import { useChatComposerModeHotkey } from '@/features/chat-composer/model/useChatComposerModeHotkey'
 import { useVoiceInput } from '@/features/voice-input/model/useVoiceInput'
 import { useLiveConversationLoop } from '@/features/voice-input/model/useLiveConversationLoop'
+import {
+  isPendingComposerChatId,
+  isPendingVoiceMessageId,
+  PENDING_COMPOSER_CHAT_ID,
+  PENDING_VOICE_MESSAGE_ID,
+  resolveComposerChatId
+} from '@/entities/chat/lib/pending-composer'
 import { useChatsStore } from '@/entities/chat/model/store'
+import type { Message } from '@/entities/message/model/types'
 import {
   EMPTY_COMPOSER_ATTACHMENTS,
   type MessageAttachment
@@ -41,6 +49,7 @@ export function MainPage() {
   } | null>(null)
 
   const scheduleAutoListenRef = useRef<(() => void) | null>(null)
+  const syncSessionChatIdRef = useRef<(chatId: string) => void>(() => undefined)
 
   const {
     messages,
@@ -69,13 +78,12 @@ export function MainPage() {
   const activeChat = useChatsStore((s) => s.getActiveChat())
   const activeChatId = activeChat?.id ?? null
   const selectChat = useChatsStore((s) => s.selectChat)
-  const draft = useChatsStore((s) =>
-    activeChatId ? (s.composerDraftByChatId?.[activeChatId] ?? '') : ''
+  const composerChatId = resolveComposerChatId(activeChatId)
+  const draft = useChatsStore(
+    (s) => s.composerDraftByChatId?.[composerChatId] ?? ''
   )
-  const composerAttachments = useChatsStore((s) =>
-    activeChatId
-      ? (s.composerAttachmentsByChatId[activeChatId] ?? EMPTY_COMPOSER_ATTACHMENTS)
-      : EMPTY_COMPOSER_ATTACHMENTS
+  const composerAttachments = useChatsStore(
+    (s) => s.composerAttachmentsByChatId[composerChatId] ?? EMPTY_COMPOSER_ATTACHMENTS
   )
   const setComposerDraft = useChatsStore((s) => s.setComposerDraft)
   const addComposerAttachments = useChatsStore((s) => s.addComposerAttachments)
@@ -100,26 +108,23 @@ export function MainPage() {
 
   const setDraft = useCallback(
     (value: string) => {
-      if (!activeChatId) return
-      setComposerDraft(activeChatId, value)
+      setComposerDraft(composerChatId, value)
     },
-    [activeChatId, setComposerDraft]
+    [composerChatId, setComposerDraft]
   )
 
   const handleAddAttachments = useCallback(
     (items: MessageAttachment[]) => {
-      if (!activeChatId) return
-      addComposerAttachments(activeChatId, items)
+      addComposerAttachments(composerChatId, items)
     },
-    [activeChatId, addComposerAttachments]
+    [composerChatId, addComposerAttachments]
   )
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {
-      if (!activeChatId) return
-      removeComposerAttachment(activeChatId, id)
+      removeComposerAttachment(composerChatId, id)
     },
-    [activeChatId, removeComposerAttachment]
+    [composerChatId, removeComposerAttachment]
   )
 
   const handleAttachmentError = useCallback(
@@ -128,6 +133,7 @@ export function MainPage() {
   )
 
   const voiceMessageIdRef = useRef('')
+  const voiceCaptureChatIdRef = useRef<string | null>(null)
   const [liveVoiceUserMessageId, setLiveVoiceUserMessageId] = useState<string | null>(null)
   const isLiveConversationActiveRef = useRef(false)
   const editSpeechTargetRef = useRef<EditSpeechTarget | null>(null)
@@ -148,36 +154,56 @@ export function MainPage() {
         }
       },
       onConversationStart: () => {
-        const { messageId } = beginVoiceUserMessage()
+        const { messageId, chatId } = beginVoiceUserMessage()
         if (!messageId) return null
         voiceMessageIdRef.current = messageId
+        voiceCaptureChatIdRef.current = chatId
         setLiveVoiceUserMessageId(messageId)
         return messageId
       },
       onConversationLive: (text: string) => {
-        if (voiceMessageIdRef.current) {
-          updateVoiceUserMessage(voiceMessageIdRef.current, text)
+        const chatId = voiceCaptureChatIdRef.current
+        if (voiceMessageIdRef.current && chatId) {
+          updateVoiceUserMessage(voiceMessageIdRef.current, text, chatId)
         }
       },
       onConversationCommit: async (messageId: string) => {
+        const captureChatId = voiceCaptureChatIdRef.current
         voiceMessageIdRef.current = ''
+        voiceCaptureChatIdRef.current = null
         setLiveVoiceUserMessageId(null)
-        const chat = useChatsStore.getState().getActiveChat()
-        const trimmed =
-          chat?.messages.find((m) => m.id === messageId)?.content.trim() ?? ''
+        if (!captureChatId) return
+
+        const trimmed = isPendingComposerChatId(captureChatId)
+          ? useChatsStore.getState().getComposerDraft(PENDING_COMPOSER_CHAT_ID).trim()
+          : (useChatsStore
+              .getState()
+              .chats.find((c) => c.id === captureChatId)
+              ?.messages.find((m) => m.id === messageId)
+              ?.content.trim() ?? '')
+
         if (!trimmed) {
-          cancelVoiceUserMessage(messageId)
+          cancelVoiceUserMessage(messageId, captureChatId)
           if (isLiveConversationActiveRef.current) {
             scheduleAutoListenRef.current?.()
           }
           return
         }
-        await commitVoiceUserMessage(messageId)
+
+        const realChatId = await commitVoiceUserMessage(messageId, captureChatId)
+        if (realChatId) {
+          syncSessionChatIdRef.current(realChatId)
+        }
+        if (isLiveConversationActiveRef.current) {
+          scheduleAutoListenRef.current?.()
+        }
       },
       onConversationCancel: (messageId: string) => {
+        const chatId = voiceCaptureChatIdRef.current
         voiceMessageIdRef.current = ''
+        voiceCaptureChatIdRef.current = null
         setLiveVoiceUserMessageId(null)
-        cancelVoiceUserMessage(messageId)
+        if (chatId) cancelVoiceUserMessage(messageId, chatId)
         if (isLiveConversationActiveRef.current) {
           scheduleAutoListenRef.current?.()
         }
@@ -236,6 +262,7 @@ export function MainPage() {
   })
 
   scheduleAutoListenRef.current = liveConversation.scheduleAutoListen
+  syncSessionChatIdRef.current = liveConversation.syncSessionChatId
 
   useEffect(() => {
     isLiveConversationActiveRef.current = liveConversation.isLiveConversationActive
@@ -262,25 +289,19 @@ export function MainPage() {
     if (!text) return
 
     if (chatComposerMode === 'text') {
-      if (activeChatId) setComposerDraft(activeChatId, '')
       setSpeechError(null)
+      voice.setDraftPrefix('')
       await sendUserMessage(text)
     }
-  }, [
-    activeChatId,
-    chatComposerMode,
-    sendUserMessage,
-    setComposerDraft,
-    setSpeechError,
-    voice
-  ])
+  }, [chatComposerMode, sendUserMessage, setSpeechError, voice])
 
   const stopAgentSpeechSession = useCallback(() => {
     liveConversation.stopLiveConversation()
     void voice.cancel()
-    if (voiceMessageIdRef.current) {
-      cancelVoiceUserMessage(voiceMessageIdRef.current)
+    if (voiceMessageIdRef.current && voiceCaptureChatIdRef.current) {
+      cancelVoiceUserMessage(voiceMessageIdRef.current, voiceCaptureChatIdRef.current)
       voiceMessageIdRef.current = ''
+      voiceCaptureChatIdRef.current = null
     }
     setLiveVoiceUserMessageId(null)
     forceStopAgent()
@@ -314,9 +335,7 @@ export function MainPage() {
     }
 
     if (actionsDisabled) return
-    const chatId =
-      activeChatId ?? useChatsStore.getState().ensureActiveChat()
-    liveConversation.startLiveConversation(chatId)
+    liveConversation.startLiveConversation(resolveComposerChatId(activeChatId))
     void startVoiceCapture()
   }, [
     actionsDisabled,
@@ -371,22 +390,38 @@ export function MainPage() {
     voice
   ])
 
+  const displayMessages = useMemo((): Message[] => {
+    if (!isPendingVoiceMessageId(liveVoiceUserMessageId ?? '')) return messages
+    return [
+      ...messages,
+      {
+        id: PENDING_VOICE_MESSAGE_ID,
+        role: 'user',
+        content: draft,
+        createdAt: Date.now()
+      }
+    ]
+  }, [draft, liveVoiceUserMessageId, messages])
+
   const onSend = useCallback(async () => {
     if (!llmChatReady) return
     const text = draft
     const attachments = [...composerAttachments]
-    if (activeChatId) setComposerDraft(activeChatId, '')
+    if (!text.trim() && attachments.length === 0) return
+
     setSpeechError(null)
     chatScrollRef.current?.followBottom()
+    voice.setDraftPrefix('')
+
+    useChatsStore.getState().ensureActiveChat()
     await sendUserMessage(text, attachments)
   }, [
-    activeChatId,
     composerAttachments,
     draft,
     sendUserMessage,
-    setComposerDraft,
     setSpeechError,
-    llmChatReady
+    llmChatReady,
+    voice
   ])
 
   useEffect(() => {
@@ -418,7 +453,7 @@ export function MainPage() {
 
       <div className="relative min-h-0 flex-1">
         <ConversationPanel
-          messages={messages}
+          messages={displayMessages}
           stage={stage}
           activeChatId={activeChat?.id ?? null}
           actionsDisabled={actionsDisabled}

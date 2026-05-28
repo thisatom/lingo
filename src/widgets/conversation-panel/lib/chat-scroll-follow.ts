@@ -14,6 +14,8 @@ export const CHAT_FOLLOW_BOTTOM_THRESHOLD_PX = CHAT_SCROLL_BOTTOM_THRESHOLD_PX
 export type ChatScrollFollowState = {
   pinToBottom: boolean
   isRestoring: boolean
+  /** Agent turn in progress — keep following unless user scrolls up. */
+  agentReplyActive?: boolean
 }
 
 export function distanceFromChatBottom(viewport: HTMLElement): number {
@@ -37,6 +39,7 @@ export function shouldStickToBottom(
 ): boolean {
   if (state.isRestoring) return false
   if (state.pinToBottom) return true
+  if (state.agentReplyActive) return true
   if (viewport) return isViewportNearChatBottom(viewport)
   return false
 }

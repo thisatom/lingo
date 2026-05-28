@@ -218,7 +218,7 @@ export function ChatComposer({
               <TooltipIconButton
                 type="button"
                 variant="destructive"
-                size="icon"
+                size="iconSm"
                 className={cn(composerToolbarIconClass, 'animate-pulse')}
                 disabled={disabled}
                 tooltip="Stop recording"
@@ -230,6 +230,7 @@ export function ChatComposer({
             ) : (
               <VoiceRecordButton
                 variant="ghost"
+                size="iconSm"
                 interactionMode={voiceInteractionMode}
                 isListening={!!isListening}
                 disabled={
@@ -254,12 +255,12 @@ export function ChatComposer({
             <Button
               type="button"
               variant="ghost"
-              size="icon"
+              size="iconSm"
               className={composerToolbarIconClass}
               disabled
               tabIndex={-1}
             >
-              <Mic className="size-4" />
+              <Mic />
             </Button>
           )}
 
@@ -275,7 +276,7 @@ export function ChatComposer({
           <TooltipIconButton
             type="button"
             variant="ghost"
-            size="icon"
+            size="iconSm"
             className={cn(
               composerToolbarIconClass,
               webSearchEnabled && cn(composerInputHoverClass, 'bg-accent text-foreground')
@@ -286,7 +287,7 @@ export function ChatComposer({
             aria-pressed={webSearchEnabled}
             onClick={() => setWebSearchEnabled(!webSearchEnabled)}
           >
-            <Globe className="size-4" />
+            <Globe />
           </TooltipIconButton>
 
           <ComposerAgentMenuSelect

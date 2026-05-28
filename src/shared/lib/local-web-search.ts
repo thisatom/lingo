@@ -3,6 +3,7 @@ import { detectLocalSearchIntent } from '@/shared/lib/local-search-intent'
 import { enrichSearchResultsWithPageContent } from '@/shared/lib/local-page-research'
 import { fetchLocalDate, fetchLocalTime } from '@/shared/lib/local-search-time'
 import { fetchLocalWeather } from '@/shared/lib/local-search-weather'
+import type { LocalWebSearchProgress } from '@/shared/lib/local-web-search-progress'
 import { performWebsearchQuery } from '@/shared/lib/websearch-query'
 
 const PRACTICE_LOCALE: Record<string, string> = {
@@ -18,12 +19,25 @@ const PRACTICE_LOCALE: Record<string, string> = {
   ko: 'ko-KR'
 }
 
-function resolveSearchLocale(): string {
-  const lang = useSettingsStore.getState().practiceLanguage ?? 'en'
-  return (
-    PRACTICE_LOCALE[lang] ??
-    (typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US')
-  )
+export function localeForPracticeLanguage(practiceLanguage?: string): string | undefined {
+  const lang = practiceLanguage?.trim()
+  if (!lang) return undefined
+  return PRACTICE_LOCALE[lang]
+}
+
+function resolveSearchLocale(localeOverride?: string): string {
+  const trimmed = localeOverride?.trim()
+  if (trimmed) return trimmed
+  try {
+    const lang = useSettingsStore.getState().practiceLanguage ?? 'en'
+    const fromStore = PRACTICE_LOCALE[lang]
+    if (fromStore) return fromStore
+  } catch {
+    // settings store unavailable (e.g. Electron main)
+  }
+  return typeof navigator !== 'undefined' && navigator.language
+    ? navigator.language
+    : 'en-US'
 }
 
 export type LocalWebSearchResult = {
@@ -262,22 +276,31 @@ async function fetchSpecializedResults(
   }
 }
 
-async function finalizeResults(results: LocalWebSearchResult[]): Promise<LocalWebSearchResult[]> {
+async function finalizeResults(
+  results: LocalWebSearchResult[],
+  progress?: LocalWebSearchProgress
+): Promise<LocalWebSearchResult[]> {
   if (results.length === 0) return results
   if (results.some((r) => r.pageContent && r.pageContent.trim().length > 80)) {
     return results
   }
-  return enrichSearchResultsWithPageContent(results)
+  return enrichSearchResultsWithPageContent(results, progress)
 }
 
 /** Local search: weather/time APIs + websearch-mcp + DuckDuckGo fallback. */
-export async function performLocalWebSearch(query: string): Promise<LocalWebSearchResult[]> {
-  const locale = resolveSearchLocale()
+export async function performLocalWebSearch(
+  query: string,
+  progress?: LocalWebSearchProgress
+): Promise<LocalWebSearchResult[]> {
+  const locale = resolveSearchLocale(progress?.locale)
 
   const specialized = await fetchSpecializedResults(query, locale).catch(() => null)
   if (specialized?.length) {
+    progress?.onInitialResults?.(specialized)
     return specialized
   }
 
-  return finalizeResults(await fetchGeneralWebSearch(query, locale))
+  const general = await fetchGeneralWebSearch(query, locale)
+  progress?.onInitialResults?.(general)
+  return finalizeResults(general, progress)
 }

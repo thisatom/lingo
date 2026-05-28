@@ -40,6 +40,8 @@ type VirtualizedConversationTurnsProps = {
   ) => Promise<SubmitEditedUserMessageResult>
   onAttachmentError?: (message: string) => void
   liveVoiceUserMessageId?: string | null
+  /** Called after the tail turn height is remeasured during an active agent reply. */
+  onTailContentChange?: () => void
 }
 
 export function VirtualizedConversationTurns({
@@ -62,7 +64,8 @@ export function VirtualizedConversationTurns({
   onExitEdit,
   onSubmitEdit,
   onAttachmentError,
-  liveVoiceUserMessageId = null
+  liveVoiceUserMessageId = null,
+  onTailContentChange
 }: VirtualizedConversationTurnsProps) {
   const measureRafRef = useRef<number | null>(null)
 
@@ -86,11 +89,12 @@ export function VirtualizedConversationTurns({
     measureRafRef.current = requestAnimationFrame(() => {
       measureRafRef.current = null
       virtualizer.measure()
+      onTailContentChange?.()
     })
     return () => {
       if (measureRafRef.current != null) cancelAnimationFrame(measureRafRef.current)
     }
-  }, [agentBusy, turns.length, tailAssistantLen, tailThinkingLen, virtualizer])
+  }, [agentBusy, onTailContentChange, turns.length, tailAssistantLen, tailThinkingLen, virtualizer])
 
   const items = virtualizer.getVirtualItems()
   const totalSize = virtualizer.getTotalSize()

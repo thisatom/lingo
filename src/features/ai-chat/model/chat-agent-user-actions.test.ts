@@ -4,7 +4,11 @@ import { useMessageQueueStore } from '@/entities/message-queue/model/store'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { setAgentStreamSession } from '@/features/ai-chat/lib/agent-stream-session'
 import { setPipelineStageForChat } from '@/features/ai-chat/lib/pipeline-stage'
-import { sendUserMessageAction } from '@/features/ai-chat/model/chat-agent-user-actions'
+import {
+  commitVoiceUserMessageAction,
+  sendUserMessageAction,
+  updateVoiceUserMessageAction
+} from '@/features/ai-chat/model/chat-agent-user-actions'
 import type { ChatAgentUserActionsDeps } from '@/features/ai-chat/model/chat-agent-user-actions'
 
 const chatId = 'actions-chat'
@@ -28,6 +32,7 @@ function createDeps(overrides: Partial<ChatAgentUserActionsDeps> = {}): ChatAgen
 describe('chat-agent-user-actions', () => {
   beforeEach(() => {
     setAgentStreamSession(null, false)
+    useChatsStore.getState().resetChats()
     useChatsStore.setState({
       chats: [
         {
@@ -64,5 +69,75 @@ describe('chat-agent-user-actions', () => {
     expect(deps.addMessage).toHaveBeenCalled()
     expect(deps.runAssistantReply).toHaveBeenCalledWith(chatId)
     expect(deps.enqueueUserMessage).not.toHaveBeenCalled()
+  })
+
+  it('updateVoiceUserMessageAction writes to the capture chat, not active chat', () => {
+    const otherChatId = 'other-chat'
+    useChatsStore.setState({
+      chats: [
+        {
+          id: chatId,
+          title: 'Capture',
+          messages: [{ id: 'voice-1', role: 'user', content: '', createdAt: 0 }],
+          createdAt: 0,
+          updatedAt: 0
+        },
+        {
+          id: otherChatId,
+          title: 'Other',
+          messages: [],
+          createdAt: 0,
+          updatedAt: 0
+        }
+      ],
+      activeChatId: otherChatId
+    })
+    const deps = createDeps()
+    updateVoiceUserMessageAction(deps, 'voice-1', 'Hello', chatId)
+
+    expect(deps.updateMessageContent).toHaveBeenCalledWith('voice-1', 'Hello', chatId, {
+      allowEmptyUser: true
+    })
+  })
+
+  it('commitVoiceUserMessageAction runs turn on capture chat after active chat changed', async () => {
+    const otherChatId = 'other-chat'
+    useChatsStore.setState({
+      chats: [
+        {
+          id: chatId,
+          title: 'Capture',
+          messages: [{ id: 'voice-1', role: 'user', content: 'Hi', createdAt: 0 }],
+          createdAt: 0,
+          updatedAt: 0
+        },
+        {
+          id: otherChatId,
+          title: 'Other',
+          messages: [],
+          createdAt: 0,
+          updatedAt: 0
+        }
+      ],
+      activeChatId: otherChatId
+    })
+    setPipelineStageForChat(chatId, 'idle')
+    const deps = createDeps()
+
+    await commitVoiceUserMessageAction(deps, 'voice-1', chatId)
+
+    expect(deps.runAssistantReply).toHaveBeenCalledWith(chatId)
+  })
+
+  it('sendUserMessageAction creates the first chat when none exist', async () => {
+    useChatsStore.getState().resetChats()
+    setPipelineStageForChat('unused', 'idle')
+    const deps = createDeps()
+
+    await sendUserMessageAction(deps, 'Hello world', undefined)
+
+    expect(useChatsStore.getState().chats).toHaveLength(1)
+    expect(deps.addMessage).toHaveBeenCalled()
+    expect(deps.runAssistantReply).toHaveBeenCalledWith(useChatsStore.getState().chats[0]!.id)
   })
 })

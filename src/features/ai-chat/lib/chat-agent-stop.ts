@@ -96,7 +96,7 @@ export function executeAgentStop(
     }
   }
 
-  if (chatId) {
+  if (chatId && useChatsStore.getState().chats.some((c) => c.id === chatId)) {
     setPipelineStreamingAnswerForChat(chatId, false)
     clearPipelineDetailForChat(chatId)
     setPipelineErrorForChat(chatId, null)

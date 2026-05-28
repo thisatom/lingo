@@ -49,12 +49,12 @@ export function ChatTextContextMenu({ children, className }: ChatTextContextMenu
           {children}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className={cn('w-52 p-1', sidebarMenuSurfaceClass)}>
+      <ContextMenuContent className={cn('w-52', sidebarMenuSurfaceClass)}>
         <ContextMenuItem className={sidebarMenuItemClass} onSelect={() => void handleCopy()}>
           <span className="min-w-0 flex-1">Copy</span>
           <CtrlCShortcut />
         </ContextMenuItem>
-        <ContextMenuSeparator className="my-1 bg-border/60" />
+        <ContextMenuSeparator className="bg-border/60" />
         <ContextMenuItem className={sidebarMenuItemClass} onSelect={handleSelectAll}>
           <span className="min-w-0 flex-1">Select All</span>
           <CtrlAShortcut />

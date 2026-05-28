@@ -49,6 +49,24 @@ export function isThinkingMessageLive(
     .some((message) => message.role === 'assistant')
 }
 
+/** Hide thinking left over from a stopped turn so it does not sit above the next question. */
+export function shouldShowThinkingInTurn(
+  turn: Pick<ConversationTurn, 'assistantMessages'>,
+  message: Message,
+  messageIndex: number,
+  options: { agentBusy: boolean; isLatestTurn: boolean }
+): boolean {
+  if (message.role !== 'thinking') return true
+
+  const hasFollowingAnswer = turn.assistantMessages
+    .slice(messageIndex + 1)
+    .some((m) => m.role === 'assistant' && m.content.trim().length > 0)
+
+  if (hasFollowingAnswer) return true
+  if (options.isLatestTurn && options.agentBusy) return true
+  return false
+}
+
 export function groupMessagesIntoTurns(
   messages: readonly Message[],
   options?: { preserveEmptyUserMessageId?: string | null }

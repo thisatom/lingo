@@ -1,3 +1,4 @@
+import { menuItemPaddingClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from '@/shared/lib/utils'
 
 /** Shared compact control styles for settings pages. */
@@ -34,7 +35,8 @@ export const settingsMenuItemHighlightClass = cn(
 )
 
 export const settingsSelectItemClass = cn(
-  '!h-6 !min-h-6 rounded-sm py-0 text-xs leading-none',
+  '!h-6 !min-h-6 rounded-sm text-xs leading-none',
+  menuItemPaddingClass,
   settingsMenuItemHighlightClass
 )
 
@@ -50,7 +52,8 @@ export const settingsPopoverTriggerClass = cn(
 )
 
 export const settingsCommandItemClass = cn(
-  '!h-6 !min-h-6 rounded-sm px-2 py-0 text-xs leading-none',
+  '!h-6 !min-h-6 rounded-sm text-xs leading-none',
+  menuItemPaddingClass,
   settingsMenuItemHighlightClass,
   'dark:data-[selected=true]:!bg-[#252525] dark:data-[selected=true]:!text-popover-foreground'
 )

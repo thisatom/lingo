@@ -1,7 +1,10 @@
 import { cn } from '@/shared/lib/utils'
 
-/** Text selection allowed inside chat Q&A (app shell uses select-none). */
+/** Text selection allowed for agent answer / thinking (app shell uses select-none). */
 export const chatSelectableClass = 'select-text'
+
+/** User questions and chrome — not selectable (inherits from shell). */
+export const chatNonSelectableClass = 'select-none'
 
 /** Shared layout for user questions and agent messages in the chat column */
 export const messageTextClass = 'text-[13px] leading-[1.5] text-foreground'

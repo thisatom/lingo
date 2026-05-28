@@ -41,6 +41,9 @@ const lingo: LingoApi = {
           case 'search-targets':
             handlers.onSearchTargets?.(payload)
             break
+          case 'search-visiting':
+            handlers.onSearchVisiting?.(payload)
+            break
           case 'thinking-delta':
             handlers.onThinkingDelta?.(payload)
             break

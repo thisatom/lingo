@@ -1,5 +1,11 @@
 import * as React from 'react'
 import * as ContextMenuPrimitive from '@radix-ui/react-context-menu'
+import {
+  menuContentPaddingClass,
+  menuItemHighlightClass,
+  menuItemPaddingClass,
+  menuSeparatorClass
+} from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from '@/shared/lib/utils'
 
 function ContextMenu({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
@@ -21,7 +27,8 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
-          'z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md',
+          'z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
+          menuContentPaddingClass,
           'animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
           className
         )}
@@ -41,9 +48,9 @@ function ContextMenuItem({
       data-slot="context-menu-item"
       data-inset={inset}
       className={cn(
-        'relative flex cursor-pointer items-center gap-2 rounded-[8px] px-2.5 py-1 text-xs leading-normal outline-hidden select-none',
-        'focus:bg-menu-hover data-[highlighted]:bg-menu-hover data-[highlighted]:text-popover-foreground dark:focus:bg-[#252525] dark:data-[highlighted]:bg-[#252525]',
-        'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        'relative flex cursor-default items-center gap-2 rounded-[8px] text-xs leading-normal outline-hidden select-none',
+        menuItemPaddingClass,
+        menuItemHighlightClass,
         inset && 'pl-8',
         className
       )}
@@ -59,7 +66,7 @@ function ContextMenuSeparator({
   return (
     <ContextMenuPrimitive.Separator
       data-slot="context-menu-separator"
-      className={cn('-mx-1 my-1 h-px bg-border/60', className)}
+      className={cn(menuSeparatorClass, 'bg-border/60', className)}
       {...props}
     />
   )

@@ -57,7 +57,7 @@ export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {
       <DropdownMenuContent
         align="end"
         sideOffset={6}
-        className={cn('w-48 p-1', sidebarMenuSurfaceClass)}
+        className={cn('w-48', sidebarMenuSurfaceClass)}
       >
         <DropdownMenuItem className={sidebarMenuItemClass} disabled={!chatId} onSelect={handleFork}>
           Fork chat
@@ -69,7 +69,7 @@ export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {
         >
           Copy messages
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="my-1 bg-border/60" />
+        <DropdownMenuSeparator className="bg-border/60" />
         <DropdownMenuItem
           className={sidebarMenuItemClass}
           disabled={!chatId}
