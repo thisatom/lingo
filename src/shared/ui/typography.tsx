@@ -3,29 +3,32 @@
  * @see https://ui.shadcn.com/docs/components/radix/typography
  */
 
+const chatTextClass =
+  'text-[length:var(--lingo-chat-font-size)] leading-[var(--lingo-chat-line-height)]'
+const codeTextClass =
+  'font-mono text-[length:var(--lingo-code-font-size)] leading-[var(--lingo-code-line-height)]'
+
 /** Wrapper for agent markdown — spacing between block elements */
 export const typographyProseClass =
   'max-w-full min-w-0 text-foreground break-words [overflow-wrap:anywhere] [&>*:first-child]:mt-0 [&>*:last-child]:mb-0'
 
 export const typography = {
-  h1: 'scroll-m-20 mt-4 border-b border-border pb-2 text-[17px] font-semibold tracking-tight text-foreground text-balance first:mt-0',
-  h2: 'scroll-m-20 mt-4 border-b border-border/80 pb-1.5 text-[15px] font-semibold tracking-tight text-foreground first:mt-0',
-  h3: 'scroll-m-20 mt-3.5 text-[14px] font-semibold text-foreground first:mt-0',
-  h4: 'scroll-m-20 mt-3 text-[13px] font-semibold text-foreground first:mt-0',
-  p: 'text-[13px] leading-[1.55] text-foreground [&:not(:first-child)]:mt-2.5',
-  lead: 'text-[13px] leading-[1.55] text-muted-foreground',
-  blockquote:
-    'my-2.5 border-l-2 border-border pl-3 text-[13px] italic text-muted-foreground [&_p]:text-foreground/90',
-  ul: 'my-2.5 ml-5 list-disc space-y-1 text-[13px] leading-[1.55] text-foreground [&>li]:mt-0',
-  ol: 'my-2.5 ml-5 list-decimal space-y-1 text-[13px] leading-[1.55] text-foreground [&>li]:mt-0',
-  li: 'text-[13px] leading-[1.55] marker:text-muted-foreground [&>p]:my-0',
+  h1: `scroll-m-20 mt-4 border-b border-border pb-2 text-[calc(var(--lingo-chat-font-size)+4px)] font-semibold tracking-tight text-foreground text-balance first:mt-0`,
+  h2: `scroll-m-20 mt-4 border-b border-border/80 pb-1.5 text-[calc(var(--lingo-chat-font-size)+2px)] font-semibold tracking-tight text-foreground first:mt-0`,
+  h3: `scroll-m-20 mt-3.5 text-[calc(var(--lingo-chat-font-size)+1px)] font-semibold text-foreground first:mt-0`,
+  h4: `scroll-m-20 mt-3 ${chatTextClass} font-semibold text-foreground first:mt-0`,
+  p: `${chatTextClass} text-foreground [&:not(:first-child)]:mt-2.5`,
+  lead: `${chatTextClass} text-muted-foreground`,
+  blockquote: `my-2.5 border-l-2 border-border pl-3 ${chatTextClass} italic text-muted-foreground [&_p]:text-foreground/90`,
+  ul: `my-2.5 ml-5 list-disc space-y-1 ${chatTextClass} text-foreground [&>li]:mt-0`,
+  ol: `my-2.5 ml-5 list-decimal space-y-1 ${chatTextClass} text-foreground [&>li]:mt-0`,
+  li: `${chatTextClass} marker:text-muted-foreground [&>p]:my-0`,
   a: 'font-medium text-foreground underline decoration-border underline-offset-[3px] hover:text-foreground/80',
   strong: 'font-semibold text-foreground',
   em: 'italic text-foreground',
-  inlineCode:
-    'rounded-md border border-border/60 bg-muted/70 px-1 py-0.5 font-mono text-[12px] font-medium text-foreground',
-  pre: 'm-0 overflow-x-auto p-0 font-mono text-[12px] leading-[1.55]',
-  preCode: 'block font-mono text-[12px] leading-[1.55]',
+  inlineCode: `rounded-md border border-border/60 bg-muted/70 px-1 py-0.5 ${codeTextClass} font-medium text-foreground`,
+  pre: `m-0 overflow-x-auto p-0 ${codeTextClass}`,
+  preCode: `block ${codeTextClass}`,
   codeBlock:
     'my-2.5 overflow-hidden rounded-lg border border-border bg-[var(--md-code-bg)]',
   codeBlockHeader:
@@ -47,5 +50,7 @@ export const typography = {
   tableRow: '',
   tableTh:
     'whitespace-nowrap px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground',
-  tableTd: 'px-3 py-2 text-[13px] leading-[1.45] text-foreground align-top [overflow-wrap:anywhere]'
+  tableTd: `px-3 py-2 ${chatTextClass} text-foreground align-top [overflow-wrap:anywhere]`
 } as const
+
+export { chatTextClass, codeTextClass }

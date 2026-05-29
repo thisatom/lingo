@@ -11,9 +11,9 @@ import {
   CommandDialog,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
+  CommandPaletteInput,
   CommandSeparator
 } from '@/shared/ui/command'
 
@@ -57,20 +57,16 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
       onOpenChange={onOpenChange}
       title="Search chats"
       description="Find and open a chat by title or date"
-      className="max-w-lg"
     >
-      <CommandInput
-        placeholder="Search by title or date…"
-        wrapperClassName="h-[30px] min-h-[30px]"
-        className="h-[30px] min-h-[30px]"
-      />
-      <CommandList className="max-h-[min(50vh,20rem)]">
-        <CommandEmpty>No chats found</CommandEmpty>
+      <CommandPaletteInput placeholder="Search chats by title or date…" />
+      <CommandList variant="palette">
+        <CommandEmpty variant="palette">No chats found</CommandEmpty>
 
         {pinned.length > 0 ? (
-          <CommandGroup heading="Pinned">
+          <CommandGroup variant="palette" heading="Pinned">
             {pinned.map((chat) => (
               <CommandItem
+                variant="palette"
                 key={chat.id}
                 value={buildChatCommandSearchValue(chat, 'Pinned')}
                 onSelect={() => pickChat(chat.id)}
@@ -84,10 +80,13 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
         {dateGroups.length > 0 ? (
           dateGroups.map((group, index) => (
             <div key={group.dateKey}>
-              {index > 0 || pinned.length > 0 ? <CommandSeparator className="my-1" /> : null}
-              <CommandGroup heading={group.label}>
+              {index > 0 || pinned.length > 0 ? (
+                <CommandSeparator variant="palette" />
+              ) : null}
+              <CommandGroup variant="palette" heading={group.label}>
                 {group.chats.map((chat) => (
                   <CommandItem
+                    variant="palette"
                     key={chat.id}
                     value={buildChatCommandSearchValue(chat, group.label)}
                     onSelect={() => pickChat(chat.id)}
@@ -99,9 +98,10 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
             </div>
           ))
         ) : (
-          <CommandGroup heading="Chats">
+          <CommandGroup variant="palette" heading="Chats">
             {flat.map((chat) => (
               <CommandItem
+                variant="palette"
                 key={chat.id}
                 value={buildChatCommandSearchValue(chat, formatChatDateLabel(chat.updatedAt))}
                 onSelect={() => pickChat(chat.id)}

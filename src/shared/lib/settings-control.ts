@@ -17,9 +17,10 @@ export const settingsMenuSurfaceClass = cn(
 )
 
 export const settingsSelectTriggerClass = cn(
+  'cursor-pointer',
   '!h-6 rounded-md border px-2 py-0 text-xs leading-tight shadow-none transition-colors outline-none',
-  'border-menu-border bg-input hover:border-ring/60 focus-visible:ring-0',
-  'dark:bg-[#181818] dark:hover:border-[#444444]',
+  'border-menu-border bg-white text-foreground hover:border-ring/60 focus-visible:ring-0',
+  'dark:bg-[#181818] dark:text-popover-foreground dark:hover:border-[#444444]',
   'dark:focus:border-[#444444] dark:focus:bg-[#181818]',
   'dark:focus-visible:border-[#444444] dark:focus-visible:bg-[#181818]',
   'dark:data-[state=open]:border-[#444444] dark:data-[state=open]:bg-[#181818]'
@@ -35,6 +36,7 @@ export const settingsMenuItemHighlightClass = cn(
 )
 
 export const settingsSelectItemClass = cn(
+  'cursor-pointer',
   '!h-6 !min-h-6 rounded-sm text-xs leading-none',
   menuItemPaddingClass,
   settingsMenuItemHighlightClass
@@ -45,6 +47,7 @@ export const settingsCommandClass = cn(settingsMenuSurfaceClass, 'border-0 shado
 export const settingsButtonSize = 'compact' as const
 
 export const settingsPopoverTriggerClass = cn(
+  'cursor-pointer',
   'h-7 w-full justify-between rounded-md border px-2.5 text-sm font-normal shadow-none',
   'border-menu-border bg-input hover:bg-input',
   'dark:bg-[#181818] dark:hover:border-[#444444] dark:hover:bg-[#181818]',
@@ -52,6 +55,7 @@ export const settingsPopoverTriggerClass = cn(
 )
 
 export const settingsCommandItemClass = cn(
+  'cursor-pointer',
   '!h-6 !min-h-6 rounded-sm text-xs leading-none',
   menuItemPaddingClass,
   settingsMenuItemHighlightClass,
@@ -68,3 +72,6 @@ export const settingsCommandInputClass =
   'h-[30px] min-h-[30px] border-0 bg-transparent text-sm leading-none text-foreground shadow-none focus-visible:ring-0'
 
 export const settingsCommandListClass = 'max-h-[min(280px,50vh)]'
+
+/** Fixed width for settings row selects (Appearance, General, …). */
+export const settingsRowSelectTriggerClass = cn(settingsSelectTriggerClass, 'w-[220px] min-w-0')

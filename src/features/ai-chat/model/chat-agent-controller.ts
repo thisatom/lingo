@@ -6,6 +6,7 @@ import {
   type AgentStopContext,
   type AgentStopOptions
 } from '@/features/ai-chat/lib/chat-agent-stop'
+import { requestChatFollowBottom } from '@/app/lib/chat-scroll-registry'
 import { shouldAutoFlushMessageQueue } from '@/features/ai-chat/lib/chat-agent-queue'
 import { isChatAgentBusy } from '@/features/ai-chat/lib/chat-agent-busy'
 import {
@@ -25,6 +26,9 @@ import {
 
 export type { AgentStopOptions, AgentTurnSession }
 
+/** Prevents overlapping queue drains for the same chat (e.g. flush effect + nested runTurn). */
+const queueDrainInFlight = new Set<string>()
+
 export class ChatAgentController {
   async runTurn(params: Omit<RunAgentTurnParams, 'session'> & { session: AgentTurnSession }) {
     return runAgentTurn(params)
@@ -38,51 +42,56 @@ export class ChatAgentController {
     chatId: string,
     runTurn: (chatId: string) => Promise<boolean>
   ): Promise<void> {
-    useConversationStore.getState().setQueueAheadPreview(null)
-    const addMessage = useChatsStore.getState().addMessage
-    const removeMessagesFrom = useChatsStore.getState().removeMessagesFrom
+    if (queueDrainInFlight.has(chatId)) return
+    queueDrainInFlight.add(chatId)
 
-    while (useMessageQueueStore.getState().getQueue(chatId).length > 0) {
-      if (getOtherChatStreamBlocking(chatId)) {
+    try {
+      useConversationStore.getState().setQueueAheadPreview(null)
+      const addMessage = useChatsStore.getState().addMessage
+      const removeMessagesFrom = useChatsStore.getState().removeMessagesFrom
+
+      while (true) {
+        if (getOtherChatStreamBlocking(chatId)) {
+          setPipelineStageForChat(chatId, 'idle')
+          return
+        }
+
+        const item = useMessageQueueStore.getState().dequeue(chatId)
+        if (!item) break
+
+        const hasText = Boolean(item.content.trim())
+        const hasAttachments = (item.attachments?.length ?? 0) > 0
+        if (!hasText && !hasAttachments) {
+          continue
+        }
+
+        const userMessageId = addMessage(
+          {
+            role: 'user',
+            content: item.content,
+            attachments: hasAttachments ? item.attachments : undefined
+          },
+          chatId
+        )
+        requestChatFollowBottom()
+        const ok = await runTurn(chatId)
+        if (ok) {
+          continue
+        }
+
+        if (userMessageId) removeMessagesFrom(userMessageId, chatId)
         setPipelineStageForChat(chatId, 'idle')
         return
       }
 
-      const item = useMessageQueueStore.getState().getQueue(chatId)[0]
-      if (!item) break
-
-      const hasText = Boolean(item.content.trim())
-      const hasAttachments = (item.attachments?.length ?? 0) > 0
-      if (!hasText && !hasAttachments) {
-        useMessageQueueStore.getState().remove(chatId, item.id)
-        continue
-      }
-
-      const userMessageId = addMessage(
-        {
-          role: 'user',
-          content: item.content,
-          attachments: hasAttachments ? item.attachments : undefined
-        },
-        chatId
-      )
-      const ok = await runTurn(chatId)
-      if (ok) {
-        useMessageQueueStore.getState().remove(chatId, item.id)
+      if (await this.tryRunPendingAgentReply(chatId, runTurn)) {
         return
       }
 
-      if (userMessageId) removeMessagesFrom(userMessageId, chatId)
-      useMessageQueueStore.getState().remove(chatId, item.id)
       setPipelineStageForChat(chatId, 'idle')
-      return
+    } finally {
+      queueDrainInFlight.delete(chatId)
     }
-
-    if (await this.tryRunPendingAgentReply(chatId, runTurn)) {
-      return
-    }
-
-    setPipelineStageForChat(chatId, 'idle')
   }
 
   async tryRunPendingAgentReply(

@@ -34,7 +34,7 @@ export function SidebarUserFooter() {
             asChild
             aria-label="Settings"
           >
-            <Link to={isSettings ? '/' : '/settings/user'}>
+            <Link to={isSettings ? '/' : '/settings/general'}>
               <Settings className="size-4" />
             </Link>
           </Button>

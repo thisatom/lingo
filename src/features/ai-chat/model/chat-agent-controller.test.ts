@@ -57,4 +57,24 @@ describe('ChatAgentController', () => {
     expect(runTurn).toHaveBeenCalledOnce()
     expect(runTurn).toHaveBeenCalledWith(chatId)
   })
+
+  it('processNextInQueue dequeues each item once and runs one turn per message', async () => {
+    useMessageQueueStore.getState().enqueue(chatId, 'first')
+    useMessageQueueStore.getState().enqueue(chatId, 'second')
+    setPipelineStageForChat(chatId, 'idle')
+
+    const runTurn = vi.fn(async () => true)
+    const addMessage = vi.spyOn(useChatsStore.getState(), 'addMessage')
+
+    await controller.processNextInQueue(chatId, runTurn)
+
+    expect(runTurn).toHaveBeenCalledTimes(2)
+    expect(addMessage).toHaveBeenCalledTimes(2)
+    expect(useMessageQueueStore.getState().getQueue(chatId)).toHaveLength(0)
+    const userMessages = useChatsStore
+      .getState()
+      .chats.find((c) => c.id === chatId)
+      ?.messages.filter((m) => m.role === 'user')
+    expect(userMessages?.map((m) => m.content)).toEqual(['first', 'second'])
+  })
 })

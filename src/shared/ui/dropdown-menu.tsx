@@ -4,7 +4,8 @@ import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import {
   menuCheckboxItemClass,
-  menuContentPaddingClass,
+  menuCheckboxRadioGroupClass,
+  menuContentSpacingClass,
   menuIndicatorInsetClass,
   menuItemHighlightClass,
   menuItemPaddingClass,
@@ -71,7 +72,7 @@ function DropdownMenuContent({
             scrollAreaClassName
           )}
         >
-          <div className={menuContentPaddingClass}>{children}</div>
+          <div className={menuContentSpacingClass}>{children}</div>
         </CustomScrollArea>
       </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
@@ -127,7 +128,7 @@ function DropdownMenuCheckboxItem({
     >
       <span
         className={cn(
-          'pointer-events-none absolute flex size-3.5 items-center justify-center',
+          'pointer-events-none absolute top-1/2 flex size-3.5 -translate-y-1/2 items-center justify-center',
           menuIndicatorInsetClass
         )}
       >
@@ -141,11 +142,13 @@ function DropdownMenuCheckboxItem({
 }
 
 function DropdownMenuRadioGroup({
+  className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
   return (
     <DropdownMenuPrimitive.RadioGroup
       data-slot="dropdown-menu-radio-group"
+      className={cn(menuCheckboxRadioGroupClass, className)}
       {...props}
     />
   )
@@ -164,7 +167,7 @@ function DropdownMenuRadioItem({
     >
       <span
         className={cn(
-          'pointer-events-none absolute flex size-3.5 items-center justify-center',
+          'pointer-events-none absolute top-1/2 flex size-3.5 -translate-y-1/2 items-center justify-center',
           menuIndicatorInsetClass
         )}
       >
@@ -285,7 +288,7 @@ function DropdownMenuSubContent({
       {...props}
     >
       <CustomScrollArea variant="menu" className="max-h-64">
-        <div className={menuContentPaddingClass}>{children}</div>
+        <div className={menuContentSpacingClass}>{children}</div>
       </CustomScrollArea>
     </DropdownMenuPrimitive.SubContent>
   )

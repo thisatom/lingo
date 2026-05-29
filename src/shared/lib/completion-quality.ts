@@ -19,10 +19,7 @@ export type IncompleteCompletionCheck = {
   userMessage: string
   /** When true, short answers to factual questions also trigger retry. */
   requireSubstantive?: boolean
-  /**
-   * Custom OpenAI-compatible endpoints (NVIDIA, Ollama, …): only retry on token limit.
-   * Heuristic “cut off” retries cause a second stream that looked like a duplicate answer.
-   */
+  /** Custom OpenAI-compatible endpoints (NVIDIA, Ollama, …). */
   customBackend?: boolean
 }
 
@@ -43,7 +40,9 @@ export function shouldRetryIncompleteCompletion({
   customBackend = false
 }: IncompleteCompletionCheck): boolean {
   if (finishReason === 'length') return true
-  if (customBackend) return false
+  if (customBackend && !looksTruncatedOrRefusal(answer) && !looksCutOffMidSentence(answer)) {
+    return false
+  }
   if (looksTruncatedOrRefusal(answer) || looksCutOffMidSentence(answer)) return true
   if (!requireSubstantive) return false
   const question = userMessage.trim()

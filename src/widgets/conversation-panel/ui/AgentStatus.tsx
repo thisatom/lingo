@@ -8,10 +8,10 @@ import { agentMessageClass } from './agent-layout'
 import { SearchTargetList } from './PipelineDetailPanels'
 
 const STAGE_LABEL: Partial<Record<PipelineStage, string>> = {
-  listening: 'Listening…',
-  transcribing: 'Transcribing…',
-  thinking: 'Thinking…',
-  speaking: 'Speaking…'
+  listening: 'Listening',
+  transcribing: 'Transcribing',
+  thinking: 'Thinking',
+  speaking: 'Speaking'
 }
 
 interface AgentStatusProps {
@@ -25,29 +25,21 @@ export function AgentStatus({ stage }: AgentStatusProps) {
   if (stage === 'searching') {
     const targets = pipelineSearchTargets.filter(isBrowsableSearchTarget)
     const activeHost = pipelineSearchActiveUrl ? hostFromUrl(pipelineSearchActiveUrl) : null
-    const statusLine = activeHost
-      ? `Reading ${activeHost}…`
-      : targets.length > 0
-        ? 'Reviewing pages…'
-        : 'Finding pages…'
 
     return (
       <div
         className={agentMessageClass}
         role="status"
         aria-live="polite"
-        aria-label="Searching the web"
+        aria-label="Search web"
       >
         <ShinyText
-          text="Searching the web"
+          text={activeHost ? `Search web · ${activeHost}` : 'Search web'}
           className="text-[13px] leading-[1.5] font-normal"
           speed={2.2}
           spread={110}
         />
-        <p className="mt-1.5 text-[12px] text-muted-foreground">{statusLine}</p>
-        {targets.length > 0 ? (
-          <SearchTargetList targets={targets} activeUrl={pipelineSearchActiveUrl} />
-        ) : null}
+        {targets.length > 0 ? <SearchTargetList targets={targets} /> : null}
       </div>
     )
   }

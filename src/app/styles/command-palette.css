@@ -1,0 +1,19 @@
+/* Glass command palette (chat search) — backdrop blur on semi-transparent surface */
+
+.lingo-command-palette-surface {
+  border-color: var(--command-palette-border);
+  background: var(--command-palette-surface);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+.lingo-command-palette-surface [cmdk-item] {
+  min-height: 30px;
+  height: 30px;
+}
+
+/* cmdk: only the active row has aria-selected="true"; data-selected="false" is on the rest */
+.lingo-command-palette-surface [cmdk-item][aria-selected='true'] {
+  background-color: var(--command-palette-item-hover);
+  color: var(--popover-foreground);
+}

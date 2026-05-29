@@ -238,7 +238,12 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
           const browsable = targets.filter(isBrowsableSearchTarget)
           turnSearchSources = browsable
           setPipelineSearchTargetsForChat(targetChatId, browsable)
-          if (assistantMessageId && browsable.length > 0) {
+          if (browsable.length === 0) return
+          if (!assistantMessageId) {
+            const id = addMessage({ role: 'assistant', content: '' }, targetChatId)
+            assistantMessageId = id || null
+          }
+          if (assistantMessageId) {
             updateMessageSearchSources(assistantMessageId, browsable, targetChatId)
           }
         },
@@ -392,12 +397,11 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
         finalizeAgentTurnPipeline(targetChatId)
         return
       }
-      if (hasQueued) {
-        await processNextInQueue(targetChatId)
-        return
-      }
       finishAgentTurnForChat(targetChatId, agentSpeechMode, onLiveConversationTurnComplete)
       await tryRunPendingAgentReply(targetChatId)
+      if (hasQueued) {
+        await processNextInQueue(targetChatId)
+      }
     }
 
     const playAnswerTts = async (): Promise<void> => {

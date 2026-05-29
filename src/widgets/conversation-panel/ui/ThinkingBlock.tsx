@@ -80,7 +80,7 @@ function ThinkingTriggerLabel({ live, summary }: { live: boolean; summary: strin
   if (live) {
     return (
       <ShinyText
-        text="Thinking…"
+        text="Thinking"
         className={cn('min-w-0 truncate', thinkingTriggerClass)}
         color="var(--thinking-foreground)"
         shineColor="var(--foreground)"

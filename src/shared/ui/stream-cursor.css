@@ -1,0 +1,15 @@
+.stream-cursor {
+  background-color: color-mix(in oklab, var(--foreground) 78%, transparent);
+  animation: stream-cursor-blink 1s step-end infinite;
+}
+
+@keyframes stream-cursor-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}

@@ -8,6 +8,15 @@ type GeoTimezone = {
   timezone: string
 }
 
+export function normalizeCityForTimezoneLookup(city: string): string {
+  return city
+    .trim()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[?.!,;:]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 async function geocodeForTimezone(city: string): Promise<GeoTimezone | null> {
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`
   const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
@@ -20,6 +29,38 @@ async function geocodeForTimezone(city: string): Promise<GeoTimezone | null> {
   if (!hit?.timezone) return null
 
   return { name: hit.name, country: hit.country, timezone: hit.timezone }
+}
+
+type OsmSearchHit = {
+  display_name?: string
+  lat?: string
+  lon?: string
+}
+
+async function geocodeViaNominatim(city: string, locale: string): Promise<GeoTimezone | null> {
+  const lang = locale.split('-')[0]?.trim() || 'en'
+  const url =
+    `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(city)}` +
+    `&accept-language=${encodeURIComponent(lang)}`
+  const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+  if (!response.ok) return null
+  const data = (await response.json()) as OsmSearchHit[]
+  const hit = data?.[0]
+  if (!hit?.lat || !hit?.lon) return null
+  const latitude = Number(hit.lat)
+  const longitude = Number(hit.lon)
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
+
+  const tzUrl =
+    `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(String(latitude))}` +
+    `&longitude=${encodeURIComponent(String(longitude))}&hourly=temperature_2m&forecast_days=1&timezone=auto`
+  const tzResponse = await fetch(tzUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+  if (!tzResponse.ok) return null
+  const tzData = (await tzResponse.json()) as { timezone?: string }
+  if (!tzData.timezone) return null
+
+  const place = hit.display_name?.split(',')[0]?.trim() || city
+  return { name: place, timezone: tzData.timezone }
 }
 
 function formatDateTime(
@@ -83,7 +124,11 @@ export async function fetchLocalTime(
     return [formatDateTime(tz, locale, 'Your device')]
   }
 
-  const geo = await geocodeForTimezone(city)
+  const lookupCity = normalizeCityForTimezoneLookup(city)
+  let geo = await geocodeForTimezone(lookupCity)
+  if (!geo) {
+    geo = await geocodeViaNominatim(lookupCity, locale)
+  }
   if (!geo) {
     return [
       {

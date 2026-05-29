@@ -89,5 +89,9 @@ export function messageHasApiContent(payload: ChatMessagePayload): boolean {
 
 export function messageHasVisibleContent(message: Message): boolean {
   if (message.role === 'thinking') return true
-  return message.content.trim().length > 0 || (message.attachments?.length ?? 0) > 0
+  return (
+    message.content.trim().length > 0 ||
+    (message.attachments?.length ?? 0) > 0 ||
+    (message.searchSources?.length ?? 0) > 0
+  )
 }

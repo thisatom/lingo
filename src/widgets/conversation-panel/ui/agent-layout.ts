@@ -1,4 +1,5 @@
 import { cn } from '@/shared/lib/utils'
+import { chatTextClass } from '@/shared/ui/typography'
 
 /** Text selection allowed for agent answer / thinking (app shell uses select-none). */
 export const chatSelectableClass = 'select-text'
@@ -7,7 +8,7 @@ export const chatSelectableClass = 'select-text'
 export const chatNonSelectableClass = 'select-none'
 
 /** Shared layout for user questions and agent messages in the chat column */
-export const messageTextClass = 'text-[13px] leading-[1.5] text-foreground'
+export const messageTextClass = cn(chatTextClass, 'text-foreground/90')
 
 const chatMessageBubbleBorderClass =
   'border border-chat-message-border transition-[border-color] hover:border-chat-message-border-hover'
@@ -45,12 +46,13 @@ export const messageActionButtonClass = cn(
 )
 
 /** “Thought for …” — New chat font, reasoning color token. */
+/** Trigger label — `text-sm` (rem) like before appearance settings; body uses fixed thinking tokens. */
 export const thinkingTriggerClass =
   'text-sm font-medium leading-normal text-[color:var(--thinking-foreground)]'
 
 /** Same markdown as agent reply; color via `--thinking-foreground` + `.thinking-markdown`. */
 export const thinkingReasoningClass = cn(
-  'thinking-markdown min-w-0 text-[13px] leading-[1.5] text-[color:var(--thinking-foreground)]',
+  'thinking-markdown min-w-0 text-[length:var(--lingo-thinking-font-size)] leading-[var(--lingo-thinking-line-height)] text-[color:var(--thinking-foreground)]',
   '[overflow-wrap:anywhere] [word-break:break-word]'
 )
 

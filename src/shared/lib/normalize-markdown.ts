@@ -7,8 +7,15 @@ const BLOCK_LINE =
 /**
  * Normalize AI quirks: CRLF, trailing spaces, indented block syntax, blank lines around tables.
  */
+/** Keycap digit emoji (e.g. 1️⃣) → plain ASCII digit for lists and tables. */
+function normalizeKeycapDigits(content: string): string {
+  return content
+    .replace(/^(\s*)(\d)\uFE0F?\u20E3[.)]?\s+/gm, '$1$2. ')
+    .replace(/(\d)\uFE0F?\u20E3/g, '$1')
+}
+
 export function normalizeMarkdown(content: string): string {
-  const lines = content.replace(/\r\n/g, '\n').split('\n')
+  const lines = normalizeKeycapDigits(content).replace(/\r\n/g, '\n').split('\n')
   const out: string[] = []
 
   for (let i = 0; i < lines.length; i++) {

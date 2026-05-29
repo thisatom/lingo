@@ -182,8 +182,8 @@ export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
 
           <Field
             id="onboarding-lang"
-            label="Practice language"
-            hint="Used for speech recognition and AI replies."
+            label="Model language"
+            hint="Language the assistant uses for replies; also used for speech recognition."
           >
             <Select value={practiceLanguage} onValueChange={setPracticeLanguageLocal}>
               <SelectTrigger

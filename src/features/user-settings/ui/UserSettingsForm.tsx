@@ -1,7 +1,15 @@
 import { useState } from 'react'
+import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
+import { AppUpdateSettingsSection } from '@/features/app-update/ui/AppUpdateSettingsSection'
 import { clearAppDataAndPersist } from '@/features/user-settings/lib/clear-app-data'
+import { SIDEBAR_CHAT_SORT_OPTIONS, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
 import { settingsInputClass } from '@/shared/lib/settings-control'
+import {
+  settingsSelectContentClass,
+  settingsSelectItemClass,
+  settingsSelectTriggerClass
+} from '@/shared/lib/settings-control'
 import {
   settingsCardClass,
   settingsRowClass,
@@ -11,6 +19,7 @@ import {
   settingsRowTitleClass,
   settingsSectionTitleClass
 } from '@/shared/lib/settings-surface'
+import { cn } from '@/shared/lib/utils'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,25 +40,23 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/shared/ui/select'
-import { Switch } from '@/shared/ui/switch'
-import {
-  settingsSelectContentClass,
-  settingsSelectItemClass,
-  settingsSelectTriggerClass
-} from '@/shared/lib/settings-control'
-import { cn } from '@/shared/lib/utils'
-import { APP_THEME_OPTIONS } from '@/shared/lib/theme-options'
-import { AppUpdateSettingsSection } from '@/features/app-update/ui/AppUpdateSettingsSection'
 
 const CLEAR_APP_DATA_CONFIRM_TEXT = 'Confirm'
+
+const SIDEBAR_GROUP_OPTIONS = [
+  { value: 'date', label: 'By last updated' },
+  { value: 'flat', label: 'Flat list' }
+] as const
 
 export function UserSettingsForm() {
   const displayName = useSettingsStore((s) => s.displayName)
   const setDisplayName = useSettingsStore((s) => s.setDisplayName)
-  const addressUserByName = useSettingsStore((s) => s.addressUserByName)
-  const setAddressUserByName = useSettingsStore((s) => s.setAddressUserByName)
-  const appTheme = useSettingsStore((s) => s.appTheme)
-  const setAppTheme = useSettingsStore((s) => s.setAppTheme)
+  const sidebarShowDateGroups = useSettingsStore((s) => s.sidebarShowDateGroups)
+  const setSidebarShowDateGroups = useSettingsStore((s) => s.setSidebarShowDateGroups)
+  const sidebarChatSort = useSettingsStore((s) => s.sidebarChatSort)
+  const setSidebarChatSort = useSettingsStore((s) => s.setSidebarChatSort)
+  const resortChats = useChatsStore((s) => s.resortChats)
+
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const [clearConfirmInput, setClearConfirmInput] = useState('')
   const canClearAppData = clearConfirmInput.trim() === CLEAR_APP_DATA_CONFIRM_TEXT
@@ -58,6 +65,11 @@ export function UserSettingsForm() {
     await clearAppDataAndPersist()
     setClearConfirmInput('')
     setClearDialogOpen(false)
+  }
+
+  const applyChatSort = (sort: SidebarChatSort) => {
+    setSidebarChatSort(sort)
+    resortChats()
   }
 
   return (
@@ -82,31 +94,56 @@ export function UserSettingsForm() {
         </div>
       </div>
 
-      <p className={settingsSubsectionTitleClass}>Appearance</p>
+      <p className={settingsSubsectionTitleClass}>Sidebar</p>
       <div className={settingsCardClass}>
         <div className={settingsRowClass}>
           <div className={settingsRowTextWrapClass}>
-            <p className={settingsRowTitleClass}>Theme</p>
+            <p className={settingsRowTitleClass}>Sort chats by</p>
             <p className={settingsRowDescriptionClass}>
-              Light, dark, or follow your system setting.
+              Order of conversations in the chat list.
             </p>
           </div>
-          <Select
-            value={appTheme}
-            onValueChange={(value) => {
-              const option = APP_THEME_OPTIONS.find((o) => o.value === value)
-              if (option) setAppTheme(option.value)
-            }}
-          >
+          <Select value={sidebarChatSort} onValueChange={(value) => applyChatSort(value as SidebarChatSort)}>
             <SelectTrigger
-              id="app-theme"
+              id="sidebar-chat-sort"
               size="sm"
               className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
-              {APP_THEME_OPTIONS.map((option) => (
+              {SIDEBAR_CHAT_SORT_OPTIONS.map((option) => (
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  className={settingsSelectItemClass}
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Chat list layout</p>
+            <p className={settingsRowDescriptionClass}>
+              Group chats into date sections or show one continuous list.
+            </p>
+          </div>
+          <Select
+            value={sidebarShowDateGroups ? 'date' : 'flat'}
+            onValueChange={(value) => setSidebarShowDateGroups(value === 'date')}
+          >
+            <SelectTrigger
+              id="sidebar-chat-groups"
+              size="sm"
+              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
+              {SIDEBAR_GROUP_OPTIONS.map((option) => (
                 <SelectItem
                   key={option.value}
                   value={option.value}
@@ -120,32 +157,16 @@ export function UserSettingsForm() {
         </div>
       </div>
 
-      <p className={settingsSubsectionTitleClass}>Personalization</p>
-      <div className={settingsCardClass}>
-        <div className={settingsRowClass}>
-          <div className={settingsRowTextWrapClass}>
-            <p className={settingsRowTitleClass}>Address me by name</p>
-            <p className={settingsRowDescriptionClass}>
-              Adds a hidden instruction so the assistant uses your display name.
-            </p>
-          </div>
-          <Switch
-            checked={addressUserByName}
-            onCheckedChange={(checked) => setAddressUserByName(Boolean(checked))}
-            aria-label="Address by name"
-          />
-        </div>
-      </div>
-
       <AppUpdateSettingsSection />
 
-      <p className={settingsSubsectionTitleClass}>User data</p>
+      <p className={settingsSubsectionTitleClass}>Privacy &amp; data</p>
       <div className={settingsCardClass}>
         <div className={settingsRowClass}>
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Clear app data</p>
             <p className={settingsRowDescriptionClass}>
-              Clears local chats and resets settings to defaults.
+              Removes all chats and resets settings to defaults. API keys in the system keychain
+              are cleared when available.
             </p>
           </div>
           <Button

@@ -1,8 +1,7 @@
-import { APP_RADIUS_8_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
 
 /** Rounded hover rows in sidebar / composer menus. */
-export const sidebarMenuRadiusClass = APP_RADIUS_8_CLASS
+export const sidebarMenuRadiusClass = 'rounded-[6px]'
 
 /** Hover for composer input controls (matches context button). */
 export const composerInputHoverClass =
@@ -19,15 +18,16 @@ export const sidebarMenuSurfaceClass = cn(
 export const menuContentPaddingClass = 'p-[3px]'
 
 /** Interactive row padding — 3px on all sides. */
-export const menuItemPaddingClass = 'p-[3px]'
+export const menuItemPaddingClass = 'py-[3px] pr-[3px] pl-[8px]'
 
-/** Checkbox / radio rows: 3px top/bottom/right, room for left indicator. */
-export const menuIndicatorItemPaddingClass = 'py-[3px] pr-[3px] pl-[22px]'
+/** Checkbox / radio rows: left inset for indicator + text aligned with select rows. */
+export const menuIndicatorItemPaddingClass = 'py-[3px] pr-[3px] pl-[28px]'
 
 /** Submenu trigger: 3px + chevron on the right. */
-export const menuSubTriggerPaddingClass = 'py-[3px] pl-[3px] pr-[22px]'
+export const menuSubTriggerPaddingClass = 'py-[3px] pl-[8px] pr-[24px]'
 
-export const menuIndicatorInsetClass = 'left-[3px]'
+/** Matches `menuItemPaddingClass` pl-8 — indicator sits in the same column as select checkmarks. */
+export const menuIndicatorInsetClass = 'left-[8px]'
 
 export const menuTrailingInsetClass = 'right-[3px]'
 
@@ -50,9 +50,28 @@ export const sidebarMenuItemClass = cn(
 )
 
 export const menuCheckboxItemClass = cn(
-  'relative flex cursor-default items-center gap-2 rounded-sm text-sm outline-hidden select-none',
+  'relative flex min-h-7 cursor-default items-center gap-2 rounded-sm text-sm leading-normal outline-hidden select-none',
   menuIndicatorItemPaddingClass,
   menuItemHighlightClass
+)
+
+/** Tight stack for radio options inside a dropdown. */
+export const menuCheckboxRadioGroupClass = 'flex flex-col gap-px'
+
+/**
+ * Panel padding + gap after checkbox/radio block before plain items, labels, or submenus
+ * (select-style dropdown rows).
+ */
+export const menuContentSpacingClass = cn(
+  menuContentPaddingClass,
+  '[&_[data-slot=dropdown-menu-radio-group]+[data-slot=dropdown-menu-item]]:mt-1',
+  '[&_[data-slot=dropdown-menu-radio-group]+[data-slot=dropdown-menu-sub]]:mt-1',
+  '[&_[data-slot=dropdown-menu-radio-group]+[data-slot=dropdown-menu-label]]:mt-1',
+  '[&_[data-slot=dropdown-menu-radio-group]+[data-slot=dropdown-menu-separator]]:mt-0.5',
+  '[&_[data-slot=dropdown-menu-checkbox-item]+[data-slot=dropdown-menu-item]]:mt-1',
+  '[&_[data-slot=dropdown-menu-checkbox-item]+[data-slot=dropdown-menu-sub]]:mt-1',
+  '[&_[data-slot=dropdown-menu-checkbox-item]+[data-slot=dropdown-menu-label]]:mt-1',
+  '[&_[data-slot=dropdown-menu-checkbox-item]+[data-slot=dropdown-menu-separator]]:mt-0.5'
 )
 
 export const menuCommandItemClass = cn(

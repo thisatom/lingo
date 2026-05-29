@@ -1,0 +1,17 @@
+:root {
+  --lingo-chat-font-size: 13px;
+  --lingo-chat-line-height: 1.55;
+  --lingo-code-font-size: 12px;
+  --lingo-code-line-height: 1.55;
+  --lingo-thinking-font-size: 13px;
+  --lingo-thinking-line-height: 1.5;
+}
+
+.lingo-reduce-motion *,
+.lingo-reduce-motion *::before,
+.lingo-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

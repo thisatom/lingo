@@ -2,7 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AgentChatScrollArea } from './AgentChatScrollArea'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
-import { registerChatScrollFlush } from '@/app/lib/chat-scroll-registry'
+import {
+  registerChatFollowBottom,
+  registerChatScrollFlush
+} from '@/app/lib/chat-scroll-registry'
 import { flushChatPersistDebounce } from '@/entities/chat/lib/chat-persist-storage'
 import { CHAT_SCROLL_MIN_PX } from '@/entities/chat/lib/chat-scroll-persist'
 import { useChatsStore } from '@/entities/chat/model/store'
@@ -10,6 +13,8 @@ import {
   useConversationStore,
   type PipelineStage
 } from '@/entities/conversation/model/store'
+import { useSettingsStore } from '@/entities/settings/model/store'
+import { CONVERSATION_DENSITY_GAP_CLASS } from '@/shared/lib/appearance'
 import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { CHAT_BOTTOM_INSET } from '@/widgets/conversation-panel/lib/chat-layout'
 import {
@@ -40,6 +45,7 @@ import {
   voiceCaptureLabelForUserMessage
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { cn } from '@/shared/lib/utils'
+import { ConfirmActionDialog } from '@/shared/ui/confirm-action-dialog'
 import { AgentStatus } from './AgentStatus'
 import { ChatEmptyPrompt } from './ChatEmptyPrompt'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
@@ -140,6 +146,9 @@ export function ConversationPanel({
   })
 
   const [editingUserMessageId, setEditingUserMessageId] = useState<string | null>(null)
+  const [pendingCheckpointMessageId, setPendingCheckpointMessageId] = useState<string | null>(null)
+  const [checkpointConfirmOpen, setCheckpointConfirmOpen] = useState(false)
+  const [checkpointDontShowAgain, setCheckpointDontShowAgain] = useState(false)
   const atBottomRef = useRef(true)
   /** Follow the latest messages until the user scrolls up. */
   const pinToBottomRef = useRef(false)
@@ -158,10 +167,28 @@ export function ConversationPanel({
     const latestTurn = groupMessagesIntoTurns(messages).at(-1)
     return latestTurn?.assistantMessages.some((m) => m.role === 'thinking') ?? false
   }, [agentBusy, messages, pipelineStreamingAnswer, stage])
+  const searchSourcesVisibleInLatestTurn = useMemo(() => {
+    const latestTurn = groupMessagesIntoTurns(messages).at(-1)
+    return (
+      latestTurn?.assistantMessages.some(
+        (m) => m.role === 'assistant' && (m.searchSources?.length ?? 0) > 0
+      ) ?? false
+    )
+  }, [messages])
   const showStatus =
     ACTIVE_STAGES.includes(stage) &&
     !assistantStreaming &&
-    !(stage === 'thinking' && thinkingLiveInChat)
+    !(stage === 'thinking' && thinkingLiveInChat) &&
+    !(stage === 'searching' && searchSourcesVisibleInLatestTurn)
+
+  const checkpointReturnConfirmEnabled = useSettingsStore((s) => s.checkpointReturnConfirmEnabled)
+  const setCheckpointReturnConfirmEnabled = useSettingsStore(
+    (s) => s.setCheckpointReturnConfirmEnabled
+  )
+  const conversationDensity = useSettingsStore((s) => s.conversationDensity)
+  const conversationGapClass =
+    CONVERSATION_DENSITY_GAP_CLASS[conversationDensity] ??
+    CONVERSATION_DENSITY_GAP_CLASS.default
 
   const tailScrollSignature = useMemo(
     () => buildChatTailScrollSignature(messages),
@@ -183,12 +210,23 @@ export function ConversationPanel({
     [onAtBottomChange]
   )
 
-  const followBottom = useCallback(() => {
+  const stickToBottomNow = useCallback(() => {
     pinToBottomRef.current = true
-    scrollToLatest('instant')
+    const viewport = viewportRef.current
+    if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
+    else scrollToLatest('instant')
     atBottomRef.current = true
-    onAtBottomChange?.(true)
-  }, [scrollToLatest, onAtBottomChange])
+  }, [onAtBottomChange, scrollToLatest])
+
+  const followBottom = useCallback(() => {
+    stickToBottomNow()
+    requestAnimationFrame(() => {
+      stickToBottomNow()
+      requestAnimationFrame(stickToBottomNow)
+    })
+  }, [stickToBottomNow])
+
+  useEffect(() => registerChatFollowBottom(followBottom), [followBottom])
 
   const skipAutoScrollOnMountRef = useRef(true)
   const prevMessagesLengthRef = useRef(messages.length)
@@ -346,6 +384,34 @@ export function ConversationPanel({
     [followBottom, onSubmitEditedUserMessage]
   )
 
+  const handleEnterEdit = useCallback(
+    (messageId: string) => {
+      if (!checkpointReturnConfirmEnabled) {
+        setEditingUserMessageId(messageId)
+        return
+      }
+      setPendingCheckpointMessageId(messageId)
+      setCheckpointDontShowAgain(false)
+      setCheckpointConfirmOpen(true)
+    },
+    [checkpointReturnConfirmEnabled]
+  )
+
+  const handleConfirmCheckpointReturn = useCallback(() => {
+    if (!pendingCheckpointMessageId) return
+    if (checkpointDontShowAgain) {
+      setCheckpointReturnConfirmEnabled(false)
+    }
+    setEditingUserMessageId(pendingCheckpointMessageId)
+    setPendingCheckpointMessageId(null)
+    setCheckpointConfirmOpen(false)
+    setCheckpointDontShowAgain(false)
+  }, [
+    checkpointDontShowAgain,
+    pendingCheckpointMessageId,
+    setCheckpointReturnConfirmEnabled
+  ])
+
   const stickToBottomIfFollowing = useCallback(() => {
     const viewport = viewportRef.current
     if (
@@ -387,6 +453,9 @@ export function ConversationPanel({
     prevRestoreChatIdRef.current = activeChatId
 
     setEditingUserMessageId(null)
+    setPendingCheckpointMessageId(null)
+    setCheckpointConfirmOpen(false)
+    setCheckpointDontShowAgain(false)
     scrollSaveEnabledRef.current = false
 
     if (chatChanged) {
@@ -461,6 +530,7 @@ export function ConversationPanel({
       const target = event.target
       if (!(target instanceof Node)) return
       if (target instanceof Element && target.closest('[data-user-message-edit]')) return
+      if (target instanceof Element && target.closest('[data-checkpoint-return-action]')) return
       setEditingUserMessageId(null)
     }
 
@@ -663,20 +733,17 @@ export function ConversationPanel({
     if (!contentChanged) return
 
     if (userJustSent || agentJustStarted || statusAppeared) {
-      pinToBottomRef.current = true
-      if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
-      else scrollToLatest('instant')
-      atBottomRef.current = true
+      followBottom()
       return
     }
 
     stickToBottomIfFollowing()
   }, [
     agentBusy,
+    followBottom,
     messages.length,
     showStatus,
     tailScrollSignature,
-    scrollToLatest,
     stickToBottomIfFollowing,
     onAtBottomChange
   ])
@@ -704,7 +771,7 @@ export function ConversationPanel({
         >
           <div
             data-chat-scroll-content
-            className={cn('relative select-none', turns.length > 0 && 'space-y-5')}
+            className={cn('relative select-none', turns.length > 0 && conversationGapClass)}
             style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
           >
             {useVirtualizedTurns ? (
@@ -724,7 +791,7 @@ export function ConversationPanel({
                 onVoicePress={onVoicePress}
                 onVoiceStop={onVoiceStop}
                 onRegisterEditSpeech={onRegisterEditSpeech}
-                onEnterEdit={setEditingUserMessageId}
+                onEnterEdit={handleEnterEdit}
                 onExitEdit={() => setEditingUserMessageId(null)}
                 onSubmitEdit={(messageId, text, attachments) =>
                   handleSubmitEditedUserMessage(messageId, text, attachments)
@@ -754,7 +821,7 @@ export function ConversationPanel({
                     onVoicePress={onVoicePress}
                     onVoiceStop={onVoiceStop}
                     onRegisterEditSpeech={onRegisterEditSpeech}
-                    onEnterEdit={setEditingUserMessageId}
+                    onEnterEdit={handleEnterEdit}
                     onExitEdit={() => setEditingUserMessageId(null)}
                     onSubmitEdit={(messageId, text, attachments) =>
                       handleSubmitEditedUserMessage(messageId, text, attachments)
@@ -791,6 +858,25 @@ export function ConversationPanel({
           </div>
         </div>
       </AgentChatScrollArea>
+
+      <ConfirmActionDialog
+        open={checkpointConfirmOpen}
+        onOpenChange={(open) => {
+          setCheckpointConfirmOpen(open)
+          if (!open) {
+            setPendingCheckpointMessageId(null)
+            setCheckpointDontShowAgain(false)
+          }
+        }}
+        title="Submit from a previous message?"
+        description="Submitting from this point will remove all messages after it and start a new assistant reply from here."
+        primaryLabel="Revert"
+        onPrimary={handleConfirmCheckpointReturn}
+        showDontAskAgain
+        dontAskAgain={checkpointDontShowAgain}
+        onDontAskAgainChange={setCheckpointDontShowAgain}
+        dontAskAgainId="checkpoint-return-hide-confirm"
+      />
     </div>
   )
 }

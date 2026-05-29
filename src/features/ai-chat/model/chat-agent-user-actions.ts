@@ -22,6 +22,7 @@ import {
 } from '@/features/ai-chat/lib/pipeline-stage'
 import { isPlaybackOnlyConversationError } from '@/features/ai-chat/lib/post-reply'
 import { persistAttachments } from '@/entities/message/lib/prepare-attachment'
+import { requestChatFollowBottom } from '@/app/lib/chat-scroll-registry'
 import { formatLlmError } from '@/shared/lib/llm-errors'
 import {
   restoreUserMessageEdit,
@@ -62,6 +63,7 @@ export async function sendUserMessageAction(
     if (hasAttachments) {
       store.clearComposerAttachments(chatId)
     }
+    requestChatFollowBottom()
     return
   }
 
@@ -82,6 +84,7 @@ export async function sendUserMessageAction(
     },
     chatId
   )
+  requestChatFollowBottom()
   store.clearComposerDraft(chatId)
   store.clearComposerAttachments(chatId)
   await deps.runAssistantReply(chatId)
@@ -109,6 +112,7 @@ export async function sendQueuedMessageNowAction(
     },
     chatId
   )
+  requestChatFollowBottom()
   await deps.runAssistantReply(chatId)
 }
 

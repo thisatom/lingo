@@ -129,7 +129,7 @@ export function DevicesSettingsForm() {
   return (
     <section>
       <h2 className={settingsSectionTitleClass}>Devices</h2>
-      <p className={settingsSubsectionTitleClass}>Input & Output</p>
+      <p className={settingsSubsectionTitleClass}>Input</p>
       <div className={settingsCardClass}>
         <div className={settingsRowClass}>
           <div className={settingsRowTextWrapClass}>
@@ -213,6 +213,10 @@ export function DevicesSettingsForm() {
           </Select>
         </div>
 
+      </div>
+
+      <p className={settingsSubsectionTitleClass}>Output</p>
+      <div className={settingsCardClass}>
         <div className={settingsRowClass}>
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Headphones / speaker</p>
@@ -266,7 +270,6 @@ export function DevicesSettingsForm() {
             </Select>
           </div>
         </div>
-
       </div>
 
       <p className={settingsSubsectionTitleClass}>Diagnostics</p>

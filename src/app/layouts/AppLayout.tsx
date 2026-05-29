@@ -5,6 +5,7 @@ import { useChatsStore } from '@/entities/chat/model/store'
 import { ResizableSidebarContext } from '@/app/context/resizable-sidebar-context'
 import { AppStartupOverlay } from '@/app/ui/AppStartupOverlay'
 import { AppSidebar } from '@/widgets/app-sidebar/ui/AppSidebar'
+import { useAppearanceSync } from '@/app/hooks/use-appearance-sync'
 import { useThemeSync } from '@/app/hooks/use-theme-sync'
 import { useWindowTitle } from '@/app/hooks/use-window-title'
 import { useNewChatHotkey } from '@/features/chat/model/useNewChatHotkey'
@@ -15,6 +16,7 @@ import { TooltipProvider } from '@/shared/ui/tooltip'
 
 export function AppLayout() {
   useThemeSync()
+  useAppearanceSync()
   useWindowTitle()
   useNewChatHotkey()
   const appReady = useAppReady()

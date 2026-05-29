@@ -1,0 +1,74 @@
+/* Modal enter/exit — centered dialogs (Dialog + AlertDialog) */
+
+@keyframes lingo-dialog-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lingo-dialog-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.lingo-dialog-content {
+  translate: -50% -50%;
+}
+
+@keyframes lingo-dialog-content-in {
+  from {
+    opacity: 0;
+    translate: -50% calc(-50% + 8px);
+    scale: 0.97;
+  }
+  to {
+    opacity: 1;
+    translate: -50% -50%;
+    scale: 1;
+  }
+}
+
+@keyframes lingo-dialog-content-out {
+  from {
+    opacity: 1;
+    translate: -50% -50%;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    translate: -50% calc(-50% + 4px);
+    scale: 0.98;
+  }
+}
+
+.lingo-dialog-overlay[data-state='open'] {
+  animation: lingo-dialog-overlay-in 180ms ease-out both;
+}
+
+.lingo-dialog-overlay[data-state='closed'] {
+  animation: lingo-dialog-overlay-out 140ms ease-in both;
+}
+
+.lingo-dialog-content[data-state='open'] {
+  animation: lingo-dialog-content-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.lingo-dialog-content[data-state='closed'] {
+  animation: lingo-dialog-content-out 160ms ease-in both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lingo-dialog-overlay[data-state='open'],
+  .lingo-dialog-overlay[data-state='closed'],
+  .lingo-dialog-content[data-state='open'],
+  .lingo-dialog-content[data-state='closed'] {
+    animation: none;
+  }
+}

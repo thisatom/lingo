@@ -48,7 +48,7 @@ function ContextMenuItem({
       data-slot="context-menu-item"
       data-inset={inset}
       className={cn(
-        'relative flex cursor-default items-center gap-2 rounded-[8px] text-xs leading-normal outline-hidden select-none',
+        'relative flex cursor-default items-center gap-2 rounded-[6px] text-xs leading-normal outline-hidden select-none',
         menuItemPaddingClass,
         menuItemHighlightClass,
         inset && 'pl-8',

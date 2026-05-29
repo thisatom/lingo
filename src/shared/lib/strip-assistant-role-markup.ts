@@ -1,3 +1,5 @@
+import { stripAssistantDisplayLeaks } from '@/shared/lib/strip-assistant-display-leaks'
+
 /** Role / template delimiters some models leak into visible answer text. */
 const ROLE_TAG =
   /<\/?(?:assistant|user|system|tool|think(?:ing)?|redacted_reasoning)\b[^>]*>/gi
@@ -16,5 +18,5 @@ export function stripAssistantRoleMarkup(text: string): string {
     .replace(CHATML_END, '')
 
   s = s.replace(/^\s*<\/?[a-z][\w-]*\s*>\s*$/gim, '')
-  return s
+  return stripAssistantDisplayLeaks(s)
 }

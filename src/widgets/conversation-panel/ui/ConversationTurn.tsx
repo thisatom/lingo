@@ -1,5 +1,6 @@
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { PipelineStage } from '@/entities/conversation/model/store'
+import { useConversationStore } from '@/entities/conversation/model/store'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { cn } from '@/shared/lib/utils'
@@ -72,6 +73,19 @@ export function ConversationTurn({
   voiceCaptureLabel = null
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
+  const pipelineSearchActiveUrl = useConversationStore((s) => s.pipelineSearchActiveUrl)
+  const latestAssistantMessageId =
+    [...turn.assistantMessages].reverse().find((message) => message.role === 'assistant')?.id ?? null
+  const searchUiAssistantMessageId =
+    streamingAssistantMessageId ??
+    latestAssistantMessageId ??
+    turn.assistantMessages.find((message) => (message.searchSources?.length ?? 0) > 0)?.id ??
+    null
+  const searchInProgress =
+    isLatestTurn &&
+    agentBusy &&
+    !pipelineStreamingAnswer &&
+    (pipelineStage === 'searching' || pipelineSearchActiveUrl != null)
 
   return (
     <section
@@ -136,6 +150,14 @@ export function ConversationTurn({
           return null
         }
 
+        const showSearchSpinner =
+          message.role === 'assistant' &&
+          searchInProgress &&
+          message.id === searchUiAssistantMessageId &&
+          !pipelineStreamingAnswer &&
+          !isAnswerStream &&
+          !message.content.trim()
+
         return (
           <article key={message.id} className="relative z-0 mt-1.5 min-w-0 max-w-full">
             {message.role === 'thinking' ? (
@@ -148,7 +170,9 @@ export function ConversationTurn({
               <AgentMessage
                 content={message.content}
                 searchSources={message.searchSources}
+                showSearchSpinner={showSearchSpinner}
                 parseThrottleMs={isAnswerStream ? 120 : undefined}
+                showStreamingCursor={isAnswerStream}
               />
             )}
           </article>

@@ -3,7 +3,7 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@/shared/ui/icons"
 import { Select as SelectPrimitive } from "radix-ui"
 
 import {
-  menuContentPaddingClass,
+  menuContentSpacingClass,
   menuItemHighlightClass,
   menuItemPaddingClass,
   menuSurfaceBorderClass
@@ -108,7 +108,7 @@ function SelectContent({
         >
           <SelectPrimitive.Viewport
             className={cn(
-              menuContentPaddingClass,
+              menuContentSpacingClass,
               position === "popper" &&
                 "w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
             )}
@@ -157,7 +157,7 @@ function SelectItem({
     >
       <span
         data-slot="select-item-indicator"
-        className="absolute right-[3px] flex size-3.5 items-center justify-center"
+        className="absolute top-1/2 right-[3px] flex size-3.5 -translate-y-1/2 items-center justify-center"
       >
         <SelectPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />

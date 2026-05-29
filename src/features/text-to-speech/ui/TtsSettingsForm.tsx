@@ -98,7 +98,7 @@ export function TtsSettingsForm() {
   return (
     <section>
       <h2 className={settingsSectionTitleClass}>Speech</h2>
-      <p className={settingsSubsectionTitleClass}>Assistant voice</p>
+      <p className={settingsSubsectionTitleClass}>Output</p>
       <div className={settingsCardClass}>
         <div className={settingsRowClass}>
           <div className={settingsRowTextWrapClass}>
@@ -176,8 +176,8 @@ export function TtsSettingsForm() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Voice</p>
             <p className={settingsRowDescriptionClass}>
-              Automatic uses a neural voice matching your practice language (
-              {practiceLanguage.toUpperCase()}).
+              Automatic picks a neural voice for the model language (
+              {practiceLanguage.toUpperCase()}) set under Agent.
             </p>
           </div>
           <Select

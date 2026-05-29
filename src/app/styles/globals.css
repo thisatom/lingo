@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+@import './appearance.css';
+@import './dialog-motion.css';
+@import './command-palette.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -89,6 +92,11 @@
   --surface-raised: #ffffff;
   --surface-overlay: #ffffff;
   --overlay: rgb(0 0 0 / 0.28);
+  --command-palette-surface: rgb(255 255 255 / 0.82);
+  --command-palette-border: #d6d6d6;
+  --command-palette-separator: #e5e5e5;
+  --command-palette-overlay: rgb(0 0 0 / 0.32);
+  --command-palette-item-hover: var(--menu-hover);
 
   --sidebar: #f0f0f0;
   --sidebar-foreground: #171717;
@@ -168,6 +176,11 @@
   --kbd-divider: #181818;
   --titlebar-border: #242424;
   --overlay: rgb(0 0 0 / 0.55);
+  --command-palette-surface: rgb(30 30 30 / 0.8);
+  --command-palette-border: #313131;
+  --command-palette-separator: #1e1e1e;
+  --command-palette-overlay: rgb(0 0 0 / 0.42);
+  --command-palette-item-hover: #282828;
 
   --md-code-bg: #161616;
   --md-code-fg: #d4d4d4;

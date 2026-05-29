@@ -38,8 +38,6 @@ import { stripAssistantRoleMarkup } from '@/shared/lib/strip-assistant-role-mark
 import {
   isLocalWebSearchRegistered
 } from '@/shared/lib/local-web-search-runtime'
-import { buildDirectLocalSearchReply } from '@/shared/lib/local-search-direct-reply'
-import { detectLocalSearchIntent } from '@/shared/lib/local-search-intent'
 import { localeForPracticeLanguage } from '@/shared/lib/local-web-search'
 import { performLocalWebSearch } from '@/shared/lib/local-web-search'
 import {
@@ -726,15 +724,6 @@ async function completeWithLocalWebSearch(
 
   emitTargets(results)
 
-  const intent = detectLocalSearchIntent(lastUserMessage)
-  const locale = practiceLanguage?.trim() || 'en'
-  const directReply = buildDirectLocalSearchReply(intent, results, locale)
-  if (directReply && (intent.type === 'time' || intent.type === 'date')) {
-    send({ type: 'text-delta', delta: directReply, text: directReply })
-    send({ type: 'done', text: directReply })
-    return
-  }
-
   const augmented = substituteMessagesWithLocalWebSearchResults(
     apiMessages,
     lastUserMessage,
@@ -812,7 +801,28 @@ async function completeTextChat(
   if (webSearchEnabled) {
     send({ type: 'searching' })
 
-    if (isLocalWebSearchRegistered() || isCustomBackend(request)) {
+    // Custom endpoints do not support provider-native web tools, so their
+    // "web search on" path should behave like OpenRouter's local fallback.
+    if (isCustomBackend(request)) {
+      try {
+        await completeWithLocalWebSearch(
+          request,
+          apiKey,
+          userModelId,
+          apiMessages,
+          practiceLanguage,
+          lastUserMessage,
+          send,
+          signal,
+          fetchImpl
+        )
+        return
+      } catch {
+        // Keep chat responsive: if local lookup fails, continue with regular completion.
+      }
+    }
+
+    if (isLocalWebSearchRegistered()) {
       await completeWithLocalWebSearch(
         request,
         apiKey,

@@ -3,16 +3,7 @@ import { Trash2 } from '@/shared/ui/icons'
 import { sidebarRowActionNoHoverBgClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import type { Chat } from '@/entities/chat/model/types'
 import { cn } from '@/shared/lib/utils'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/shared/ui/alert-dialog'
+import { ConfirmActionDialog } from '@/shared/ui/confirm-action-dialog'
 import { SidebarMenuButton, SidebarMenuItem } from '@/shared/ui/sidebar'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 import {
@@ -100,32 +91,23 @@ export function ChatListItem({
         </TooltipIconButton>
       </SidebarMenuItem>
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
-            <AlertDialogDescription>
-              &quot;{chat.title}&quot; will be removed from your list. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-row justify-end gap-2 sm:justify-end">
-            <AlertDialogCancel size="sm" className="min-w-[5.5rem]">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              size="sm"
-              variant="destructive"
-              className="min-w-[5.5rem]"
-              onClick={() => {
-                onDelete()
-                setDeleteOpen(false)
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmActionDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete this chat?"
+        description={
+          <>
+            <span className="font-medium text-[#d4d4d4]">&quot;{chat.title}&quot;</span> will be
+            removed from your list. This cannot be undone.
+          </>
+        }
+        primaryLabel="Delete"
+        primaryVariant="destructive"
+        onPrimary={() => {
+          onDelete()
+          setDeleteOpen(false)
+        }}
+      />
     </>
   )
 }

@@ -30,10 +30,26 @@ import { isTtsSpeechRate, type TtsSpeechRate } from '@/shared/lib/tts-rate'
 import { normalizeTtsVolume, TTS_VOLUME_DEFAULT } from '@/shared/lib/tts-volume'
 import { hasPersistedChatsInStorage } from '@/shared/lib/has-persisted-chats'
 import { resolveOnboardingCompleted } from '@/shared/lib/onboarding-status'
+import {
+  DEFAULT_APPEARANCE,
+  isConversationDensity,
+  isTextScale,
+  isUiFontFamily,
+  type ConversationDensity,
+  type TextScale,
+  type UiFontFamily
+} from '@/shared/lib/appearance'
 import { isAppTheme } from '@/shared/lib/theme'
 import type { AppTheme } from '@/shared/types/app-theme'
 
-export type { AppTheme, MicNoiseSuppression, TtsSpeechRate }
+export type {
+  AppTheme,
+  ConversationDensity,
+  MicNoiseSuppression,
+  TextScale,
+  TtsSpeechRate,
+  UiFontFamily
+}
 
 export type ChatComposerMode = 'text' | 'conversation'
 
@@ -62,6 +78,13 @@ interface SettingsState {
   speakerDeviceId: string
   speakerLabel: string
   appTheme: AppTheme
+  uiFontFamily: UiFontFamily
+  uiTextScale: TextScale
+  chatTextScale: TextScale
+  codeTextScale: TextScale
+  thinkingTextScale: TextScale
+  conversationDensity: ConversationDensity
+  reduceUiMotion: boolean
   /** Speak assistant replies in Conversation / Agent Speech mode. */
   ttsEnabled: boolean
   ttsSpeechRate: TtsSpeechRate
@@ -77,6 +100,8 @@ interface SettingsState {
   llmMaxTokens: number
   sidebarShowDateGroups: boolean
   sidebarChatSort: SidebarChatSort
+  /** Ask before returning to checkpoint edit flow. */
+  checkpointReturnConfirmEnabled: boolean
   /** First-run setup wizard completed. */
   onboardingCompleted: boolean
   setPracticeLanguage: (lang: string) => void
@@ -94,6 +119,13 @@ interface SettingsState {
   setMicNoiseSuppression: (level: MicNoiseSuppression) => void
   setSpeakerDevice: (deviceId: string, label: string) => void
   setAppTheme: (theme: AppTheme) => void
+  setUiFontFamily: (font: UiFontFamily) => void
+  setUiTextScale: (scale: TextScale) => void
+  setChatTextScale: (scale: TextScale) => void
+  setCodeTextScale: (scale: TextScale) => void
+  setThinkingTextScale: (scale: TextScale) => void
+  setConversationDensity: (density: ConversationDensity) => void
+  setReduceUiMotion: (enabled: boolean) => void
   setTtsEnabled: (enabled: boolean) => void
   setTtsSpeechRate: (rate: TtsSpeechRate) => void
   setTtsVoiceId: (voiceId: string) => void
@@ -104,6 +136,7 @@ interface SettingsState {
   setLlmMaxTokens: (maxTokens: number) => void
   setSidebarShowDateGroups: (show: boolean) => void
   setSidebarChatSort: (sort: SidebarChatSort) => void
+  setCheckpointReturnConfirmEnabled: (enabled: boolean) => void
   setOnboardingCompleted: (completed: boolean) => void
   resetSettings: () => void
 }
@@ -125,6 +158,13 @@ type PersistedSettings = Pick<
   | 'speakerDeviceId'
   | 'speakerLabel'
   | 'appTheme'
+  | 'uiFontFamily'
+  | 'uiTextScale'
+  | 'chatTextScale'
+  | 'codeTextScale'
+  | 'thinkingTextScale'
+  | 'conversationDensity'
+  | 'reduceUiMotion'
   | 'ttsEnabled'
   | 'ttsSpeechRate'
   | 'ttsVoiceId'
@@ -135,6 +175,7 @@ type PersistedSettings = Pick<
   | 'llmMaxTokens'
   | 'sidebarShowDateGroups'
   | 'sidebarChatSort'
+  | 'checkpointReturnConfirmEnabled'
   | 'onboardingCompleted'
 >
 
@@ -155,6 +196,13 @@ const DEFAULT_SETTINGS: Omit<
   | 'setMicNoiseSuppression'
   | 'setSpeakerDevice'
   | 'setAppTheme'
+  | 'setUiFontFamily'
+  | 'setUiTextScale'
+  | 'setChatTextScale'
+  | 'setCodeTextScale'
+  | 'setThinkingTextScale'
+  | 'setConversationDensity'
+  | 'setReduceUiMotion'
   | 'setTtsEnabled'
   | 'setTtsSpeechRate'
   | 'setTtsVoiceId'
@@ -165,6 +213,7 @@ const DEFAULT_SETTINGS: Omit<
   | 'setLlmMaxTokens'
   | 'setSidebarShowDateGroups'
   | 'setSidebarChatSort'
+  | 'setCheckpointReturnConfirmEnabled'
   | 'setOnboardingCompleted'
   | 'resetSettings'
 > = {
@@ -183,6 +232,13 @@ const DEFAULT_SETTINGS: Omit<
   speakerDeviceId: '',
   speakerLabel: '',
   appTheme: 'dark',
+  uiFontFamily: DEFAULT_APPEARANCE.uiFontFamily,
+  uiTextScale: DEFAULT_APPEARANCE.uiTextScale,
+  chatTextScale: DEFAULT_APPEARANCE.chatTextScale,
+  codeTextScale: DEFAULT_APPEARANCE.codeTextScale,
+  thinkingTextScale: DEFAULT_APPEARANCE.thinkingTextScale,
+  conversationDensity: DEFAULT_APPEARANCE.conversationDensity,
+  reduceUiMotion: DEFAULT_APPEARANCE.reduceUiMotion,
   ttsEnabled: true,
   ttsSpeechRate: 'normal',
   ttsVoiceId: TTS_VOICE_AUTO,
@@ -193,6 +249,7 @@ const DEFAULT_SETTINGS: Omit<
   llmMaxTokens: LLM_MAX_TOKENS_DEFAULT,
   sidebarShowDateGroups: true,
   sidebarChatSort: 'updated-desc',
+  checkpointReturnConfirmEnabled: true,
   onboardingCompleted: false
 }
 
@@ -263,6 +320,25 @@ export const useSettingsStore = create<SettingsState>()(
         set({ speakerDeviceId, speakerLabel }),
       setAppTheme: (appTheme) =>
         set({ appTheme: isAppTheme(appTheme) ? appTheme : 'dark' }),
+      setUiFontFamily: (uiFontFamily) =>
+        set({ uiFontFamily: isUiFontFamily(uiFontFamily) ? uiFontFamily : 'system' }),
+      setUiTextScale: (uiTextScale) =>
+        set({ uiTextScale: isTextScale(uiTextScale) ? uiTextScale : 'default' }),
+      setChatTextScale: (chatTextScale) =>
+        set({ chatTextScale: isTextScale(chatTextScale) ? chatTextScale : 'default' }),
+      setCodeTextScale: (codeTextScale) =>
+        set({ codeTextScale: isTextScale(codeTextScale) ? codeTextScale : 'default' }),
+      setThinkingTextScale: (thinkingTextScale) =>
+        set({
+          thinkingTextScale: isTextScale(thinkingTextScale) ? thinkingTextScale : 'default'
+        }),
+      setConversationDensity: (conversationDensity) =>
+        set({
+          conversationDensity: isConversationDensity(conversationDensity)
+            ? conversationDensity
+            : 'default'
+        }),
+      setReduceUiMotion: (reduceUiMotion) => set({ reduceUiMotion: Boolean(reduceUiMotion) }),
       setTtsEnabled: (ttsEnabled) => set({ ttsEnabled }),
       setTtsSpeechRate: (ttsSpeechRate) =>
         set({ ttsSpeechRate: isTtsSpeechRate(ttsSpeechRate) ? ttsSpeechRate : 'normal' }),
@@ -279,12 +355,14 @@ export const useSettingsStore = create<SettingsState>()(
       setLlmMaxTokens: (llmMaxTokens) => set({ llmMaxTokens: normalizeLlmMaxTokens(llmMaxTokens) }),
       setSidebarShowDateGroups: (sidebarShowDateGroups) => set({ sidebarShowDateGroups }),
       setSidebarChatSort: (sidebarChatSort) => set({ sidebarChatSort }),
+      setCheckpointReturnConfirmEnabled: (checkpointReturnConfirmEnabled) =>
+        set({ checkpointReturnConfirmEnabled }),
       setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
       resetSettings: () => set({ ...DEFAULT_SETTINGS })
     }),
     {
       name: 'lingo-settings',
-      version: 20,
+      version: 23,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
         llmBackend: state.llmBackend,
@@ -301,6 +379,13 @@ export const useSettingsStore = create<SettingsState>()(
         speakerDeviceId: state.speakerDeviceId,
         speakerLabel: state.speakerLabel,
         appTheme: state.appTheme,
+        uiFontFamily: state.uiFontFamily,
+        uiTextScale: state.uiTextScale,
+        chatTextScale: state.chatTextScale,
+        codeTextScale: state.codeTextScale,
+        thinkingTextScale: state.thinkingTextScale,
+        conversationDensity: state.conversationDensity,
+        reduceUiMotion: state.reduceUiMotion,
         ttsEnabled: state.ttsEnabled,
         ttsSpeechRate: state.ttsSpeechRate,
         ttsVoiceId: state.ttsVoiceId,
@@ -311,6 +396,7 @@ export const useSettingsStore = create<SettingsState>()(
         llmMaxTokens: state.llmMaxTokens,
         sidebarShowDateGroups: state.sidebarShowDateGroups,
         sidebarChatSort: state.sidebarChatSort,
+        checkpointReturnConfirmEnabled: state.checkpointReturnConfirmEnabled,
         onboardingCompleted: state.onboardingCompleted
       }),
       migrate: (persisted, version) => {
@@ -445,6 +531,47 @@ export const useSettingsStore = create<SettingsState>()(
             }
           }
         }
+        if (version < 21) {
+          state = {
+            ...state,
+            checkpointReturnConfirmEnabled:
+              typeof state.checkpointReturnConfirmEnabled === 'boolean'
+                ? state.checkpointReturnConfirmEnabled
+                : true
+          }
+        }
+        if (version < 22) {
+          state = {
+            ...state,
+            uiFontFamily: isUiFontFamily(state.uiFontFamily)
+              ? state.uiFontFamily
+              : DEFAULT_APPEARANCE.uiFontFamily,
+            chatTextScale: isTextScale(state.chatTextScale)
+              ? state.chatTextScale
+              : DEFAULT_APPEARANCE.chatTextScale,
+            codeTextScale: isTextScale(state.codeTextScale)
+              ? state.codeTextScale
+              : DEFAULT_APPEARANCE.codeTextScale
+          }
+        }
+        if (version < 23) {
+          state = {
+            ...state,
+            uiTextScale: isTextScale(state.uiTextScale)
+              ? state.uiTextScale
+              : DEFAULT_APPEARANCE.uiTextScale,
+            thinkingTextScale: isTextScale(state.thinkingTextScale)
+              ? state.thinkingTextScale
+              : DEFAULT_APPEARANCE.thinkingTextScale,
+            conversationDensity: isConversationDensity(state.conversationDensity)
+              ? state.conversationDensity
+              : DEFAULT_APPEARANCE.conversationDensity,
+            reduceUiMotion:
+              typeof state.reduceUiMotion === 'boolean'
+                ? state.reduceUiMotion
+                : DEFAULT_APPEARANCE.reduceUiMotion
+          }
+        }
         if (version < 16) {
           const baseUrl =
             typeof state.customApiBaseUrl === 'string'
@@ -514,6 +641,10 @@ export const useSettingsStore = create<SettingsState>()(
               ? saved.webSearchEnabled
               : current.webSearchEnabled,
           llmMaxTokens: normalizeLlmMaxTokens(saved.llmMaxTokens ?? current.llmMaxTokens),
+          checkpointReturnConfirmEnabled:
+            typeof saved.checkpointReturnConfirmEnabled === 'boolean'
+              ? saved.checkpointReturnConfirmEnabled
+              : current.checkpointReturnConfirmEnabled,
           ttsSpeechRate: isTtsSpeechRate(saved.ttsSpeechRate)
             ? saved.ttsSpeechRate
             : current.ttsSpeechRate,
@@ -525,6 +656,26 @@ export const useSettingsStore = create<SettingsState>()(
               : current.ttsVoiceId,
           ttsVolume: normalizeTtsVolume(saved.ttsVolume ?? current.ttsVolume),
           appTheme: isAppTheme(saved.appTheme) ? saved.appTheme : current.appTheme,
+          uiFontFamily: isUiFontFamily(saved.uiFontFamily)
+            ? saved.uiFontFamily
+            : current.uiFontFamily,
+          chatTextScale: isTextScale(saved.chatTextScale)
+            ? saved.chatTextScale
+            : current.chatTextScale,
+          codeTextScale: isTextScale(saved.codeTextScale)
+            ? saved.codeTextScale
+            : current.codeTextScale,
+          uiTextScale: isTextScale(saved.uiTextScale) ? saved.uiTextScale : current.uiTextScale,
+          thinkingTextScale: isTextScale(saved.thinkingTextScale)
+            ? saved.thinkingTextScale
+            : current.thinkingTextScale,
+          conversationDensity: isConversationDensity(saved.conversationDensity)
+            ? saved.conversationDensity
+            : current.conversationDensity,
+          reduceUiMotion:
+            typeof saved.reduceUiMotion === 'boolean'
+              ? saved.reduceUiMotion
+              : current.reduceUiMotion,
           onboardingCompleted: resolveOnboardingCompleted(
             typeof saved.onboardingCompleted === 'boolean'
               ? saved.onboardingCompleted

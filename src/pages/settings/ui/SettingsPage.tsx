@@ -1,9 +1,10 @@
 import { Navigate, useParams } from 'react-router-dom'
-import { isSettingsSectionId } from '@/entities/settings/config/sections'
+import { resolveSettingsSectionId } from '@/entities/settings/config/sections'
+import { AgentSettingsForm } from '@/features/ai-chat/ui/AgentSettingsForm'
 import { ApiSettingsForm } from '@/features/manage-api-keys/ui/ApiSettingsForm'
-import { PracticeSettingsForm } from '@/features/practice-settings/ui/PracticeSettingsForm'
 import { TtsSettingsForm } from '@/features/text-to-speech/ui/TtsSettingsForm'
 import { DevicesSettingsForm } from '@/features/user-settings/ui/DevicesSettingsForm'
+import { AppearanceSettingsForm } from '@/features/user-settings/ui/AppearanceSettingsForm'
 import { UserSettingsForm } from '@/features/user-settings/ui/UserSettingsForm'
 import { settingsPageContentClass } from '@/shared/lib/settings-surface'
 import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
@@ -13,13 +14,14 @@ import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 export function SettingsPage() {
   const { section } = useParams<{ section?: string }>()
   const { sidebarCollapsed } = useResizableSidebar()
+  const resolvedSection = resolveSettingsSectionId(section)
 
   if (!section) {
-    return <Navigate to="/settings/user" replace />
+    return <Navigate to="/settings/general" replace />
   }
 
-  if (!isSettingsSectionId(section)) {
-    return <Navigate to="/settings/user" replace />
+  if (!resolvedSection) {
+    return <Navigate to="/settings/general" replace />
   }
 
   return (
@@ -33,11 +35,12 @@ export function SettingsPage() {
       <CustomScrollArea variant="chat" className="min-h-0 flex-1">
         <div className="p-4">
           <div className={settingsPageContentClass}>
-            {section === 'user' && <UserSettingsForm />}
-            {section === 'devices' && <DevicesSettingsForm />}
-            {section === 'speech' && <TtsSettingsForm />}
-            {section === 'practice' && <PracticeSettingsForm />}
-            {section === 'api' && <ApiSettingsForm />}
+            {resolvedSection === 'general' && <UserSettingsForm />}
+            {resolvedSection === 'appearance' && <AppearanceSettingsForm />}
+            {resolvedSection === 'devices' && <DevicesSettingsForm />}
+            {resolvedSection === 'speech' && <TtsSettingsForm />}
+            {resolvedSection === 'agent' && <AgentSettingsForm />}
+            {resolvedSection === 'api' && <ApiSettingsForm />}
           </div>
         </div>
       </CustomScrollArea>

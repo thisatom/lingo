@@ -44,6 +44,7 @@ export function UserMessageActionButton({
       type="button"
       variant="ghost"
       size="iconSm"
+      data-checkpoint-return-action
       className={cn(
         userMessageEditButtonClass,
         'text-muted-foreground/55 hover:bg-accent hover:text-muted-foreground',

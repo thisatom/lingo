@@ -8,8 +8,8 @@ export const settingsSubsectionTitleClass =
 
 /** Settings cards — dark: #1c1c1c surface, #242424 row dividers. */
 export const settingsCardClass = cn(
-  'rounded-xl bg-card shadow-sm',
-  'dark:bg-[#1c1c1c] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
+  'rounded-xl border border-border/80 bg-card shadow-sm',
+  'dark:border-transparent dark:bg-[#1c1c1c] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
 )
 
 export const settingsRowClass = cn(
@@ -24,3 +24,10 @@ export const settingsRowTextWrapClass = 'min-w-0 flex-1'
 export const settingsRowTitleClass = 'text-sm font-normal text-foreground'
 
 export const settingsRowDescriptionClass = 'mt-0.5 text-sm text-muted-foreground'
+
+/** Live preview panel in Appearance settings. */
+export const settingsPreviewCardClass = cn(
+  settingsCardClass,
+  'px-4 py-3',
+  'dark:bg-[#1c1c1c]'
+)

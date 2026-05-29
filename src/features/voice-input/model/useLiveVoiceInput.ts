@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { selectSttBackend } from '@/features/voice-input/lib/select-stt-backend'
+import { mergePrefixAndSpoken } from '@/shared/lib/voice-draft-merge'
 import { useBrowserSpeechVoiceInput } from '@/features/voice-input/model/useBrowserSpeechVoiceInput'
 import { useRecordedVoiceInput } from '@/features/voice-input/model/useRecordedVoiceInput'
 
@@ -27,12 +28,7 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
 
   const applyTextDraft = useCallback(
     (spoken: string) => {
-      const prefix = draftPrefixRef.current
-      const next = prefix
-        ? spoken
-          ? `${prefix}${prefix.endsWith(' ') ? '' : ' '}${spoken}`.trim()
-          : prefix
-        : spoken
+      const next = mergePrefixAndSpoken(draftPrefixRef.current, spoken)
       handlers.onTextDraft(next)
       return next
     },
