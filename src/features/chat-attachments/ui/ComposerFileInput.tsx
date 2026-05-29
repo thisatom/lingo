@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Paperclip } from '@/shared/ui/icons'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
-import { processDroppedFiles } from '@/features/chat-attachments/lib/process-files'
+import { runComposerAttachmentFiles } from '@/features/chat-attachments/lib/process-files'
 import { composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
@@ -32,10 +32,7 @@ export function ComposerFileInput({ existingCount, disabled, onAdd, onError }: P
           const files = e.target.files ? Array.from(e.target.files) : []
           e.target.value = ''
           if (files.length === 0) return
-          void processDroppedFiles(files, existingCount).then(({ attachments, errors }) => {
-            if (attachments.length > 0) onAdd(attachments)
-            if (errors.length > 0) onError?.(errors.join(' '))
-          })
+          runComposerAttachmentFiles(files, existingCount, onAdd, onError)
         }}
       />
       <TooltipIconButton

@@ -119,6 +119,14 @@ export function parseStreamChannel(input: unknown): string {
   return parseOrThrow(streamChannelSchema, input, 'stream channel')
 }
 
+const droppedFilePathSchema = z.string().trim().min(1).max(4096)
+
+export const droppedFilePathsSchema = z.array(droppedFilePathSchema).max(5)
+
+export function parseDroppedFilePaths(input: unknown): string[] {
+  return parseOrThrow(droppedFilePathsSchema, input, 'dropped file paths')
+}
+
 export function parseLlmBackend(input: unknown): LlmBackend {
   return parseOrThrow(llmBackendSchema, input, 'llm backend')
 }

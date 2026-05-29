@@ -293,7 +293,7 @@ export function UserMessage({
             <UserMessageAttachments attachments={attachments} />
           ) : null}
           {content.trim() ? (
-            <MarkdownContent content={content} variant="agent" />
+            <MarkdownContent content={content} variant="user" />
           ) : voiceCaptureLabel ? (
             <p className="text-sm italic text-muted-foreground">
               {voiceCaptureLabel === 'transcribing' ? 'Transcribing…' : 'Listening…'}

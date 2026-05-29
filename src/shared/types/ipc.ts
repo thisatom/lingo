@@ -150,6 +150,28 @@ export interface PendingUpdateNotice {
 
 export type LingoPlatform = 'electron' | 'web'
 
+/** Payload from main after reading OS paths for drag-and-drop (Electron). */
+export interface DroppedFileReadResult {
+  name: string
+  mimeType: string
+  sizeBytes: number
+  kind: 'image' | 'text'
+  /** UTF-8 text or a data URL for images. */
+  payload: string
+}
+
+export type ComposerDropRect = {
+  left: number
+  top: number
+  right: number
+  bottom: number
+} | null
+
+export type DesktopFileDropPayload = {
+  results: DroppedFileReadResult[]
+  errors: string[]
+}
+
 export interface LingoApi {
   platform: LingoPlatform
   secrets: {
@@ -200,6 +222,13 @@ export interface LingoApi {
   app?: {
     onPrepareShutdown: (handler: () => void | Promise<void>) => () => void
     notifyShutdownComplete: () => void
+  }
+  /** Desktop: drag-and-drop may expose paths only (Electron 32+). */
+  files?: {
+    getPathForFile: (file: File) => string
+    setComposerDropRect: (rect: ComposerDropRect) => void
+    onDesktopFileDrop: (handler: (payload: DesktopFileDropPayload) => void) => () => void
+    readDroppedPaths: (paths: string[]) => Promise<DesktopFileDropPayload>
   }
 }
 

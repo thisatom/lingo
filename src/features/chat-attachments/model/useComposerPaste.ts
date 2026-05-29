@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
-import { processDroppedFiles } from '@/features/chat-attachments/lib/process-files'
+import { runComposerAttachmentFiles } from '@/features/chat-attachments/lib/process-files'
 
 type Options = {
   textareaRef: RefObject<HTMLTextAreaElement | null>
@@ -40,10 +40,12 @@ export function useComposerPaste({
       if (files.length === 0) return
       e.preventDefault()
 
-      void processDroppedFiles(files, existingCount).then(({ attachments, errors }) => {
-        if (attachments.length > 0) onAddRef.current(attachments)
-        if (errors.length > 0) onErrorRef.current?.(errors.join(' '))
-      })
+      runComposerAttachmentFiles(
+        files,
+        existingCount,
+        (items) => onAddRef.current(items),
+        (message) => onErrorRef.current?.(message)
+      )
     }
 
     el.addEventListener('paste', onPaste)

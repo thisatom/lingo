@@ -133,6 +133,12 @@ export function createMainWindow(): BrowserWindow {
     return { action: 'deny' }
   })
 
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('file:') || url.startsWith('javascript:')) {
+      event.preventDefault()
+    }
+  })
+
   void loadMainRenderer(mainWindow)
 
   return mainWindow

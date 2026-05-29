@@ -107,3 +107,53 @@ export async function processDroppedFiles(
 
   return { attachments, errors }
 }
+
+const EMPTY_DROP_HINT =
+  'Could not read the dropped file. Try the attachment button or pick files with the paperclip.'
+
+/**
+ * Shared drop/paste pipeline: resolve blobs → process attachments, always surfaces failures.
+ */
+export function runComposerAttachmentPipeline(
+  filesPromise: Promise<{ files: File[]; errors: string[] }>,
+  existingCount: number,
+  onAdd: (items: MessageAttachment[]) => void,
+  onError?: (message: string) => void
+): void {
+  void filesPromise
+    .then(({ files, errors: resolveErrors }) => {
+      if (files.length === 0) {
+        if (resolveErrors.length > 0) onError?.(resolveErrors.join(' '))
+        else onError?.(EMPTY_DROP_HINT)
+        return null
+      }
+      return processDroppedFiles(files, existingCount).then((result) => ({
+        ...result,
+        errors: [...resolveErrors, ...result.errors]
+      }))
+    })
+    .then((result) => {
+      if (!result) return
+      if (result.attachments.length > 0) onAdd(result.attachments)
+      if (result.errors.length > 0) onError?.(result.errors.join(' '))
+    })
+    .catch((error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : 'Could not attach dropped files'
+      onError?.(message)
+    })
+}
+
+export function runComposerAttachmentFiles(
+  files: File[],
+  existingCount: number,
+  onAdd: (items: MessageAttachment[]) => void,
+  onError?: (message: string) => void
+): void {
+  runComposerAttachmentPipeline(
+    Promise.resolve({ files, errors: [] }),
+    existingCount,
+    onAdd,
+    onError
+  )
+}

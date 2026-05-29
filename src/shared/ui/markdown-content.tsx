@@ -7,8 +7,10 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { segmentMarkdown, type MarkdownSegment } from '@/shared/lib/math/segment-markdown'
 import { normalizeMarkdown } from '@/shared/lib/normalize-markdown'
+import { stripAssistantRoleMarkup } from '@/shared/lib/strip-assistant-role-markup'
 import { cn } from '@/shared/lib/utils'
 import { KaTeXBlock } from '@/shared/ui/katex-block'
+import { StreamCursor } from '@/shared/ui/stream-cursor'
 import {
   agentMarkdownComponents,
   compactMarkdownComponents
@@ -21,6 +23,8 @@ const rehypePlugins: PluggableList = [[rehypeHighlight, { plainText: ['plaintext
 
 const proseVariantClass = {
   agent: cn(typographyProseClass, 'markdown-prose'),
+  /** User questions — same typography as agent, without assistant leak stripping. */
+  user: cn(typographyProseClass, 'markdown-prose'),
   compact: cn(
     'markdown-prose max-w-none text-sm leading-relaxed text-foreground',
     '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0'
@@ -35,9 +39,11 @@ interface MarkdownContentProps {
   content: string
   className?: string
   /** @default 'agent' — AI chat; use 'compact' for dialogs */
-  variant?: 'agent' | 'compact' | 'thinking' | 'typography' | 'default'
+  variant?: 'agent' | 'user' | 'compact' | 'thinking' | 'typography' | 'default'
   /** Throttle KaTeX/markdown re-parses while content grows (streaming). */
   parseThrottleMs?: number
+  /** Blinking caret after content while the answer is still streaming. */
+  showStreamingCursor?: boolean
 }
 
 function renderSegment(
@@ -82,20 +88,25 @@ function MarkdownContentInner({
   content,
   className,
   variant = 'agent',
-  parseThrottleMs
+  parseThrottleMs,
+  showStreamingCursor = false
 }: MarkdownContentProps) {
   const throttleMs = parseThrottleMs ?? 0
   const parsedSource = useThrottledValue(content, throttleMs, throttleMs > 0)
-  const segments = useMemo(
-    () => segmentMarkdown(normalizeMarkdown(parsedSource)),
-    [parsedSource]
-  )
   const resolvedVariant =
     variant === 'typography' || variant === 'default'
       ? 'agent'
       : variant === 'thinking'
         ? 'thinking'
         : variant
+  const displaySource = useMemo(() => {
+    const normalized = normalizeMarkdown(parsedSource)
+    if (resolvedVariant === 'agent' || resolvedVariant === 'thinking') {
+      return stripAssistantRoleMarkup(normalized)
+    }
+    return normalized
+  }, [parsedSource, resolvedVariant])
+  const segments = useMemo(() => segmentMarkdown(displaySource), [displaySource])
   const components =
     resolvedVariant === 'compact' ? compactMarkdownComponents : agentMarkdownComponents
 
@@ -109,6 +120,7 @@ function MarkdownContentInner({
       {segments.map((segment, index) => (
         <Fragment key={index}>{renderSegment(segment, index, components)}</Fragment>
       ))}
+      {showStreamingCursor ? <StreamCursor /> : null}
     </div>
   )
 }

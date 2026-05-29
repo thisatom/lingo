@@ -1,16 +1,23 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AppUpdateInfo,
   ChatCompleteRequest,
   ChatStreamEvent,
   ChatStreamHandlers,
   ChatStreamRequest,
+  ComposerDropRect,
+  DesktopFileDropPayload,
   LingoApi,
   SecretProviderId,
   SttTranscribeRequest,
   TtsSynthesizeRequest
 } from '../../src/shared/types/ipc'
 import { applyTitlebarTheme, initCustomTitlebar, updateTitlebarCaption } from './titlebar'
+import {
+  ensurePreloadFileDropCapture,
+  setComposerDropRect,
+  setDesktopFileDropHandler
+} from './file-drop-paths'
 
 const lingo: LingoApi = {
   platform: 'electron',
@@ -55,7 +62,7 @@ const lingo: LingoApi = {
             break
           case 'error':
             streamError = new Error(payload.message)
-            handlers.onError?.(payload)
+            handlers.onError?.({ type: 'error', message: streamError.message })
             break
         }
       }
@@ -133,6 +140,24 @@ const lingo: LingoApi = {
       }
     }
   },
+  files: {
+    getPathForFile: (file: File) => {
+      try {
+        return webUtils.getPathForFile(file)
+      } catch {
+        return ''
+      }
+    },
+    setComposerDropRect: (rect: ComposerDropRect) => {
+      setComposerDropRect(rect)
+    },
+    onDesktopFileDrop: (handler: (payload: DesktopFileDropPayload) => void) => {
+      setDesktopFileDropHandler(handler)
+      return () => setDesktopFileDropHandler(null)
+    },
+    readDroppedPaths: (paths: string[]) =>
+      ipcRenderer.invoke('lingo:files:readDroppedPaths', paths)
+  },
   app: {
     onPrepareShutdown: (handler: () => void | Promise<void>) => {
       const listener = () => {
@@ -150,6 +175,8 @@ const lingo: LingoApi = {
 }
 
 contextBridge.exposeInMainWorld('lingo', lingo)
+
+ensurePreloadFileDropCapture()
 
 window.addEventListener('DOMContentLoaded', () => {
   void initCustomTitlebar().catch((error: unknown) => {

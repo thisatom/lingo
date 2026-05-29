@@ -26,7 +26,10 @@ import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
 import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
 import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
 import { ChatHeaderTitle } from '@/widgets/chat-header/ui/ChatHeaderTitle'
-import { flushChatScrollPositions } from '@/app/lib/chat-scroll-registry'
+import {
+  flushChatScrollPositions,
+  requestChatFollowBottom
+} from '@/app/lib/chat-scroll-registry'
 import { flushChatPersistDebounce } from '@/entities/chat/lib/chat-persist-storage'
 import { ConversationPanel } from '@/widgets/conversation-panel/ui/ConversationPanel'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
@@ -280,8 +283,6 @@ export function MainPage() {
     const text = (await voice.stop())?.trim() ?? ''
 
     if (editSpeechTargetRef.current) {
-      const target = editSpeechTargetRef.current
-      if (text) target.setText(text)
       setSpeechError(null)
       return
     }
@@ -410,11 +411,14 @@ export function MainPage() {
     if (!text.trim() && attachments.length === 0) return
 
     setSpeechError(null)
+    requestChatFollowBottom()
     chatScrollRef.current?.followBottom()
     voice.setDraftPrefix('')
 
     useChatsStore.getState().ensureActiveChat()
     await sendUserMessage(text, attachments)
+    requestChatFollowBottom()
+    chatScrollRef.current?.followBottom()
   }, [
     composerAttachments,
     draft,
@@ -477,13 +481,8 @@ export function MainPage() {
           }}
         />
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[50]">
-          <div
-            className={cn(
-              'pointer-events-auto mx-auto w-full px-4 pb-3 sm:px-6',
-              CHAT_COLUMN_MAX_WIDTH_CLASS
-            )}
-          >
+        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-[50]">
+          <div className={cn('mx-auto w-full px-4 pb-3 sm:px-6', CHAT_COLUMN_MAX_WIDTH_CLASS)}>
             <div className="relative">
               <ScrollToLatestButton
                 show={showScrollToLatest}

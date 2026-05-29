@@ -17,6 +17,7 @@ import { composerInputHoverClass } from '@/shared/lib/sidebar-filter-menu-styles
 import { CHAT_MODE_LABELS, composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
 import { ComposerAgentMenuSelect } from '@/widgets/chat-composer/ui/ComposerAgentMenuSelect'
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
+import { isElectronApp } from '@/shared/lib/lingo'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
@@ -78,6 +79,20 @@ function resizeTextarea(el: HTMLTextAreaElement) {
   el.style.height = `${Math.max(el.scrollHeight, INPUT_MIN_HEIGHT_PX)}px`
 }
 
+function allowFileDragOver(event: React.DragEvent) {
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
+}
+
+function onComposerTextareaDrop(event: React.DragEvent) {
+  event.preventDefault()
+  if (!isElectronApp()) {
+    event.stopPropagation()
+  }
+}
+
 export function ChatComposer({
   value,
   onChange,
@@ -133,8 +148,9 @@ export function ChatComposer({
   )
 
   const canSend = !disabled && (value.trim().length > 0 || attachments.length > 0)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { zoneRef, dragOver } = useNativeComposerDrop({
-    enabled: !disabled && Boolean(onAddAttachments),
+    enabled: Boolean(onAddAttachments),
     existingCount: attachments.length,
     onAdd: onAddAttachments ?? noopAddAttachments,
     onError: onAttachmentError
@@ -148,7 +164,6 @@ export function ChatComposer({
   )
   const sendTooltip = agentBusy && canSend ? 'Send follow-up (queued)' : 'Send'
   const micLabel = voiceMicLabel(chatComposerMode, liveConversationActive, Boolean(isListening))
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useComposerPaste({
     textareaRef,
@@ -167,11 +182,11 @@ export function ChatComposer({
     if (!focusChatId) return
     const frame = requestAnimationFrame(() => {
       const el = textareaRef.current
-      if (!el || el.disabled) return
+      if (!el || disabled) return
       el.focus({ preventScroll: true })
     })
     return () => cancelAnimationFrame(frame)
-  }, [focusChatId])
+  }, [focusChatId, disabled])
 
   return (
     <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')}>
@@ -179,6 +194,7 @@ export function ChatComposer({
         ref={zoneRef}
         className={cn(
           composerShellClass,
+          '[app-region:no-drag]',
           disabled && 'opacity-60',
           dragOver && 'border-ring/80 bg-accent/50'
         )}
@@ -191,18 +207,27 @@ export function ChatComposer({
             <textarea
               ref={textareaRef}
               value={value}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={(e) => {
+                if (disabled) return
+                onChange(e.target.value)
+              }}
               placeholder={placeholder}
               rows={1}
-              disabled={disabled}
+              readOnly={disabled}
+              aria-disabled={disabled}
               style={{ height: INPUT_MIN_HEIGHT_PX }}
               className={cn(
                 'block min-h-6 w-full resize-none overflow-hidden bg-transparent',
                 'px-3.5 pt-3.5 pb-1 text-sm leading-5 text-foreground placeholder:text-muted-foreground',
-                'outline-none disabled:cursor-not-allowed'
+                'outline-none',
+                disabled && 'cursor-not-allowed'
               )}
               onInput={(e) => resizeTextarea(e.currentTarget)}
+              onDragEnter={allowFileDragOver}
+              onDragOver={allowFileDragOver}
+              onDrop={onComposerTextareaDrop}
               onKeyDown={(e) => {
+                if (disabled) return
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   if (canSend) onSend()

@@ -7,9 +7,11 @@ import {
   parseLinkPreviewUrl,
   parseSecretProviderId,
   parseSttTranscribeRequest,
+  parseDroppedFilePaths,
   parseStreamChannel,
   parseTtsSynthesizeRequest
 } from '../../src/shared/types/ipc-schemas'
+import { readDroppedFilePaths } from './read-dropped-files'
 import { completeChat, validateOpenRouterKey } from './chat'
 import { streamChat } from './chat-stream'
 import { abortStream, clearStream, registerStreamAbort } from './chat-stream-registry'
@@ -143,6 +145,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('lingo:link:preview', (_e, url: unknown) => {
     try {
       return fetchLinkPreview(parseLinkPreviewUrl(url))
+    } catch (error) {
+      rejectInvalidPayload(error)
+    }
+  })
+
+  ipcMain.handle('lingo:files:readDroppedPaths', (_e, paths: unknown) => {
+    try {
+      return readDroppedFilePaths(parseDroppedFilePaths(paths))
     } catch (error) {
       rejectInvalidPayload(error)
     }
