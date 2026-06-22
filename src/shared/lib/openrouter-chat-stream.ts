@@ -25,8 +25,7 @@ import {
   isSubstantiveReply,
   looksTruncatedOrRefusal,
   shouldForceWebSearch,
-  shouldRetryWebSearchAnswer,
-  shouldUseResearchMode
+  shouldRetryWebSearchAnswer
 } from '@/shared/lib/web-search-intent'
 import {
   formatOpenRouterError,
@@ -34,7 +33,10 @@ import {
 } from '@/shared/lib/openrouter-errors'
 import { openRouterHeaders } from '@/shared/lib/openrouter-headers'
 import { extractAssistantText } from '@/shared/lib/openrouter-model'
-import { stripAssistantRoleMarkup } from '@/shared/lib/strip-assistant-role-markup'
+import {
+  stripAssistantRoleMarkup,
+  stripAssistantStreamSafeMarkup
+} from '@/shared/lib/strip-assistant-role-markup'
 import {
   isLocalWebSearchRegistered
 } from '@/shared/lib/local-web-search-runtime'
@@ -476,6 +478,7 @@ async function fetchCompletionStreaming(
 
   const decoder = new TextDecoder()
   let buffer = ''
+  let rawText = ''
   let text = ''
   let thinkingText = ''
   let finishReason: string | null = null
@@ -515,7 +518,8 @@ async function fetchCompletionStreaming(
 
       const delta = extractStreamDelta(chunk)
       if (delta) {
-        text = stripAssistantRoleMarkup(text + delta)
+        rawText += delta
+        text = stripAssistantStreamSafeMarkup(rawText)
         send({ type: 'text-delta', delta, text })
       }
 
@@ -529,7 +533,7 @@ async function fetchCompletionStreaming(
   }
 
   return {
-    text: stripAssistantRoleMarkup(text),
+    text: stripAssistantRoleMarkup(rawText),
     finishReason
   }
 }
@@ -765,16 +769,14 @@ async function tryNativeWebSearch(
   fetchImpl: OpenRouterFetch
 ): Promise<void> {
   const lastUserMessage = getLastUserMessageContent(apiMessages)
-  const researchMode =
-    shouldForceWebSearch(lastUserMessage) || shouldUseResearchMode(lastUserMessage)
 
   const body = withCustomCompletionExtras(
     request,
     applyCompletionMaxTokens(
       {
         model: userModelId.trim(),
-        messages: buildMessages(apiMessages, practiceLanguage, researchMode ? 'research' : 'practice'),
-        temperature: researchMode ? 0.3 : 0.7
+        messages: buildMessages(apiMessages, practiceLanguage, 'research'),
+        temperature: 0.3
       },
       request
     )
@@ -871,9 +873,7 @@ async function completeTextChat(
     }
   }
 
-  const researchMode =
-    !isCustomBackend(request) &&
-    (shouldForceWebSearch(lastUserMessage) || shouldUseResearchMode(lastUserMessage))
+  const researchMode = shouldForceWebSearch(lastUserMessage)
   const promptMode: PromptMode = researchMode ? 'research' : 'practice'
 
   const body = withCustomCompletionExtras(

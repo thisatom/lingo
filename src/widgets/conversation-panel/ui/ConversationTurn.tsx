@@ -1,53 +1,20 @@
-import type { MessageAttachment } from '@/entities/message/model/attachment'
-import type { PipelineStage } from '@/entities/conversation/model/store'
-import { useConversationStore } from '@/entities/conversation/model/store'
-import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
-import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
+import { memo } from 'react'
 import { cn } from '@/shared/lib/utils'
 import {
+  areConversationTurnPropsEqual,
+  type ConversationTurnRenderProps
+} from '@/widgets/conversation-panel/lib/conversation-turn-render'
+import {
   isThinkingMessageLive,
-  shouldShowThinkingInTurn,
-  type ConversationTurn as Turn
+  shouldShowThinkingInTurn
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { AgentMessage } from './AgentMessage'
 import { AgentThinkingMessage } from './AgentThinkingMessage'
 import { UserMessage } from './UserMessage'
 
-interface ConversationTurnProps {
-  turn: Turn
-  /** Stack order when multiple question headers stick (later turns on top). */
-  turnIndex: number
-  activeChatId: string | null
-  editingUserMessageId: string | null
-  actionsDisabled?: boolean
-  showStopOnUserMessage?: boolean
-  onStopAgent?: () => void
-  voiceSupported?: boolean
-  voiceBusy?: boolean
-  isVoiceListening?: boolean
-  onVoicePress?: () => void
-  onVoiceStop?: () => void
-  onRegisterEditSpeech?: (target: EditSpeechTarget | null) => void
-  onEnterEdit: (messageId: string) => void
-  onExitEdit: () => void
-  onSubmitEdit: (
-    messageId: string,
-    text: string,
-    attachments?: MessageAttachment[]
-  ) => Promise<SubmitEditedUserMessageResult>
-  onAttachmentError?: (message: string) => void
-  /** Last assistant answer id when streaming — throttles markdown parse. */
-  streamingAssistantMessageId?: string
-  agentBusy?: boolean
-  isLatestTurn?: boolean
-  /** Active pipeline stage for the latest turn only (gates live thinking UI). */
-  pipelineStage?: PipelineStage
-  pipelineStreamingAnswer?: boolean
-  liveVoiceUserMessageId?: string | null
-  voiceCaptureLabel?: 'listening' | 'transcribing' | null
-}
+type ConversationTurnProps = ConversationTurnRenderProps
 
-export function ConversationTurn({
+export const ConversationTurn = memo(function ConversationTurn({
   turn,
   turnIndex,
   activeChatId,
@@ -70,10 +37,10 @@ export function ConversationTurn({
   isLatestTurn = false,
   pipelineStage = 'idle',
   pipelineStreamingAnswer = false,
+  pipelineSearchActiveUrl = null,
   voiceCaptureLabel = null
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
-  const pipelineSearchActiveUrl = useConversationStore((s) => s.pipelineSearchActiveUrl)
   const latestAssistantMessageId =
     [...turn.assistantMessages].reverse().find((message) => message.role === 'assistant')?.id ?? null
   const searchUiAssistantMessageId =
@@ -89,7 +56,10 @@ export function ConversationTurn({
 
   return (
     <section
-      className="w-full min-w-0 max-w-full scroll-mt-[18px] space-y-3.5"
+      className={cn(
+        'w-full min-w-0 max-w-full scroll-mt-[18px] space-y-3.5',
+        !isLatestTurn && '[contain:layout_style]'
+      )}
       data-conversation-turn
       data-turn-id={turn.user.id}
     >
@@ -171,7 +141,7 @@ export function ConversationTurn({
                 content={message.content}
                 searchSources={message.searchSources}
                 showSearchSpinner={showSearchSpinner}
-                parseThrottleMs={isAnswerStream ? 120 : undefined}
+                parseThrottleMs={isAnswerStream ? 80 : undefined}
                 showStreamingCursor={isAnswerStream}
               />
             )}
@@ -180,4 +150,4 @@ export function ConversationTurn({
       })}
     </section>
   )
-}
+}, areConversationTurnPropsEqual)

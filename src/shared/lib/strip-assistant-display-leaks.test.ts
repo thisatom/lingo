@@ -39,9 +39,37 @@ In the Russian version the character is called Dora.`
     expect(stripAssistantDisplayLeaks(raw).trim()).toBe('Summary.')
   })
 
-  it('removes single-letter lines as citation debris (assistant leak cleanup)', () => {
-    expect(stripAssistantDisplayLeaks('а')).toBe('')
-    expect(stripAssistantDisplayLeaks('OK')).toBe('')
+  it('keeps short standalone prose lines (only strips them after citation blocks)', () => {
+    expect(stripAssistantDisplayLeaks('а')).toBe('а')
+    expect(stripAssistantDisplayLeaks('OK')).toBe('OK')
+    expect(stripAssistantDisplayLeaks('да нет')).toBe('да нет')
+  })
+
+  it('removes citation debris lines after bracket titles', () => {
+    const raw = `[Broken title]
+ti
+https://example.com
+Real answer line.`
+    expect(stripAssistantDisplayLeaks(raw).trim()).toBe('Real answer line.')
+  })
+
+  it('preserves Russian prose', () => {
+    const raw = `Привет! Чем могу помочь?
+
+В Санкт-Петербурге центральное время совпадает с Москвой — около 19:52:17, что соответствует UTC+3. Это для общения с соседями и местными жителями.`
+    expect(stripAssistantDisplayLeaks(raw)).toBe(raw)
+  })
+
+  it('removes provider safety rating boilerplate', () => {
+    const raw = `User Safety: safe
+Response Safety: safe
+
+Привет! У меня всё хорошо.`
+    expect(stripAssistantDisplayLeaks(raw).trim()).toBe('Привет! У меня всё хорошо.')
+  })
+
+  it('removes agent answer template prefix', () => {
+    expect(stripAssistantDisplayLeaks('agent: ### Answer: Hello there.')).toBe('Hello there.')
   })
 
   it('removes search preamble before tool XML', () => {

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { MessageSearchSource } from '@/entities/message/model/types'
 import { cn } from '@/shared/lib/utils'
 import { MarkdownContent } from '@/shared/ui/markdown-content'
@@ -18,7 +19,7 @@ interface AgentMessageProps {
   showStreamingCursor?: boolean
 }
 
-export function AgentMessage({
+export const AgentMessage = memo(function AgentMessage({
   content,
   searchSources,
   showSearchSpinner = false,
@@ -53,4 +54,4 @@ export function AgentMessage({
       ) : null}
     </ChatTextContextMenu>
   )
-}
+})

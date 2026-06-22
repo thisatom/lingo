@@ -1,8 +1,5 @@
 import { useSettingsStore } from '@/entities/settings/model/store'
-import { detectLocalSearchIntent } from '@/shared/lib/local-search-intent'
 import { enrichSearchResultsWithPageContent } from '@/shared/lib/local-page-research'
-import { fetchLocalDate, fetchLocalTime } from '@/shared/lib/local-search-time'
-import { fetchLocalWeather } from '@/shared/lib/local-search-weather'
 import type { LocalWebSearchProgress } from '@/shared/lib/local-web-search-progress'
 import { performWebsearchQuery } from '@/shared/lib/websearch-query'
 
@@ -258,24 +255,6 @@ async function fetchGeneralWebSearch(query: string, locale: string): Promise<Loc
   return fetchDdgWebSearch(query)
 }
 
-async function fetchSpecializedResults(
-  query: string,
-  locale: string
-): Promise<LocalWebSearchResult[] | null> {
-  const intent = detectLocalSearchIntent(query)
-
-  switch (intent.type) {
-    case 'weather':
-      return fetchLocalWeather(intent.city)
-    case 'time':
-      return fetchLocalTime(intent.city, locale)
-    case 'date':
-      return fetchLocalDate(locale)
-    default:
-      return null
-  }
-}
-
 async function finalizeResults(
   results: LocalWebSearchResult[],
   progress?: LocalWebSearchProgress
@@ -287,18 +266,12 @@ async function finalizeResults(
   return enrichSearchResultsWithPageContent(results, progress)
 }
 
-/** Local search: weather/time APIs + websearch-mcp + DuckDuckGo fallback. */
+/** Local search: websearch-mcp + DuckDuckGo fallback. */
 export async function performLocalWebSearch(
   query: string,
   progress?: LocalWebSearchProgress
 ): Promise<LocalWebSearchResult[]> {
   const locale = resolveSearchLocale(progress?.locale)
-
-  const specialized = await fetchSpecializedResults(query, locale).catch(() => null)
-  if (specialized?.length) {
-    progress?.onInitialResults?.(specialized)
-    return specialized
-  }
 
   const general = await fetchGeneralWebSearch(query, locale)
   progress?.onInitialResults?.(general)

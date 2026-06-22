@@ -1,6 +1,10 @@
 /** Invisible / format chars models use for citation highlights (break words in UI). */
 const INVISIBLE_CHARS = /[\u200B-\u200D\uFEFF\u2060\u00AD]/g
 
+export function stripInvisibleFormatChars(text: string): string {
+  return text.replace(INVISIBLE_CHARS, '')
+}
+
 const WEB_SEARCH_RESPONSE_BLOCK =
   /<WebSearchResponse\b[^>]*>[\s\S]*?<\/WebSearchResponse>/gi
 
@@ -21,6 +25,12 @@ const INDENTED_TOOL_BLOCK =
 const TOOL_PLANNING_PREAMBLE =
   /(?:^|\n)I(?:'|’)ll search for[\s\S]{0,240}\.\s*(?=\n\s*<(?:title|WebSearchResponse))/gi
 
+/** Provider / model safety-classifier boilerplate leaked into visible text. */
+const SAFETY_RATING_BLOCK =
+  /(?:^|\n)User Safety:\s*(?:safe|unsafe)\s*\nResponse Safety:\s*(?:safe|unsafe)\s*(?:\n|$)/gi
+
+const AGENT_ANSWER_PREFIX = /^agent:\s*(?:#{1,6}\s*)?Answer:\s*/im
+
 function isCitationTitleLine(line: string): boolean {
   return /^\[[^\]\n]{2,200}\]$/.test(line.trim())
 }
@@ -29,15 +39,11 @@ function isCitationUrlLine(line: string): boolean {
   return /^https?:\/\/\S+$/i.test(line.trim())
 }
 
-/** Single-letter lines or tiny fragments left after citation span stripping. */
+/** Isolated 1–2 letter lines left after citation span stripping (not normal prose). */
 function isBrokenCitationFragment(line: string): boolean {
   const t = line.trim()
   if (!t) return false
-  if (t.length <= 2 && /\p{L}/u.test(t)) return true
-  if (t.length > 32) return false
-  const words = t.split(/\s+/).filter(Boolean)
-  if (words.length >= 2 && words.every((w) => w.length <= 3)) return true
-  return false
+  return t.length <= 2 && /\p{L}/u.test(t)
 }
 
 function stripBracketCitationBlocks(text: string): string {
@@ -53,10 +59,6 @@ function stripBracketCitationBlocks(text: string): string {
       ) {
         i++
       }
-      continue
-    }
-    if (isBrokenCitationFragment(lines[i])) {
-      i++
       continue
     }
     out.push(lines[i])
@@ -100,7 +102,9 @@ function stripOrphanCitationUrls(text: string): string {
 export function stripAssistantDisplayLeaks(text: string): string {
   if (!text) return text
 
-  let s = text.replace(INVISIBLE_CHARS, '')
+  let s = stripInvisibleFormatChars(text)
+  s = s.replace(SAFETY_RATING_BLOCK, '\n')
+  s = s.replace(AGENT_ANSWER_PREFIX, '')
   s = s.replace(TOOL_PLANNING_PREAMBLE, '\n')
   s = stripFencedToolBlocks(s)
   s = s.replace(WEB_SEARCH_RESPONSE_BLOCK, '')

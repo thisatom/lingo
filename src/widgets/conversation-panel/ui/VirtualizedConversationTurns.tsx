@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { createRafCoalescer } from '@/shared/lib/raf-coalesce'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { PipelineStage } from '@/entities/conversation/model/store'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
@@ -22,6 +23,7 @@ type VirtualizedConversationTurnsProps = {
   actionsDisabled?: boolean
   agentBusy?: boolean
   pipelineStreamingAnswer?: boolean
+  pipelineSearchActiveUrl?: string | null
   /** Live thinking in thread only when pipeline is in `thinking`. */
   stage: PipelineStage
   onStopAgent?: () => void
@@ -40,7 +42,7 @@ type VirtualizedConversationTurnsProps = {
   ) => Promise<SubmitEditedUserMessageResult>
   onAttachmentError?: (message: string) => void
   liveVoiceUserMessageId?: string | null
-  /** Called after the tail turn height is remeasured during an active agent reply. */
+  /** Called after the tail turn height changes during an active agent reply. */
   onTailContentChange?: () => void
 }
 
@@ -52,6 +54,7 @@ export function VirtualizedConversationTurns({
   actionsDisabled,
   agentBusy,
   pipelineStreamingAnswer = false,
+  pipelineSearchActiveUrl = null,
   stage,
   onStopAgent,
   voiceSupported,
@@ -67,7 +70,13 @@ export function VirtualizedConversationTurns({
   liveVoiceUserMessageId = null,
   onTailContentChange
 }: VirtualizedConversationTurnsProps) {
-  const measureRafRef = useRef<number | null>(null)
+  const tailCoalescerRef = useRef(createRafCoalescer(() => onTailContentChange?.()))
+
+  useEffect(() => {
+    tailCoalescerRef.current.cancel()
+    tailCoalescerRef.current = createRafCoalescer(() => onTailContentChange?.())
+    return () => tailCoalescerRef.current.cancel()
+  }, [onTailContentChange])
 
   const virtualizer = useVirtualizer({
     count: turns.length,
@@ -85,24 +94,15 @@ export function VirtualizedConversationTurns({
 
   useEffect(() => {
     if (!agentBusy) return
-    if (measureRafRef.current != null) cancelAnimationFrame(measureRafRef.current)
-    measureRafRef.current = requestAnimationFrame(() => {
-      measureRafRef.current = null
-      virtualizer.measure()
-      onTailContentChange?.()
-    })
-    return () => {
-      if (measureRafRef.current != null) cancelAnimationFrame(measureRafRef.current)
-    }
-  }, [agentBusy, onTailContentChange, turns.length, tailAssistantLen, tailThinkingLen, virtualizer])
-
-  const items = virtualizer.getVirtualItems()
-  const totalSize = virtualizer.getTotalSize()
+    tailCoalescerRef.current.schedule()
+  }, [agentBusy, turns.length, tailAssistantLen, tailThinkingLen])
 
   useEffect(() => {
     if (!scrollElement) return
     virtualizer.measure()
-  }, [scrollElement, totalSize, turns.length, virtualizer])
+  }, [scrollElement, turns.length, virtualizer])
+
+  const items = virtualizer.getVirtualItems()
 
   return (
     <div
@@ -153,6 +153,7 @@ export function VirtualizedConversationTurns({
               pipelineStreamingAnswer={
                 agentBusy && isLatestTurn ? pipelineStreamingAnswer : false
               }
+              pipelineSearchActiveUrl={isLatestTurn ? pipelineSearchActiveUrl : null}
               streamingAssistantMessageId={
                 agentBusy && isLatestTurn && pipelineStreamingAnswer
                   ? lastAssistantMessageId(turn.assistantMessages)

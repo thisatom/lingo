@@ -1,7 +1,6 @@
 import {
   isSubstantiveReply,
-  looksTruncatedOrRefusal,
-  shouldUseResearchMode
+  looksTruncatedOrRefusal
 } from '@/shared/lib/web-search-intent'
 
 /** Reply likely stopped before a natural sentence end (token limit or stream cut). */
@@ -40,14 +39,17 @@ export function shouldRetryIncompleteCompletion({
   customBackend = false
 }: IncompleteCompletionCheck): boolean {
   if (finishReason === 'length') return true
-  if (customBackend && !looksTruncatedOrRefusal(answer) && !looksCutOffMidSentence(answer)) {
-    return false
+  if (customBackend) {
+    if (!requireSubstantive) return false
+    const question = userMessage.trim()
+    if (!question) return false
+    return !isSubstantiveReply(answer, question)
   }
   if (looksTruncatedOrRefusal(answer) || looksCutOffMidSentence(answer)) return true
   if (!requireSubstantive) return false
   const question = userMessage.trim()
   if (!question) return false
-  if (shouldUseResearchMode(question) && !isSubstantiveReply(answer, question)) return true
+  if (!isSubstantiveReply(answer, question)) return true
   return false
 }
 

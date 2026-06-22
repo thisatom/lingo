@@ -1,37 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import {
-  shouldRetryWebSearchAnswer,
-  shouldRunWebSearch,
-  shouldUseResearchMode
+  isSubstantiveReply,
+  looksTruncatedOrRefusal,
+  shouldForceWebSearch,
+  shouldRetryWebSearchAnswer
 } from './web-search-intent'
 
-describe('shouldRunWebSearch', () => {
-  it('skips very short casual phrases', () => {
-    expect(shouldRunWebSearch('hi')).toBe(false)
-    expect(shouldRunWebSearch('ok thanks')).toBe(false)
+describe('shouldForceWebSearch', () => {
+  it('matches explicit search requests only', () => {
+    expect(shouldForceWebSearch('search the web for X')).toBe(true)
+    expect(shouldForceWebSearch('загугли в интернете')).toBe(true)
+    expect(shouldForceWebSearch('как у тебя дела')).toBe(false)
+    expect(shouldForceWebSearch('который час')).toBe(false)
+    expect(shouldForceWebSearch('What is quantum computing?')).toBe(false)
+  })
+})
+
+describe('looksTruncatedOrRefusal', () => {
+  it('does not flag complete short factual lines', () => {
+    expect(looksTruncatedOrRefusal('Сейчас в Москве: 03:14:32.')).toBe(false)
   })
 
-  it('runs for explicit search and factual questions', () => {
-    expect(shouldRunWebSearch('search the web for X')).toBe(true)
-    expect(shouldRunWebSearch('What year is it?')).toBe(true)
-    expect(shouldRunWebSearch('Tell me about the history of Rome in detail')).toBe(true)
+  it('flags cut-off mid-word lines', () => {
+    expect(looksTruncatedOrRefusal('Сейчас в Москве 03:14:32 (т')).toBe(true)
   })
 })
 
 describe('shouldRetryWebSearchAnswer', () => {
-  it('does not retry casual short replies', () => {
-    expect(shouldRetryWebSearchAnswer('yes', 'hi', null)).toBe(false)
+  it('retries on length finish', () => {
+    expect(shouldRetryWebSearchAnswer('short', 'anything', 'length')).toBe(true)
   })
 
-  it('retries on length finish for research queries', () => {
-    expect(shouldRetryWebSearchAnswer('short', 'What is quantum computing?', 'length')).toBe(
-      true
-    )
+  it('does not retry complete short replies to short prompts', () => {
+    expect(shouldRetryWebSearchAnswer('Привет! У меня всё хорошо.', 'как дела?', null)).toBe(false)
   })
 })
 
-describe('shouldUseResearchMode', () => {
-  it('still treats length >= 8 as research prompt mode', () => {
-    expect(shouldUseResearchMode('hello there')).toBe(true)
+describe('isSubstantiveReply', () => {
+  it('accepts normal greeting replies', () => {
+    expect(isSubstantiveReply('Привет! У меня всё хорошо.', 'как у тебя дела')).toBe(true)
   })
 })

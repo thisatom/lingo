@@ -1,5 +1,5 @@
 import { Fragment, memo, useMemo } from 'react'
-import { useThrottledValue } from '@/shared/lib/use-throttled-value'
+import { useStreamMarkdownValue } from '@/shared/lib/use-throttled-value'
 import ReactMarkdown from 'react-markdown'
 import type { PluggableList } from 'unified'
 import rehypeHighlight from 'rehype-highlight'
@@ -92,7 +92,8 @@ function MarkdownContentInner({
   showStreamingCursor = false
 }: MarkdownContentProps) {
   const throttleMs = parseThrottleMs ?? 0
-  const parsedSource = useThrottledValue(content, throttleMs, throttleMs > 0)
+  const streamingParse = throttleMs > 0
+  const parsedSource = useStreamMarkdownValue(content, streamingParse, throttleMs)
   const resolvedVariant =
     variant === 'typography' || variant === 'default'
       ? 'agent'

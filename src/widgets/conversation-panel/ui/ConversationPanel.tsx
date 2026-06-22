@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createRafCoalescer } from '@/shared/lib/raf-coalesce'
 import { AgentChatScrollArea } from './AgentChatScrollArea'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
@@ -135,6 +136,7 @@ export function ConversationPanel({
   const setChatScrollPosition = useChatsStore((s) => s.setChatScrollPosition)
   const queueAheadPreview = useConversationStore((s) => s.queueAheadPreview)
   const pipelineStreamingAnswer = useConversationStore((s) => s.pipelineStreamingAnswer)
+  const pipelineSearchActiveUrl = useConversationStore((s) => s.pipelineSearchActiveUrl)
   const clearChatScrollPosition = useChatsStore((s) => s.clearChatScrollPosition)
   const [chatsStoreHydrated, setChatsStoreHydrated] = useState(() =>
     useChatsStore.persist.hasHydrated()
@@ -432,6 +434,18 @@ export function ConversationPanel({
     atBottomRef.current = true
   }, [agentBusy, onAtBottomChange, scrollToLatest])
 
+  const stickCoalescerRef = useRef(createRafCoalescer(() => stickToBottomIfFollowing()))
+
+  useEffect(() => {
+    stickCoalescerRef.current.cancel()
+    stickCoalescerRef.current = createRafCoalescer(() => stickToBottomIfFollowing())
+    return () => stickCoalescerRef.current.cancel()
+  }, [stickToBottomIfFollowing])
+
+  const scheduleStickToBottomIfFollowing = useCallback(() => {
+    stickCoalescerRef.current.schedule()
+  }, [])
+
   useEffect(() => {
     const prevChatId = prevRestoreChatIdRef.current
     const chatChanged = prevChatId !== activeChatId
@@ -511,6 +525,7 @@ export function ConversationPanel({
 
   useEffect(() => {
     return () => {
+      stickCoalescerRef.current.cancel()
       if (scrollMemoryRafRef.current != null) {
         cancelAnimationFrame(scrollMemoryRafRef.current)
       }
@@ -693,13 +708,13 @@ export function ConversationPanel({
     if (!content) return
 
     const onContentResize = () => {
-      stickToBottomIfFollowing()
+      scheduleStickToBottomIfFollowing()
     }
 
     const observer = new ResizeObserver(onContentResize)
     observer.observe(content)
     return () => observer.disconnect()
-  }, [activeChatId, hasVisibleMessages, stickToBottomIfFollowing])
+  }, [activeChatId, hasVisibleMessages, scheduleStickToBottomIfFollowing])
 
   useLayoutEffect(() => {
     const messagesGrew = messages.length > prevMessagesLengthRef.current
@@ -725,8 +740,6 @@ export function ConversationPanel({
       return
     }
 
-    const viewport = viewportRef.current
-
     const contentChanged =
       tailChanged || messagesGrew || statusAppeared || agentJustStarted
 
@@ -737,15 +750,14 @@ export function ConversationPanel({
       return
     }
 
-    stickToBottomIfFollowing()
+    scheduleStickToBottomIfFollowing()
   }, [
     agentBusy,
     followBottom,
     messages.length,
     showStatus,
     tailScrollSignature,
-    stickToBottomIfFollowing,
-    onAtBottomChange
+    scheduleStickToBottomIfFollowing
   ])
 
   const showEmptyPrompt = !hasVisibleMessages && !showStatus
@@ -798,7 +810,8 @@ export function ConversationPanel({
                 }
                 onAttachmentError={onAttachmentError}
                 liveVoiceUserMessageId={liveVoiceUserMessageId}
-                onTailContentChange={stickToBottomIfFollowing}
+                onTailContentChange={scheduleStickToBottomIfFollowing}
+                pipelineSearchActiveUrl={pipelineSearchActiveUrl}
               />
             ) : (
               turns.map((turn, turnIndex) => {
@@ -832,6 +845,9 @@ export function ConversationPanel({
                     pipelineStage={isLatestTurn ? stage : 'idle'}
                     pipelineStreamingAnswer={
                       agentBusy && isLatestTurn ? pipelineStreamingAnswer : false
+                    }
+                    pipelineSearchActiveUrl={
+                      isLatestTurn ? pipelineSearchActiveUrl : null
                     }
                     liveVoiceUserMessageId={liveVoiceUserMessageId}
                     voiceCaptureLabel={voiceCaptureLabelForUserMessage(
