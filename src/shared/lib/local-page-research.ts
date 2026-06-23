@@ -13,6 +13,18 @@ const SKIP_HOST_SUFFIXES = ['duckduckgo.com', 'open-meteo.com', 'wttr.in']
 
 const SKIP_PATH_EXT = /\.(pdf|zip|rar|7z|exe|dmg|mp4|mp3|avi|mkv)(\?|$)/i
 
+function fetchSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs)
+  if (!signal) return timeout
+  return AbortSignal.any([signal, timeout])
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError')
+  }
+}
+
 function resolveResultUrl(raw: string): string | null {
   const trimmed = raw.trim()
   if (!trimmed) return null
@@ -72,7 +84,7 @@ async function readHtmlLimited(response: Response): Promise<string> {
   return html
 }
 
-async function fetchViaJinaReader(url: string): Promise<string | null> {
+async function fetchViaJinaReader(url: string, signal?: AbortSignal): Promise<string | null> {
   const readerUrl = `https://r.jina.ai/${url}`
   try {
     const response = await fetch(readerUrl, {
@@ -80,7 +92,7 @@ async function fetchViaJinaReader(url: string): Promise<string | null> {
         Accept: 'text/plain',
         'User-Agent': SEARCH_USER_AGENT
       },
-      signal: AbortSignal.timeout(PAGE_FETCH_TIMEOUT_MS)
+      signal: fetchSignal(signal, PAGE_FETCH_TIMEOUT_MS)
     })
     if (!response.ok) return null
     const text = (await response.text()).trim()
@@ -93,7 +105,8 @@ async function fetchViaJinaReader(url: string): Promise<string | null> {
   }
 }
 
-async function fetchPageContent(url: string): Promise<string | null> {
+async function fetchPageContent(url: string, signal?: AbortSignal): Promise<string | null> {
+  throwIfAborted(signal)
   try {
     const response = await fetch(url, {
       headers: {
@@ -101,30 +114,30 @@ async function fetchPageContent(url: string): Promise<string | null> {
         'User-Agent': SEARCH_USER_AGENT
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(PAGE_FETCH_TIMEOUT_MS)
+      signal: fetchSignal(signal, PAGE_FETCH_TIMEOUT_MS)
     })
 
-    if (!response.ok) return fetchViaJinaReader(url)
+    if (!response.ok) return fetchViaJinaReader(url, signal)
 
     const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
     if (contentType.includes('text/plain') && !contentType.includes('html')) {
       const plain = (await response.text()).trim()
       return plain.length > 60
         ? plain.slice(0, MAX_CONTENT_PER_PAGE)
-        : fetchViaJinaReader(url)
+        : fetchViaJinaReader(url, signal)
     }
 
     if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
-      return fetchViaJinaReader(url)
+      return fetchViaJinaReader(url, signal)
     }
 
     const html = await readHtmlLimited(response)
     const extracted = extractTextFromHtml(html, MAX_CONTENT_PER_PAGE)
     if (extracted.length >= 120) return extracted
 
-    return fetchViaJinaReader(url)
+    return fetchViaJinaReader(url, signal)
   } catch {
-    return fetchViaJinaReader(url)
+    return fetchViaJinaReader(url, signal)
   }
 }
 
@@ -142,10 +155,13 @@ export async function enrichSearchResultsWithPageContent(
 
   if (candidates.length === 0) return results
 
+  const signal = progress?.signal
+
   const fetched = await Promise.all(
     candidates.map(async ({ result, index, url }) => {
+      throwIfAborted(signal)
       progress?.onVisitingUrl?.(url)
-      const pageContent = await fetchPageContent(url)
+      const pageContent = await fetchPageContent(url, signal)
       return { index, pageContent, url }
     })
   )

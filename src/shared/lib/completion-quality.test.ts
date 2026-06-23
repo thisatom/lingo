@@ -6,10 +6,15 @@ import {
 } from './completion-quality'
 
 describe('looksCutOffMidSentence', () => {
-  it('flags long replies without terminal punctuation', () => {
-    const cut = 'a'.repeat(150)
-    expect(looksCutOffMidSentence(cut)).toBe(true)
-    expect(looksCutOffMidSentence(`${cut}.`)).toBe(false)
+  it('flags unclosed code fences and abrupt clause endings', () => {
+    expect(looksCutOffMidSentence('```ts\nconst x = 1')).toBe(true)
+    expect(looksCutOffMidSentence(`${'word '.repeat(30)},`)).toBe(true)
+  })
+
+  it('does not flag long prose without terminal punctuation alone', () => {
+    const prose = 'a'.repeat(150)
+    expect(looksCutOffMidSentence(prose)).toBe(false)
+    expect(looksCutOffMidSentence(`${prose}.`)).toBe(false)
   })
 })
 
@@ -35,7 +40,29 @@ describe('shouldRetryIncompleteCompletion', () => {
     ).toBe(false)
   })
 
-  it('skips heuristic retry for custom backends (only length)', () => {
+  it('does not retry long unpunctuated answers without stronger cut signals', () => {
+    const cut = 'a'.repeat(150)
+    expect(
+      shouldRetryIncompleteCompletion({
+        answer: cut,
+        finishReason: 'stop',
+        userMessage: 'hello'
+      })
+    ).toBe(false)
+  })
+
+  it('retries cut-off answers for custom backends when finish_reason is stop', () => {
+    expect(
+      shouldRetryIncompleteCompletion({
+        answer: `${'word '.repeat(30)},`,
+        finishReason: 'stop',
+        userMessage: 'hello',
+        customBackend: true
+      })
+    ).toBe(true)
+  })
+
+  it('skips heuristic retry for custom backends without cut signals', () => {
     const cut = 'a'.repeat(150)
     expect(
       shouldRetryIncompleteCompletion({
@@ -57,7 +84,15 @@ describe('shouldRetryIncompleteCompletion', () => {
 })
 
 describe('mergeContinuationAnswer', () => {
-  it('concatenates prefix and continuation', () => {
-    expect(mergeContinuationAnswer('part one', 'part two')).toBe('part onepart two')
+  it('inserts a word boundary when continuation continues alphanumeric text', () => {
+    expect(mergeContinuationAnswer('part one', 'part two')).toBe('part one part two')
+  })
+
+  it('preserves an explicit leading space in the continuation chunk', () => {
+    expect(mergeContinuationAnswer('Short', ' complete answer.')).toBe('Short complete answer.')
+  })
+
+  it('keeps hyphenated continuations attached', () => {
+    expect(mergeContinuationAnswer('multi-', 'part word')).toBe('multi-part word')
   })
 })

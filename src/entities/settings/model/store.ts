@@ -244,7 +244,7 @@ const DEFAULT_SETTINGS: Omit<
   ttsVoiceId: TTS_VOICE_AUTO,
   ttsVolume: TTS_VOLUME_DEFAULT,
   chatComposerMode: 'text',
-  webSearchEnabled: true,
+  webSearchEnabled: false,
   modelAutoFallback: true,
   llmMaxTokens: LLM_MAX_TOKENS_DEFAULT,
   sidebarShowDateGroups: true,

@@ -10,6 +10,7 @@ import { useThemeSync } from '@/app/hooks/use-theme-sync'
 import { useWindowTitle } from '@/app/hooks/use-window-title'
 import { useNewChatHotkey } from '@/features/chat/model/useNewChatHotkey'
 import { useAppReady } from '@/shared/lib/hooks/use-app-ready'
+import { useIsMobile } from '@/shared/lib/hooks/use-mobile'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/shared/ui/resizable'
 import { SidebarInset, SidebarProvider } from '@/shared/ui/sidebar'
 import { TooltipProvider } from '@/shared/ui/tooltip'
@@ -23,6 +24,15 @@ export function AppLayout() {
   const reconcileActiveChat = useChatsStore((s) => s.reconcileActiveChat)
   const sidebarPanelRef = usePanelRef()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const isMobile = useIsMobile()
+
+  useEffect(() => {
+    if (!isMobile) return
+    const panel = sidebarPanelRef.current
+    if (!panel || panel.isCollapsed()) return
+    panel.collapse()
+    setSidebarCollapsed(true)
+  }, [isMobile, sidebarPanelRef])
 
   useEffect(() => {
     if (useChatsStore.persist.hasHydrated()) {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useSettingsStore } from '@/entities/settings/model/store'
 import {
   Collapsible,
   CollapsibleContent,
@@ -37,11 +38,29 @@ function ThinkingReasoningScroll({
   className?: string
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null)
+  const userPinnedAwayRef = useRef(false)
+
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el || !pinToBottom) {
+      userPinnedAwayRef.current = false
+      return
+    }
+
+    const onScroll = () => {
+      const gap = el.scrollHeight - el.scrollTop - el.clientHeight
+      userPinnedAwayRef.current = gap > 28
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [pinToBottom])
 
   useEffect(() => {
     if (!pinToBottom) return
     const el = viewportRef.current
     if (!el) return
+    if (userPinnedAwayRef.current) return
     el.scrollTop = el.scrollHeight
   }, [content, pinToBottom])
 
@@ -68,7 +87,7 @@ function ThinkingReasoningBody({ content, pinToBottom }: { content: string; pinT
     <ThinkingReasoningScroll content={content} pinToBottom={pinToBottom}>
       <MarkdownContent
         content={content}
-        variant="typography"
+        variant="thinking"
         parseThrottleMs={pinToBottom ? 120 : undefined}
         className={cn(thinkingReasoningClass, chatSelectableClass)}
       />
@@ -77,6 +96,8 @@ function ThinkingReasoningBody({ content, pinToBottom }: { content: string; pinT
 }
 
 function ThinkingTriggerLabel({ live, summary }: { live: boolean; summary: string }) {
+  const reduceUiMotion = useSettingsStore((s) => s.reduceUiMotion)
+
   if (live) {
     return (
       <ShinyText
@@ -86,6 +107,7 @@ function ThinkingTriggerLabel({ live, summary }: { live: boolean; summary: strin
         shineColor="var(--foreground)"
         speed={2.2}
         spread={110}
+        disabled={reduceUiMotion}
       />
     )
   }

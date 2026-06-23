@@ -39,14 +39,11 @@ describe('stopAgentOnChatDeleted', () => {
     expect(executeAgentStopMock).not.toHaveBeenCalled()
   })
 
-  it('force-stops when the deleted chat pipeline was still busy', () => {
-    const chatId = 'busy-deleted'
+  it('does not force-stop when another chat is streaming', () => {
+    setAgentStreamSession('other-chat', true)
 
-    stopAgentOnChatDeleted(chatId, { pipelineBusy: true })
+    stopAgentOnChatDeleted('busy-deleted')
 
-    expect(executeAgentStopMock).toHaveBeenCalledWith(
-      { chatId, force: true },
-      expect.any(Object)
-    )
+    expect(executeAgentStopMock).not.toHaveBeenCalled()
   })
 })

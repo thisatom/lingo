@@ -1,18 +1,56 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildWebSearchQuery,
   isSubstantiveReply,
   looksTruncatedOrRefusal,
   shouldForceWebSearch,
-  shouldRetryWebSearchAnswer
+  shouldRetryWebSearchAnswer,
+  shouldUseWebSearchForMessage
 } from './web-search-intent'
+
+describe('buildWebSearchQuery', () => {
+  it('strips explicit search phrases from the lookup query', () => {
+    expect(buildWebSearchQuery('search the web for latest Mars news')).toBe('latest Mars news')
+    expect(buildWebSearchQuery('загугли в интернете погоду в Париже')).toBe('погоду в Париже')
+  })
+
+  it('falls back to the original message when stripping leaves nothing', () => {
+    expect(buildWebSearchQuery('search the web')).toBe('search the web')
+  })
+})
 
 describe('shouldForceWebSearch', () => {
   it('matches explicit search requests only', () => {
     expect(shouldForceWebSearch('search the web for X')).toBe(true)
+    expect(shouldForceWebSearch('google search for X')).toBe(true)
     expect(shouldForceWebSearch('загугли в интернете')).toBe(true)
+    expect(shouldForceWebSearch('google')).toBe(false)
     expect(shouldForceWebSearch('как у тебя дела')).toBe(false)
     expect(shouldForceWebSearch('который час')).toBe(false)
     expect(shouldForceWebSearch('What is quantum computing?')).toBe(false)
+  })
+})
+
+describe('shouldUseWebSearchForMessage', () => {
+  it('allows factual questions when toggle permits search', () => {
+    expect(shouldUseWebSearchForMessage('What is quantum computing in simple terms?')).toBe(true)
+    expect(shouldUseWebSearchForMessage('What is the weather in Paris today?')).toBe(true)
+  })
+
+  it('skips small talk and local time/date', () => {
+    expect(shouldUseWebSearchForMessage('как у тебя дела')).toBe(false)
+    expect(shouldUseWebSearchForMessage('который час')).toBe(false)
+    expect(shouldUseWebSearchForMessage('hi there')).toBe(false)
+  })
+
+  it('honors explicit search requests', () => {
+    expect(shouldUseWebSearchForMessage('search the web for X')).toBe(true)
+  })
+
+  it('allows short factual wh-questions', () => {
+    expect(shouldUseWebSearchForMessage('Who won?')).toBe(true)
+    expect(shouldUseWebSearchForMessage('Why now?')).toBe(true)
+    expect(shouldUseWebSearchForMessage('ok?')).toBe(false)
   })
 })
 

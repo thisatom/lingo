@@ -68,7 +68,7 @@ export function ChatMessageQueue({
         </div>
         <button
           type="button"
-          className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="flex shrink-0 cursor-pointer items-center gap-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
           aria-expanded={!listCollapsed}
           aria-controls="chat-message-queue-list"
           onClick={() => setListCollapsed((collapsed) => !collapsed)}
@@ -89,7 +89,7 @@ export function ChatMessageQueue({
             return (
               <li
                 key={item.id}
-                className="group flex min-h-8 items-center gap-2 px-3 py-1 transition-colors hover:bg-accent/60"
+                className="group flex min-h-8 items-center gap-2 px-3 py-1"
               >
                 {isEditing ? (
                   <textarea
@@ -129,7 +129,9 @@ export function ChatMessageQueue({
                 <div
                   className={cn(
                     'flex shrink-0 items-center gap-0.5 transition-opacity',
-                    isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    isEditing
+                      ? 'pointer-events-auto opacity-100'
+                      : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'
                   )}
                 >
                   <TooltipIconButton
@@ -139,6 +141,7 @@ export function ChatMessageQueue({
                     className="size-7 text-muted-foreground hover:text-foreground"
                     tooltip="Edit"
                     aria-label="Edit queued message"
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => startEdit(item)}
                   >
                     <Pencil className="size-3.5" />
@@ -150,6 +153,7 @@ export function ChatMessageQueue({
                     className="size-7 text-muted-foreground hover:text-foreground"
                     tooltip="Send now"
                     aria-label="Send queued message now"
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => onSendNow(item.id)}
                   >
                     <ArrowUp className="size-3.5" />
@@ -161,6 +165,7 @@ export function ChatMessageQueue({
                     className="size-7 text-muted-foreground hover:text-foreground"
                     tooltip="Remove"
                     aria-label="Remove from queue"
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => onRemove(item.id)}
                   >
                     <Trash2 className="size-3.5" />

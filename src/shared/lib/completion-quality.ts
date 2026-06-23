@@ -6,10 +6,11 @@ import {
 /** Reply likely stopped before a natural sentence end (token limit or stream cut). */
 export function looksCutOffMidSentence(answer: string): boolean {
   const reply = answer.trim()
-  if (reply.length < 100) return false
-  if (/[.!?…)"'\]]$/.test(reply)) return false
   if (/```[\s\S]*$/.test(reply) && !/```[\s\S]*```/.test(reply)) return true
-  return true
+  if (reply.length < 100) return false
+  if (/[.!?…)"'\]\u3002\uFF01\uFF1F\uFF09]$/.test(reply)) return false
+  if (/[,;:—–\-(\[{«\u201C]$/.test(reply)) return true
+  return false
 }
 
 export type IncompleteCompletionCheck = {
@@ -26,9 +27,16 @@ export type IncompleteCompletionCheck = {
 export function mergeContinuationAnswer(prefix: string, continuation: string): string {
   const head = prefix.trimEnd()
   const tail = continuation.trimStart()
-  if (!head) return tail
+  if (!head) return continuation.trim()
   if (!tail) return head
-  return `${head}${tail}`
+  if (/^\s/.test(continuation)) {
+    return `${head} ${tail}`
+  }
+  const needsSpace =
+    /[\p{L}\p{N}]$/u.test(head) &&
+    /^[\p{L}\p{N}]/u.test(tail) &&
+    !/[-–—/([{'"`]$/u.test(head)
+  return needsSpace ? `${head} ${tail}` : `${head}${tail}`
 }
 
 export function shouldRetryIncompleteCompletion({
@@ -40,6 +48,8 @@ export function shouldRetryIncompleteCompletion({
 }: IncompleteCompletionCheck): boolean {
   if (finishReason === 'length') return true
   if (customBackend) {
+    if (finishReason === 'length') return true
+    if (looksCutOffMidSentence(answer)) return true
     if (!requireSubstantive) return false
     const question = userMessage.trim()
     if (!question) return false

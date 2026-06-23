@@ -1,4 +1,7 @@
-import { CHAT_SCROLL_BOTTOM_THRESHOLD_PX } from '@/shared/lib/chat-scroll-threshold'
+import {
+  CHAT_SCROLL_AGENT_BUSY_THRESHOLD_PX,
+  CHAT_SCROLL_BOTTOM_THRESHOLD_PX
+} from '@/shared/lib/chat-scroll-threshold'
 import {
   distanceFromViewportBottom,
   getViewportMaxScrollTop,
@@ -14,8 +17,8 @@ export const CHAT_FOLLOW_BOTTOM_THRESHOLD_PX = CHAT_SCROLL_BOTTOM_THRESHOLD_PX
 export type ChatScrollFollowState = {
   pinToBottom: boolean
   isRestoring: boolean
-  /** Agent turn in progress — keep following unless user scrolls up. */
-  agentReplyActive?: boolean
+  /** When true, only follow if closer to the bottom (streaming tail growth). */
+  agentBusy?: boolean
 }
 
 export function distanceFromChatBottom(viewport: HTMLElement): number {
@@ -39,8 +42,12 @@ export function shouldStickToBottom(
 ): boolean {
   if (state.isRestoring) return false
   if (state.pinToBottom) return true
-  if (state.agentReplyActive) return true
-  if (viewport) return isViewportNearChatBottom(viewport)
+  if (viewport) {
+    const threshold = state.agentBusy
+      ? CHAT_SCROLL_AGENT_BUSY_THRESHOLD_PX
+      : CHAT_SCROLL_BOTTOM_THRESHOLD_PX
+    return isViewportNearChatBottom(viewport, threshold)
+  }
   return false
 }
 
@@ -52,9 +59,15 @@ export function stickChatViewportToBottom(
   onAtBottomChange?.(true)
 }
 
-/** Tracks streaming tail growth (assistant + thinking) for auto-follow. */
+export type ChatTailScrollExtras = {
+  pipelineStage?: string
+  pipelineSearchActiveUrl?: string | null
+}
+
+/** Tracks streaming tail growth (assistant + thinking) and pipeline UI for auto-follow. */
 export function buildChatTailScrollSignature(
-  messages: readonly { id: string; role: string; content: string }[]
+  messages: readonly { id: string; role: string; content: string }[],
+  extras?: ChatTailScrollExtras
 ): string {
   if (messages.length === 0) return '0'
   const last = messages[messages.length - 1]!
@@ -66,5 +79,9 @@ export function buildChatTailScrollSignature(
       break
     }
   }
-  return `${messages.length}:${last.id}:${last.content.length}:${last.role}:t${thinkingLen}`
+  const base = `${messages.length}:${last.id}:${last.content.length}:${last.role}:t${thinkingLen}`
+  if (!extras) return base
+  const stage = extras.pipelineStage ?? ''
+  const searchUrl = extras.pipelineSearchActiveUrl ?? ''
+  return `${base}:st${stage}:su${searchUrl}`
 }

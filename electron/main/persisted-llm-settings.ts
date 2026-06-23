@@ -27,7 +27,7 @@ const READ_LLM_SETTINGS_SCRIPT = `
       customModelId: typeof s.customModelId === 'string' ? s.customModelId : '',
       customLlmProfileJson: typeof s.customLlmProfileJson === 'string' ? s.customLlmProfileJson : '',
       webSearchEnabled:
-        typeof s.webSearchEnabled === 'boolean' ? s.webSearchEnabled : true,
+        typeof s.webSearchEnabled === 'boolean' ? s.webSearchEnabled : false,
       modelAutoFallback: Boolean(s.modelAutoFallback),
       llmMaxTokens: typeof s.llmMaxTokens === 'number' ? s.llmMaxTokens : 2048
     };

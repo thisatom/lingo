@@ -23,7 +23,7 @@ export const typography = {
   ul: `my-2.5 ml-5 list-disc space-y-1 ${chatTextClass} text-foreground [&>li]:mt-0`,
   ol: `my-2.5 ml-5 list-decimal space-y-1 ${chatTextClass} text-foreground [&>li]:mt-0`,
   li: `${chatTextClass} marker:text-muted-foreground [&>p]:my-0`,
-  a: 'font-medium text-foreground underline decoration-border underline-offset-[3px] hover:text-foreground/80',
+  a: 'cursor-pointer font-medium text-foreground underline decoration-border underline-offset-[3px] hover:text-foreground/80',
   strong: 'font-semibold text-foreground',
   em: 'italic text-foreground',
   inlineCode: `rounded-md border border-border/60 bg-muted/70 px-1 py-0.5 ${codeTextClass} font-medium text-foreground`,

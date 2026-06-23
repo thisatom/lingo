@@ -150,8 +150,8 @@ export function AgentSettingsForm() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Web search</p>
             <p className={settingsRowDescriptionClass}>
-              Let the agent search the web for fresh information when needed. Also toggled in the
-              composer.
+              Allow the agent to search the web for factual or current questions when you ask.
+              Also toggled in the composer.
             </p>
           </div>
           <Switch

@@ -32,7 +32,7 @@ export function SettingsPage() {
         </div>
       )}
 
-      <CustomScrollArea variant="chat" className="min-h-0 flex-1">
+      <CustomScrollArea variant="sidebar" className="min-h-0 flex-1">
         <div className="p-4">
           <div className={settingsPageContentClass}>
             {resolvedSection === 'general' && <UserSettingsForm />}

@@ -2,6 +2,40 @@ export function getMaxScrollTop(viewport: HTMLElement): number {
   return Math.max(0, viewport.scrollHeight - viewport.clientHeight)
 }
 
+export type VirtualizationScrollAnchor = {
+  scrollTop: number
+  turnId: string | null
+}
+
+/** Capture viewport position before flat ↔ virtualized remount. */
+export function captureVirtualizationScrollAnchor(
+  viewport: HTMLElement
+): VirtualizationScrollAnchor {
+  const scrollTop = viewport.scrollTop
+  const viewportTop = viewport.getBoundingClientRect().top
+  let turnId: string | null = null
+  let bestDistance = Infinity
+
+  for (const turnEl of viewport.querySelectorAll('[data-conversation-turn]')) {
+    const id = turnEl.getAttribute('data-turn-id')
+    if (!id) continue
+    const distance = Math.abs(turnEl.getBoundingClientRect().top - viewportTop)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      turnId = id
+    }
+  }
+
+  return { scrollTop, turnId }
+}
+
+export function findTurnIndexByUserMessageId(
+  turns: readonly { user: { id: string } }[],
+  messageId: string
+): number {
+  return turns.findIndex((turn) => turn.user.id === messageId)
+}
+
 /** Scroll to the true bottom (not `scrollHeight`, which overshoots and clamps). */
 export function scrollViewportToBottom(
   viewport: HTMLElement,

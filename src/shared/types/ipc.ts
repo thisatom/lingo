@@ -68,6 +68,7 @@ export type ChatStreamEvent =
   | { type: 'searching' }
   | { type: 'search-targets'; targets: PipelineSearchTargetPayload[] }
   | { type: 'search-visiting'; url: string }
+  | { type: 'search-fallback'; message: string }
   | { type: 'thinking-delta'; delta: string; text: string }
   | { type: 'text-delta'; delta: string; text: string }
   | { type: 'done'; text: string }
@@ -75,6 +76,7 @@ export type ChatStreamEvent =
 
 export interface ChatStreamHandlers {
   onSearching?: () => void
+  onSearchFallback?: (event: Extract<ChatStreamEvent, { type: 'search-fallback' }>) => void
   onSearchTargets?: (event: Extract<ChatStreamEvent, { type: 'search-targets' }>) => void
   onSearchVisiting?: (event: Extract<ChatStreamEvent, { type: 'search-visiting' }>) => void
   onThinkingDelta?: (event: Extract<ChatStreamEvent, { type: 'thinking-delta' }>) => void

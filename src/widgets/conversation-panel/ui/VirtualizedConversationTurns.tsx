@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { createRafCoalescer } from '@/shared/lib/raf-coalesce'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
@@ -6,6 +6,8 @@ import type { PipelineStage } from '@/entities/conversation/model/store'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { estimateTurnHeightPx } from '@/widgets/conversation-panel/lib/estimate-turn-height'
+import { buildTurnsContentSignature } from '@/widgets/conversation-panel/lib/turn-content-signature'
+import { findTurnIndexByUserMessageId } from '@/widgets/conversation-panel/lib/chat-scroll-anchor'
 import {
   lastAssistantMessageId,
   type ConversationTurn as Turn,
@@ -13,7 +15,18 @@ import {
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { ConversationTurn } from './ConversationTurn'
 
-export const VIRTUALIZE_MESSAGE_THRESHOLD = 100
+export {
+  VIRTUALIZE_MESSAGE_THRESHOLD,
+  VIRTUALIZE_OFF_THRESHOLD,
+  resolveVirtualizedTurnsActive
+} from '@/widgets/conversation-panel/lib/virtualization-threshold'
+
+export type VirtualizedConversationScrollApi = {
+  scrollToTurn: (
+    messageId: string,
+    options?: { align?: 'start' | 'center' | 'end' }
+  ) => void
+}
 
 type VirtualizedConversationTurnsProps = {
   turns: Turn[]
@@ -44,6 +57,7 @@ type VirtualizedConversationTurnsProps = {
   liveVoiceUserMessageId?: string | null
   /** Called after the tail turn height changes during an active agent reply. */
   onTailContentChange?: () => void
+  scrollApiRef?: MutableRefObject<VirtualizedConversationScrollApi | null>
 }
 
 export function VirtualizedConversationTurns({
@@ -68,7 +82,8 @@ export function VirtualizedConversationTurns({
   onSubmitEdit,
   onAttachmentError,
   liveVoiceUserMessageId = null,
-  onTailContentChange
+  onTailContentChange,
+  scrollApiRef
 }: VirtualizedConversationTurnsProps) {
   const tailCoalescerRef = useRef(createRafCoalescer(() => onTailContentChange?.()))
 
@@ -78,11 +93,15 @@ export function VirtualizedConversationTurns({
     return () => tailCoalescerRef.current.cancel()
   }, [onTailContentChange])
 
+  const turnIdsSignature = useMemo(() => turns.map((turn) => turn.id).join('|'), [turns])
+  const turnContentSignature = useMemo(() => buildTurnsContentSignature(turns), [turns])
+
   const virtualizer = useVirtualizer({
     count: turns.length,
     getScrollElement: () => scrollElement,
+    getItemKey: (index) => turns[index]!.id,
     estimateSize: (index) => estimateTurnHeightPx(turns[index]!),
-    overscan: 3
+    overscan: 5
   })
 
   const tailTurn = turns[turns.length - 1]
@@ -95,12 +114,34 @@ export function VirtualizedConversationTurns({
   useEffect(() => {
     if (!agentBusy) return
     tailCoalescerRef.current.schedule()
-  }, [agentBusy, turns.length, tailAssistantLen, tailThinkingLen])
+  }, [
+    agentBusy,
+    turns.length,
+    tailAssistantLen,
+    tailThinkingLen,
+    stage,
+    pipelineStreamingAnswer,
+    pipelineSearchActiveUrl
+  ])
 
   useEffect(() => {
     if (!scrollElement) return
     virtualizer.measure()
-  }, [scrollElement, turns.length, virtualizer])
+  }, [scrollElement, turnIdsSignature, turnContentSignature, virtualizer])
+
+  useEffect(() => {
+    if (!scrollApiRef) return
+    scrollApiRef.current = {
+      scrollToTurn(messageId, options) {
+        const index = findTurnIndexByUserMessageId(turns, messageId)
+        if (index < 0) return
+        virtualizer.scrollToIndex(index, { align: options?.align ?? 'center' })
+      }
+    }
+    return () => {
+      scrollApiRef.current = null
+    }
+  }, [scrollApiRef, turns, virtualizer])
 
   const items = virtualizer.getVirtualItems()
 
@@ -125,6 +166,7 @@ export function VirtualizedConversationTurns({
             <ConversationTurn
               turn={turn}
               turnIndex={virtualRow.index + 1}
+              userHeaderSticky={false}
               activeChatId={activeChatId}
               editingUserMessageId={editingUserMessageId}
               actionsDisabled={actionsDisabled}

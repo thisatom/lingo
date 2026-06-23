@@ -1,10 +1,17 @@
 /** Side effects when a chat is deleted (registered from app / features). */
-let onChatDeleted: ((chatId: string) => void) | null = null
+const onChatDeletedHandlers: ((chatId: string) => void)[] = []
 
 export function registerChatDeletedHandler(handler: (chatId: string) => void): void {
-  onChatDeleted = handler
+  onChatDeletedHandlers.push(handler)
+}
+
+/** @internal Test-only reset. */
+export function clearChatDeletedHandlers(): void {
+  onChatDeletedHandlers.length = 0
 }
 
 export function notifyChatDeleted(chatId: string): void {
-  onChatDeleted?.(chatId)
+  for (const handler of onChatDeletedHandlers) {
+    handler(chatId)
+  }
 }

@@ -44,6 +44,9 @@ function createWebChatStream(
         case 'searching':
           handlers.onSearching?.()
           break
+        case 'search-fallback':
+          handlers.onSearchFallback?.(event)
+          break
         case 'search-targets':
           handlers.onSearchTargets?.(event)
           break

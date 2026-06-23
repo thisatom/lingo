@@ -21,10 +21,10 @@ import {
   shouldRetryIncompleteCompletion
 } from '@/shared/lib/completion-quality'
 import {
+  buildWebSearchQuery,
   getLastUserMessageContent,
   isSubstantiveReply,
   looksTruncatedOrRefusal,
-  shouldForceWebSearch,
   shouldRetryWebSearchAnswer
 } from '@/shared/lib/web-search-intent'
 import {
@@ -32,7 +32,9 @@ import {
   isOpenRouterCreditError
 } from '@/shared/lib/openrouter-errors'
 import { openRouterHeaders } from '@/shared/lib/openrouter-headers'
-import { extractAssistantText } from '@/shared/lib/openrouter-model'
+import {
+  extractAssistantStreamDelta,
+} from '@/shared/lib/openrouter-model'
 import {
   stripAssistantRoleMarkup,
   stripAssistantStreamSafeMarkup
@@ -42,6 +44,11 @@ import {
 } from '@/shared/lib/local-web-search-runtime'
 import { localeForPracticeLanguage } from '@/shared/lib/local-web-search'
 import { performLocalWebSearch } from '@/shared/lib/local-web-search'
+import {
+  isLocalWebSearchFailure,
+  SEARCH_FALLBACK_NOTICE
+} from '@/shared/lib/local-web-search-errors'
+import { resolveWebSearchForStreamTurn } from '@/shared/lib/web-search-turn'
 import {
   isWebSearchApiError,
   isWebSearchResultFailure,
@@ -168,7 +175,7 @@ function systemPrompt(practiceLanguage: string | undefined, mode: PromptMode): s
   const ocrNote =
     ' Image attachments may appear as **Text extracted from image (OCR)** blocks — treat that as the image content.'
   const localSearchNote =
-    ' Messages may include **Web search results (local)** blocks — treat them as live web search results and cite linked sources.'
+    ' Messages may include **Web search results (local)** blocks — treat them as live web excerpts; mention source titles in prose. Source links appear in the chat UI separately.'
 
   if (mode === 'vision') {
     return `You are Lingo, a helpful AI assistant with vision.
@@ -190,7 +197,7 @@ Answer in the same language the user writes in (often ${lang}).
 Rules:
 - Answer the user's question directly and completely (at least 2–4 sentences for factual questions).
 - Use web search when you need current or factual information beyond today's date.
-- Include markdown links to sources when search results are used.
+- When local web search excerpts are present, answer from them and mention source titles in prose.
 - NEVER stop mid-sentence. NEVER reply with only a few words unless asked.
 - If the user asks the current year or date, state it clearly from today's date above.${ocrNote}${localSearchNote}`
   }
@@ -256,7 +263,21 @@ function modelUsesNativeWebSearch(modelId: string): boolean {
   return id.startsWith('perplexity/') || id.includes(':online')
 }
 
-type CompletionResult = { text: string; finishReason: string | null }
+type CompletionResult = {
+  text: string
+  streamSafeText: string
+  rawText: string
+  finishReason: string | null
+}
+
+function toCompletionResult(rawText: string, finishReason: string | null): CompletionResult {
+  return {
+    rawText,
+    streamSafeText: stripAssistantStreamSafeMarkup(rawText),
+    text: stripAssistantRoleMarkup(rawText),
+    finishReason
+  }
+}
 
 function parseApiError(
   errText: string,
@@ -322,12 +343,12 @@ async function fetchCompletion(
   }
 
   const choice = data.choices?.[0]
-  const text = extractAssistantText(choice?.message ?? {})
-  if (!text.trim()) {
+  const raw = extractAssistantStreamDelta(choice?.message ?? {})
+  if (!raw.trim()) {
     throw new Error('Model returned an empty response')
   }
 
-  return { text, finishReason: choice?.finish_reason ?? null }
+  return toCompletionResult(raw, choice?.finish_reason ?? null)
 }
 
 async function fetchCompletionResilient(
@@ -390,7 +411,7 @@ type SseChunk = {
 }
 
 function extractStreamDelta(chunk: SseChunk): string {
-  return extractAssistantText(chunk.choices?.[0]?.delta ?? {})
+  return extractAssistantStreamDelta(chunk.choices?.[0]?.delta ?? {})
 }
 
 function reasoningFromContentParts(
@@ -450,7 +471,7 @@ async function fetchCompletionStreaming(
   const merged = withCustomCompletionExtras(request, { ...body, stream: true })
   if (merged.stream === false) {
     const result = await fetchCompletion(request, apiKey, body, signal, fetchImpl)
-    send({ type: 'text-delta', delta: result.text, text: result.text })
+    send({ type: 'text-delta', delta: result.text, text: result.streamSafeText })
     return result
   }
 
@@ -478,7 +499,7 @@ async function fetchCompletionStreaming(
 
   const decoder = new TextDecoder()
   let buffer = ''
-  let rawText = ''
+  let accumulatedText = ''
   let text = ''
   let thinkingText = ''
   let finishReason: string | null = null
@@ -518,8 +539,8 @@ async function fetchCompletionStreaming(
 
       const delta = extractStreamDelta(chunk)
       if (delta) {
-        rawText += delta
-        text = stripAssistantStreamSafeMarkup(rawText)
+        accumulatedText += delta
+        text = stripAssistantStreamSafeMarkup(accumulatedText)
         send({ type: 'text-delta', delta, text })
       }
 
@@ -532,10 +553,7 @@ async function fetchCompletionStreaming(
     throw new Error('Model returned an empty response')
   }
 
-  return {
-    text: stripAssistantRoleMarkup(rawText),
-    finishReason
-  }
+  return toCompletionResult(accumulatedText, finishReason)
 }
 
 type ChatCompletionMessage = {
@@ -574,7 +592,7 @@ async function streamCompletionWithIncompleteRetry(
     return result
   }
 
-  const answerPrefix = result.text
+  const streamPrefix = result.streamSafeText
   const retryMessages: ChatCompletionMessage[] = [
     ...(body.messages as ChatCompletionMessage[]),
     { role: 'assistant', content: result.text },
@@ -590,14 +608,7 @@ async function streamCompletionWithIncompleteRetry(
         send({
           type: 'text-delta',
           delta: event.delta,
-          text: mergeContinuationAnswer(answerPrefix, event.text)
-        })
-        return
-      }
-      if (event.type === 'done') {
-        send({
-          type: 'done',
-          text: mergeContinuationAnswer(answerPrefix, event.text)
+          text: mergeContinuationAnswer(streamPrefix, event.text)
         })
         return
       }
@@ -610,10 +621,8 @@ async function streamCompletionWithIncompleteRetry(
     fetchImpl
   )
 
-  return {
-    text: mergeContinuationAnswer(answerPrefix, continuation.text),
-    finishReason: continuation.finishReason
-  }
+  const mergedRaw = mergeContinuationAnswer(result.rawText, continuation.rawText)
+  return toCompletionResult(mergedRaw, continuation.finishReason)
 }
 
 async function fetchCompletionResilientStreaming(
@@ -624,8 +633,16 @@ async function fetchCompletionResilientStreaming(
   signal: AbortSignal | undefined,
   fetchImpl: OpenRouterFetch
 ): Promise<CompletionResult> {
+  let streamPrefixSafe = ''
+  const captureSend: SendEvent = (event) => {
+    if (event.type === 'text-delta') {
+      streamPrefixSafe = event.text
+    }
+    send(event)
+  }
+
   try {
-    return await fetchCompletionStreaming(request, apiKey, body, send, signal, fetchImpl)
+    return await fetchCompletionStreaming(request, apiKey, body, captureSend, signal, fetchImpl)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const maxTokens = body.max_tokens
@@ -637,14 +654,32 @@ async function fetchCompletionResilientStreaming(
     ) {
       throw error
     }
-    return fetchCompletionStreaming(
+
+    const retrySend: SendEvent = (event) => {
+      if (event.type === 'text-delta' && streamPrefixSafe) {
+        send({
+          type: 'text-delta',
+          delta: event.delta,
+          text: mergeContinuationAnswer(streamPrefixSafe, event.text)
+        })
+        return
+      }
+      send(event)
+    }
+
+    const result = await fetchCompletionStreaming(
       request,
       apiKey,
       { ...body, max_tokens: openRouterConfig.maxTokensCreditFallback },
-      send,
+      retrySend,
       signal,
       fetchImpl
     )
+
+    if (!streamPrefixSafe) return result
+
+    const mergedRaw = mergeContinuationAnswer(streamPrefixSafe, result.rawText)
+    return toCompletionResult(mergedRaw, result.finishReason)
   }
 }
 
@@ -675,6 +710,8 @@ async function completeWithWebSearch(
   let text = result.text
 
   if (shouldRetryWebSearchAnswer(text, lastUserMessage, result.finishReason)) {
+    const streamPrefix = result.streamSafeText
+    const firstPassRaw = result.rawText
     const retryMessages = [
       ...(body.messages as Array<{ role: string; content: string | ChatMessagePayload['content'] }>),
       { role: 'assistant', content: text },
@@ -683,15 +720,31 @@ async function completeWithWebSearch(
         content: `Your answer was incomplete or too short. Answer this clearly in full sentences: "${lastUserMessage}"`
       }
     ]
-    result = await fetchCompletionResilientStreaming(
+    const continuation = await fetchCompletionResilientStreaming(
       request,
       apiKey,
       applyCompletionMaxTokens({ ...body, messages: retryMessages }, request, 'retry'),
-      send,
+      (event) => {
+        if (event.type === 'text-delta') {
+          send({
+            type: 'text-delta',
+            delta: event.delta,
+            text: mergeContinuationAnswer(streamPrefix, event.text)
+          })
+          return
+        }
+        if (event.type === 'thinking-delta') {
+          return
+        }
+        send(event)
+      },
       signal,
       fetchImpl
     )
-    text = result.text
+    text = toCompletionResult(
+      mergeContinuationAnswer(firstPassRaw, continuation.rawText),
+      continuation.finishReason
+    ).text
   }
 
   if (!isSubstantiveReply(text, lastUserMessage) || looksTruncatedOrRefusal(text)) {
@@ -720,8 +773,10 @@ async function completeWithLocalWebSearch(
   }
 
   const searchLocale = localeForPracticeLanguage(practiceLanguage)
-  const results = await performLocalWebSearch(lastUserMessage, {
+  const searchQuery = buildWebSearchQuery(lastUserMessage)
+  const results = await performLocalWebSearch(searchQuery, {
     locale: searchLocale,
+    signal,
     onInitialResults: (hits) => emitTargets(hits),
     onVisitingUrl: (url) => send({ type: 'search-visiting', url })
   })
@@ -755,6 +810,11 @@ async function completeWithLocalWebSearch(
     fetchImpl,
     { requireSubstantive: true }
   )
+
+  if (!isSubstantiveReply(text, lastUserMessage) || looksTruncatedOrRefusal(text)) {
+    throw new Error('The model returned an incomplete answer.')
+  }
+
   send({ type: 'done', text })
 }
 
@@ -786,21 +846,76 @@ async function tryNativeWebSearch(
   await completeWithWebSearch(request, apiKey, body, send, lastUserMessage, signal, fetchImpl)
 }
 
+async function completeRegularTextChat(
+  request: OpenRouterStreamRequest,
+  apiKey: string,
+  userModelId: string,
+  apiMessages: ChatMessagePayload[],
+  practiceLanguage: string | undefined,
+  send: SendEvent,
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch,
+  forceWebSearch: boolean
+): Promise<void> {
+  const researchMode = forceWebSearch
+  const promptMode: PromptMode = researchMode ? 'research' : 'practice'
+
+  const body = withCustomCompletionExtras(
+    request,
+    applyCompletionMaxTokens(
+      {
+        model: userModelId.trim(),
+        messages: buildMessages(apiMessages, practiceLanguage, promptMode),
+        temperature: researchMode ? 0.3 : 0.7
+      },
+      request
+    )
+  )
+
+  const lastUserMessage = getLastUserMessageContent(apiMessages)
+  const { text } = await streamCompletionWithIncompleteRetry(
+    request,
+    apiKey,
+    body,
+    send,
+    lastUserMessage,
+    signal,
+    fetchImpl,
+    { requireSubstantive: researchMode }
+  )
+  send({ type: 'done', text })
+}
+
 async function completeTextChat(
   request: OpenRouterStreamRequest,
   apiKey: string,
   userModelId: string,
   apiMessages: ChatMessagePayload[],
   practiceLanguage: string | undefined,
-  webSearchRequested: boolean,
   send: SendEvent,
   signal: AbortSignal | undefined,
   fetchImpl: OpenRouterFetch
 ): Promise<void> {
   const lastUserMessage = getLastUserMessageContent(apiMessages)
-  const webSearchEnabled = request.webSearch === true && !messagesHaveImages(apiMessages)
+  const { webSearchForTurn, forceWebSearch, blockedByAttachments } =
+    resolveWebSearchForStreamTurn(request, apiMessages, lastUserMessage)
 
-  if (webSearchEnabled) {
+  if (blockedByAttachments) {
+    await completeRegularTextChat(
+      request,
+      apiKey,
+      userModelId,
+      apiMessages,
+      practiceLanguage,
+      send,
+      signal,
+      fetchImpl,
+      false
+    )
+    return
+  }
+
+  if (webSearchForTurn || forceWebSearch) {
     send({ type: 'searching' })
 
     // Custom endpoints do not support provider-native web tools, so their
@@ -819,8 +934,22 @@ async function completeTextChat(
           fetchImpl
         )
         return
-      } catch {
-        // Keep chat responsive: if local lookup fails, continue with regular completion.
+      } catch (error) {
+        if (signal?.aborted) throw error
+        if (!isLocalWebSearchFailure(error)) throw error
+        send({ type: 'search-fallback', message: SEARCH_FALLBACK_NOTICE })
+        await completeRegularTextChat(
+          request,
+          apiKey,
+          userModelId,
+          apiMessages,
+          practiceLanguage,
+          send,
+          signal,
+          fetchImpl,
+          forceWebSearch
+        )
+        return
       }
     }
 
@@ -873,32 +1002,17 @@ async function completeTextChat(
     }
   }
 
-  const researchMode = shouldForceWebSearch(lastUserMessage)
-  const promptMode: PromptMode = researchMode ? 'research' : 'practice'
-
-  const body = withCustomCompletionExtras(
-    request,
-    applyCompletionMaxTokens(
-      {
-        model: userModelId.trim(),
-        messages: buildMessages(apiMessages, practiceLanguage, promptMode),
-        temperature: researchMode ? 0.3 : 0.7
-      },
-      request
-    )
-  )
-
-  const { text } = await streamCompletionWithIncompleteRetry(
+  await completeRegularTextChat(
     request,
     apiKey,
-    body,
+    userModelId,
+    apiMessages,
+    practiceLanguage,
     send,
-    lastUserMessage,
     signal,
     fetchImpl,
-    { requireSubstantive: researchMode }
+    forceWebSearch
   )
-  send({ type: 'done', text })
 }
 
 export async function streamOpenRouterChat(
@@ -926,7 +1040,6 @@ export async function streamOpenRouterChat(
     : (request.model ?? options?.defaultModel ?? openRouterConfig.defaultModel)
   if (!primaryModelId) throw new Error('Model id is not configured.')
 
-  const webSearchRequested = request.webSearch !== false
   const modelAutoFallback = !custom && request.modelAutoFallback === true
 
   await runWithModelFallback(primaryModelId, modelAutoFallback, async (tryModelId) => {
@@ -983,7 +1096,6 @@ export async function streamOpenRouterChat(
       tryModelId,
       apiMessages,
       request.practiceLanguage,
-      webSearchRequested,
       send,
       signal,
       fetchImpl

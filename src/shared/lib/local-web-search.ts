@@ -1,5 +1,6 @@
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { enrichSearchResultsWithPageContent } from '@/shared/lib/local-page-research'
+import { LocalWebSearchError } from '@/shared/lib/local-web-search-errors'
 import type { LocalWebSearchProgress } from '@/shared/lib/local-web-search-progress'
 import { performWebsearchQuery } from '@/shared/lib/websearch-query'
 
@@ -47,6 +48,12 @@ export type LocalWebSearchResult = {
 
 const MAX_RESULTS = 8
 const FETCH_TIMEOUT_MS = 12_000
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new LocalWebSearchError('Web search aborted', 'aborted')
+  }
+}
 const SEARCH_USER_AGENT =
   'Mozilla/5.0 (compatible; Lingo/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
@@ -244,7 +251,12 @@ async function fetchDdgWebSearch(query: string): Promise<LocalWebSearchResult[]>
   return merged.slice(0, MAX_RESULTS)
 }
 
-async function fetchGeneralWebSearch(query: string, locale: string): Promise<LocalWebSearchResult[]> {
+async function fetchGeneralWebSearch(
+  query: string,
+  locale: string,
+  signal?: AbortSignal
+): Promise<LocalWebSearchResult[]> {
+  throwIfAborted(signal)
   try {
     const mcpResults = await performWebsearchQuery(query, locale)
     if (mcpResults.length > 0) return mcpResults
@@ -252,6 +264,7 @@ async function fetchGeneralWebSearch(query: string, locale: string): Promise<Loc
     // fall back to DuckDuckGo
   }
 
+  throwIfAborted(signal)
   return fetchDdgWebSearch(query)
 }
 
@@ -259,6 +272,7 @@ async function finalizeResults(
   results: LocalWebSearchResult[],
   progress?: LocalWebSearchProgress
 ): Promise<LocalWebSearchResult[]> {
+  throwIfAborted(progress?.signal)
   if (results.length === 0) return results
   if (results.some((r) => r.pageContent && r.pageContent.trim().length > 80)) {
     return results
@@ -271,9 +285,23 @@ export async function performLocalWebSearch(
   query: string,
   progress?: LocalWebSearchProgress
 ): Promise<LocalWebSearchResult[]> {
+  throwIfAborted(progress?.signal)
   const locale = resolveSearchLocale(progress?.locale)
 
-  const general = await fetchGeneralWebSearch(query, locale)
+  let general: LocalWebSearchResult[]
+  try {
+    general = await fetchGeneralWebSearch(query, locale, progress?.signal)
+  } catch (error) {
+    if (progress?.signal?.aborted || (error instanceof LocalWebSearchError && error.code === 'aborted')) {
+      throw error
+    }
+    throw new LocalWebSearchError(
+      error instanceof Error ? error.message : 'Web search failed',
+      'network'
+    )
+  }
+
+  throwIfAborted(progress?.signal)
   progress?.onInitialResults?.(general)
   return finalizeResults(general, progress)
 }

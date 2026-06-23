@@ -1,11 +1,7 @@
-import { registerActiveChatChangeHandler } from '@/entities/chat/model/active-chat-effects'
 import { registerChatDeletedHandler } from '@/entities/chat/model/chat-delete-effects'
+import { registerChatsResetHandler } from '@/entities/chat/model/chat-reset-effects'
 import { useChatsStore } from '@/entities/chat/model/store'
-import { isBusyPipelineStage } from '@/features/ai-chat/lib/chat-agent-transitions'
-import {
-  hasPendingAgentReply,
-  clearPendingAgentReply
-} from '@/features/ai-chat/lib/pending-agent-reply'
+import { clearPendingAgentReply } from '@/features/ai-chat/lib/pending-agent-reply'
 import { stopAgentOnChatDeleted } from '@/features/ai-chat/lib/stop-agent-on-chat-delete'
 import {
   useConversationStore,
@@ -58,6 +54,10 @@ export function clearChatPipeline(chatId: string): void {
   pipelineByChatId.delete(chatId)
 }
 
+export function clearAllChatPipelines(): void {
+  pipelineByChatId.clear()
+}
+
 function isOnSettingsScreen(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -67,6 +67,9 @@ function isOnSettingsScreen(): boolean {
 
 /** Mirrors the active chat pipeline snapshot into the global conversation store. */
 export function syncPipelineUiForActiveChat(): void {
+  useConversationStore.getState().setQueueAheadPreview(null)
+  useConversationStore.getState().setSpeechError(null)
+
   if (isOnSettingsScreen()) {
     useConversationStore.getState().setStage('idle')
     useConversationStore.getState().setError(null)
@@ -93,11 +96,13 @@ export function syncPipelineUiForActiveChat(): void {
   })
 }
 
-registerActiveChatChangeHandler(syncPipelineUiForActiveChat)
 registerChatDeletedHandler((chatId) => {
-  const pipelineBusy = isBusyPipelineStage(getChatPipeline(chatId).stage)
-  const pendingReply = hasPendingAgentReply(chatId)
   clearChatPipeline(chatId)
   clearPendingAgentReply(chatId)
-  stopAgentOnChatDeleted(chatId, { pipelineBusy, pendingReply })
+  stopAgentOnChatDeleted(chatId)
+})
+
+registerChatsResetHandler(() => {
+  clearAllChatPipelines()
+  useConversationStore.getState().resetPipeline()
 })

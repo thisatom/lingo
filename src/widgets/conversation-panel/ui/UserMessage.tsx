@@ -281,13 +281,7 @@ export function UserMessage({
 
   return (
     <div className="w-full min-w-0 max-w-full">
-      <UserQuestionContextMenu
-        prompt={content}
-        chatId={chatId}
-        className={userMessageBubbleClass}
-        activateDisabled={disabled}
-        onActivate={onEnterEdit}
-      >
+      <UserQuestionContextMenu prompt={content} chatId={chatId} className={userMessageBubbleClass}>
         <MessageBodyClamp bodyClassName="pr-8">
           {attachments && attachments.length > 0 ? (
             <UserMessageAttachments attachments={attachments} />

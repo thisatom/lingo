@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { ExternalLink } from '@/shared/ui/icons'
 import type { LinkPreviewResponse } from '@/shared/types/ipc'
 import {
@@ -98,6 +98,10 @@ function PreviewSkeleton() {
   )
 }
 
+const stopBubbleClick = (event: MouseEvent) => {
+  event.stopPropagation()
+}
+
 export function LinkPreviewHover({ href, className, children }: LinkPreviewHoverProps) {
   const canonicalHref = useMemo(() => normalizeLinkHref(href), [href])
   const [open, setOpen] = useState(false)
@@ -152,7 +156,13 @@ export function LinkPreviewHover({ href, className, children }: LinkPreviewHover
   return (
     <HoverCard open={open} onOpenChange={setOpen} openDelay={350} closeDelay={120}>
       <HoverCardTrigger asChild>
-        <a href={canonicalHref} className={className} target="_blank" rel="noopener noreferrer">
+        <a
+          href={canonicalHref}
+          className={className}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={stopBubbleClick}
+        >
           {children}
         </a>
       </HoverCardTrigger>
@@ -185,7 +195,13 @@ export function MarkdownLink({
 
   if (!isPreviewableHref(canonicalHref) || !isLingoAvailable() || !window.lingo?.link) {
     return (
-      <a href={canonicalHref} className={className} target="_blank" rel="noopener noreferrer">
+      <a
+        href={canonicalHref}
+        className={className}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={stopBubbleClick}
+      >
         {label}
       </a>
     )

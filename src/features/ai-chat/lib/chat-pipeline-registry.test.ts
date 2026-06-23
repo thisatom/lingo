@@ -3,6 +3,7 @@ import { useChatsStore } from '@/entities/chat/model/store'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import {
   clearChatPipeline,
+  clearAllChatPipelines,
   getChatPipeline,
   patchChatPipeline,
   syncPipelineUiForActiveChat
@@ -76,5 +77,36 @@ describe('chat-pipeline-registry', () => {
     patchChatPipeline('gone', { stage: 'thinking' })
     clearChatPipeline('gone')
     expect(getChatPipeline('gone').stage).toBe('idle')
+  })
+
+  it('clears global queue preview and speech error when switching chats', () => {
+    const chatA = 'chat-a'
+    const chatB = 'chat-b'
+    useChatsStore.setState({
+      chats: [
+        { id: chatA, title: 'A', messages: [], updatedAt: 0, createdAt: 0 },
+        { id: chatB, title: 'B', messages: [], updatedAt: 0, createdAt: 0 }
+      ],
+      activeChatId: chatA
+    })
+
+    useConversationStore.setState({
+      queueAheadPreview: 'Next question',
+      speechError: 'Mic failed'
+    })
+
+    useChatsStore.getState().selectChat(chatB)
+    syncPipelineUiForActiveChat()
+
+    expect(useConversationStore.getState().queueAheadPreview).toBeNull()
+    expect(useConversationStore.getState().speechError).toBeNull()
+  })
+
+  it('clearAllChatPipelines drops every snapshot', () => {
+    patchChatPipeline('a', { stage: 'thinking' })
+    patchChatPipeline('b', { stage: 'searching' })
+    clearAllChatPipelines()
+    expect(getChatPipeline('a').stage).toBe('idle')
+    expect(getChatPipeline('b').stage).toBe('idle')
   })
 })

@@ -9,17 +9,18 @@ interface ScrollToLatestButtonProps {
 }
 
 export function ScrollToLatestButton({ show, onClick, className }: ScrollToLatestButtonProps) {
-  if (!show) return null
-
   return (
     <Button
       type="button"
       variant="outline"
       size="icon"
       aria-label="Scroll to latest"
+      aria-hidden={!show}
+      tabIndex={show ? 0 : -1}
       onClick={onClick}
       className={cn(
-        'grid size-8 shrink-0 place-items-center gap-0 rounded-full border border-menu-border bg-secondary p-0 text-foreground shadow-lg hover:bg-accent',
+        'grid size-8 shrink-0 place-items-center gap-0 rounded-full border border-menu-border bg-secondary p-0 text-foreground shadow-lg transition-opacity hover:bg-accent',
+        !show && 'pointer-events-none opacity-0',
         className
       )}
     >

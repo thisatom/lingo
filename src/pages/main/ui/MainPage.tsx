@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAiChat } from '@/features/ai-chat/model/useAiChat'
 import { useLlmChatReady } from '@/features/ai-chat/model/useLlmChatReady'
 import { useChatContextUsage } from '@/features/chat-context/model/useChatContextUsage'
@@ -38,6 +38,7 @@ import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
 import { SidebarExpandButton } from '@/widgets/app-sidebar/ui/SidebarExpandButton'
 import { BackgroundStreamHint } from '@/features/ai-chat/ui/BackgroundStreamHint'
+import { bindChatBottomInset } from '@/widgets/conversation-panel/lib/sync-chat-bottom-inset'
 
 function isErrorRetryable(message: string): boolean {
   return !message.includes('OpenRouter API key')
@@ -50,6 +51,7 @@ export function MainPage() {
     scrollToLatest: (behavior?: ScrollBehavior) => void
     followBottom: () => void
   } | null>(null)
+  const bottomStackRef = useRef<HTMLDivElement>(null)
 
   const scheduleAutoListenRef = useRef<(() => void) | null>(null)
   const syncSessionChatIdRef = useRef<(chatId: string) => void>(() => undefined)
@@ -412,13 +414,10 @@ export function MainPage() {
 
     setSpeechError(null)
     requestChatFollowBottom()
-    chatScrollRef.current?.followBottom()
     voice.setDraftPrefix('')
 
     useChatsStore.getState().ensureActiveChat()
     await sendUserMessage(text, attachments)
-    requestChatFollowBottom()
-    chatScrollRef.current?.followBottom()
   }, [
     composerAttachments,
     draft,
@@ -439,6 +438,8 @@ export function MainPage() {
       flushChatPersistDebounce()
     }
   }, [])
+
+  useLayoutEffect(() => bindChatBottomInset(bottomStackRef.current), [])
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
@@ -481,15 +482,18 @@ export function MainPage() {
           }}
         />
 
-        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-[50]">
-          <div className={cn('mx-auto w-full px-4 pb-3 sm:px-6', CHAT_COLUMN_MAX_WIDTH_CLASS)}>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[50]">
+          <div
+            ref={bottomStackRef}
+            className={cn('mx-auto w-full px-4 pb-3 sm:px-6', CHAT_COLUMN_MAX_WIDTH_CLASS)}
+          >
             <div className="relative">
               <ScrollToLatestButton
                 show={showScrollToLatest}
                 onClick={() => chatScrollRef.current?.followBottom()}
-                className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2"
+                className="pointer-events-auto absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2"
               />
-              <div className="space-y-1">
+              <div className="pointer-events-auto space-y-1">
             {backgroundStreamChatId ? (
               <BackgroundStreamHint
                 streamChatId={backgroundStreamChatId}
@@ -505,7 +509,7 @@ export function MainPage() {
                 <p className="min-w-0 flex-1 leading-snug">{speechError}</p>
                 <button
                   type="button"
-                  className="shrink-0 text-xs text-foreground/70 hover:text-foreground"
+                  className="shrink-0 cursor-pointer text-xs text-foreground/70 hover:text-foreground"
                   onClick={() => setSpeechError(null)}
                 >
                   Dismiss

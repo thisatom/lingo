@@ -45,6 +45,9 @@ const lingo: LingoApi = {
           case 'searching':
             handlers.onSearching?.()
             break
+          case 'search-fallback':
+            handlers.onSearchFallback?.(payload)
+            break
           case 'search-targets':
             handlers.onSearchTargets?.(payload)
             break

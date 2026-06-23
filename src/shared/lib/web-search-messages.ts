@@ -6,6 +6,7 @@ import {
   isLocalWebSearchRegistered,
   searchWebLocal
 } from '@/shared/lib/local-web-search-runtime'
+import { LocalWebSearchError } from '@/shared/lib/local-web-search-errors'
 function formatResultBody(result: LocalWebSearchResult): string {
   const fromPage = result.pageContent?.trim()
   if (fromPage) return fromPage
@@ -35,7 +36,7 @@ export function formatLocalWebSearchBlock(query: string, results: LocalWebSearch
     '',
     lines.join('\n\n'),
     '',
-    'Use the excerpts as factual context. Answer in your own words. Do not output a list of URLs or "sources:" links unless the user explicitly asks for sources.'
+    'Use the excerpts as factual context. Answer in your own words. Mention source titles in prose when helpful; the chat UI shows link chips separately — do not paste raw URL lists.'
   ].join('\n')
 }
 
@@ -58,11 +59,20 @@ export async function fetchLocalWebSearchResults(
   progress?: LocalWebSearchProgress
 ): Promise<LocalWebSearchResult[]> {
   if (!isLocalWebSearchRegistered()) {
-    throw new Error(
-      'Local web search is not available in this environment. Use the desktop app or browser build with network access.'
+    throw new LocalWebSearchError(
+      'Local web search is not available in this environment. Use the desktop app or browser build with network access.',
+      'unavailable'
     )
   }
   return searchWebLocal(query, progress)
+}
+
+function buildLocalSearchCacheKey(query: string, results: LocalWebSearchResult[]): string {
+  const normalizedQuery = query.trim().toLowerCase()
+  const fingerprint = results
+    .map((result) => `${result.url}:${formatResultBody(result).length}`)
+    .join('|')
+  return `${normalizedQuery}::${fingerprint}`
 }
 
 export function substituteMessagesWithLocalWebSearchResults(
@@ -70,7 +80,7 @@ export function substituteMessagesWithLocalWebSearchResults(
   query: string,
   results: LocalWebSearchResult[]
 ): ChatMessagePayload[] {
-  const cacheKey = query.trim().toLowerCase()
+  const cacheKey = buildLocalSearchCacheKey(query, results)
   let block = localSearchBlockCache.get(cacheKey)
   if (!block) {
     block = formatLocalWebSearchBlock(query, results)

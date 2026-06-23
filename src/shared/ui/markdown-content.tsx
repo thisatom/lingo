@@ -7,7 +7,10 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { segmentMarkdown, type MarkdownSegment } from '@/shared/lib/math/segment-markdown'
 import { normalizeMarkdown } from '@/shared/lib/normalize-markdown'
-import { stripAssistantRoleMarkup } from '@/shared/lib/strip-assistant-role-markup'
+import {
+  stripAssistantRoleMarkup,
+  stripAssistantStreamSafeMarkup
+} from '@/shared/lib/strip-assistant-role-markup'
 import { cn } from '@/shared/lib/utils'
 import { KaTeXBlock } from '@/shared/ui/katex-block'
 import { StreamCursor } from '@/shared/ui/stream-cursor'
@@ -44,6 +47,12 @@ interface MarkdownContentProps {
   parseThrottleMs?: number
   /** Blinking caret after content while the answer is still streaming. */
   showStreamingCursor?: boolean
+}
+
+function segmentReactKey(segment: MarkdownSegment, index: number, stableKeys: boolean): string {
+  if (stableKeys) return `${segment.type}:${index}`
+  const head = segment.content.slice(0, 32)
+  return `${segment.type}:${segment.content.length}:${head}:${index}`
 }
 
 function renderSegment(
@@ -101,12 +110,14 @@ function MarkdownContentInner({
         ? 'thinking'
         : variant
   const displaySource = useMemo(() => {
-    const normalized = normalizeMarkdown(parsedSource)
+    const source = streamingParse ? parsedSource : normalizeMarkdown(parsedSource)
     if (resolvedVariant === 'agent' || resolvedVariant === 'thinking') {
-      return stripAssistantRoleMarkup(normalized)
+      return streamingParse
+        ? stripAssistantStreamSafeMarkup(source)
+        : stripAssistantRoleMarkup(source)
     }
-    return normalized
-  }, [parsedSource, resolvedVariant])
+    return source
+  }, [parsedSource, resolvedVariant, streamingParse])
   const segments = useMemo(() => segmentMarkdown(displaySource), [displaySource])
   const components =
     resolvedVariant === 'compact' ? compactMarkdownComponents : agentMarkdownComponents
@@ -119,7 +130,9 @@ function MarkdownContentInner({
       )}
     >
       {segments.map((segment, index) => (
-        <Fragment key={index}>{renderSegment(segment, index, components)}</Fragment>
+        <Fragment key={segmentReactKey(segment, index, streamingParse)}>
+          {renderSegment(segment, index, components)}
+        </Fragment>
       ))}
       {showStreamingCursor ? <StreamCursor /> : null}
     </div>

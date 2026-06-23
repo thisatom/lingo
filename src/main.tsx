@@ -6,6 +6,7 @@ import { registerActiveChatEffects } from '@/app/register-active-chat-effects'
 import { setupLocalWebSearch } from '@/shared/lib/setup-local-web-search'
 import { ensureLingoBridge } from '@/shared/lib/lingo-bridge'
 import { installFileDropNavigationGuard } from '@/shared/lib/prevent-file-drop-navigation'
+import { hideAppSplash } from '@/shared/lib/hooks/use-app-ready'
 import { initThemeFromStorage } from '@/shared/lib/theme'
 import 'katex/dist/katex.min.css'
 import '@vscode/codicons/dist/codicon.css'
@@ -22,6 +23,7 @@ void import('@/shared/lib/image-ocr-tesseract').then(({ setupTesseractImageOcr }
 })
 initThemeFromStorage()
 registerActiveChatEffects()
+hideAppSplash()
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')

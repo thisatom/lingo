@@ -29,7 +29,7 @@ export function BackgroundStreamHint({
       </p>
       <button
         type="button"
-        className="shrink-0 text-xs font-medium text-foreground hover:underline"
+        className="shrink-0 cursor-pointer text-xs font-medium text-foreground hover:underline"
         onClick={() => onOpenChat(streamChatId)}
       >
         Open chat

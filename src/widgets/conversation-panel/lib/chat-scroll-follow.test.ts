@@ -14,9 +14,28 @@ describe('shouldStickToBottom', () => {
     expect(shouldStickToBottom({ pinToBottom: true, isRestoring: false })).toBe(true)
   })
 
-  it('follows during an active agent reply', () => {
+  it('does not force follow during agent reply when user scrolled away', () => {
+    const viewport = {
+      scrollHeight: 1000,
+      clientHeight: 400,
+      scrollTop: 500
+    } as HTMLElement
+    expect(shouldStickToBottom({ pinToBottom: false, isRestoring: false }, viewport)).toBe(
+      false
+    )
+  })
+
+  it('uses a tighter near-bottom threshold while agent is busy', () => {
+    const viewport = {
+      scrollHeight: 1000,
+      clientHeight: 400,
+      scrollTop: 570
+    } as HTMLElement
     expect(
-      shouldStickToBottom({ pinToBottom: false, isRestoring: false, agentReplyActive: true })
+      shouldStickToBottom({ pinToBottom: false, isRestoring: false, agentBusy: true }, viewport)
+    ).toBe(false)
+    expect(
+      shouldStickToBottom({ pinToBottom: false, isRestoring: false, agentBusy: false }, viewport)
     ).toBe(true)
   })
 
@@ -47,5 +66,14 @@ describe('buildChatTailScrollSignature', () => {
     ])
     expect(sig).toContain(':t10')
     expect(sig).toContain(':assistant')
+  })
+
+  it('includes pipeline search UI in extras', () => {
+    const sig = buildChatTailScrollSignature(
+      [{ id: '1', role: 'assistant', content: 'answer' }],
+      { pipelineStage: 'searching', pipelineSearchActiveUrl: 'https://example.com' }
+    )
+    expect(sig).toContain(':stsearching')
+    expect(sig).toContain(':suhttps://example.com')
   })
 })

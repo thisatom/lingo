@@ -1,5 +1,5 @@
 import { app, BrowserWindow, session } from 'electron'
-import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools'
+import { registerDevToolsShortcut, unregisterDevToolsShortcut, openDevToolsIfDev } from './devtools'
 import { registerIpcHandlers } from './ipc'
 import { warmOpenRouterConnection } from './openrouter-fetch'
 import { registerRendererScheme, setupRendererProtocol } from './renderer-protocol'

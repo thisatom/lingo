@@ -66,3 +66,13 @@ export function payloadHasImages(content: ChatMessagePayload['content']): boolea
 export function messagesHaveImages(messages: ChatMessagePayload[]): boolean {
   return messages.some((m) => payloadHasImages(m.content))
 }
+
+/** Images on the latest user turn only (web search / vision gating for the current turn). */
+export function lastUserMessageHasImages(messages: ChatMessagePayload[]): boolean {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      return payloadHasImages(messages[i].content)
+    }
+  }
+  return false
+}

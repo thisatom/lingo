@@ -107,6 +107,10 @@ export function ShinyText({
     WebkitTextFillColor: 'transparent'
   } as const
 
+  if (disabled) {
+    return <span className={className}>{text}</span>
+  }
+
   return (
     <motion.span
       className={`shiny-text ${className}`}

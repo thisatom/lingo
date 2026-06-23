@@ -235,4 +235,110 @@ describe.sequential('runAgentTurn (integration)', () => {
       `ok=${ok} error=${useConversationStore.getState().error ?? 'none'} genBefore=${generationBefore} genAfter=${getAgentRunGeneration()} timeline=${roleTimeline.join(' | ')}`
     ).toBe(true)
   })
+
+  it('removes partial tail after stop without re-applying RAF sync text', async () => {
+    const { cancelAgentRun } = await import('@/features/ai-chat/model/agent-run')
+    let releaseStream: (() => void) | null = null
+
+    streamMock.mockImplementationOnce(
+      (
+        _request: unknown,
+        handlers: {
+          onTextDelta?: (e: { text: string }) => void
+        }
+      ) => {
+        handlers.onTextDelta?.({ text: 'Partial answer chunk' })
+        return {
+          abort: vi.fn(),
+          done: new Promise<void>((resolve) => {
+            releaseStream = resolve
+          })
+        }
+      }
+    )
+
+    const { runAgentTurn } = await import('@/features/ai-chat/model/run-agent-turn')
+    const session = createTestSession()
+
+    const turnPromise = runAgentTurn({
+      targetChatId: chatId,
+      session,
+      practiceLanguage: 'en',
+      chatComposerMode: 'text',
+      setBlurAnimateMessageId: () => undefined,
+      setError: (error) => useConversationStore.getState().setError(error),
+      processNextInQueue: async () => undefined,
+      tryRunPendingAgentReply: async () => false,
+      agentRun: {
+        beginAgentRun: () => {
+          agentRunState.generation += 1
+          return agentRunState.generation
+        },
+        isAgentRunActive: (runId) => runId === agentRunState.generation
+      }
+    })
+
+    await Promise.resolve()
+    await Promise.resolve()
+    cancelAgentRun()
+    releaseStream?.()
+    const ok = await turnPromise
+
+    expect(ok).toBe(false)
+    const messages = useChatsStore.getState().chats.find((c) => c.id === chatId)?.messages ?? []
+    expect(messages.some((m) => m.role === 'assistant')).toBe(false)
+    expect(messages.some((m) => m.role === 'thinking')).toBe(false)
+  })
+
+  it('clears pipelineStreamingAnswer when done arrives before stream settles', async () => {
+    let resolveDone: (() => void) | undefined
+
+    streamMock.mockImplementationOnce(
+      (
+        _request: unknown,
+        handlers: {
+          onTextDelta?: (e: { text: string }) => void
+          onDone?: (e: { text: string }) => void
+        }
+      ) => {
+        handlers.onTextDelta?.({ text: 'Streaming answer' })
+        handlers.onDone?.({ text: 'Streaming answer.' })
+        return {
+          abort: vi.fn(),
+          done: new Promise<void>((resolve) => {
+            resolveDone = resolve
+          })
+        }
+      }
+    )
+
+    const { runAgentTurn } = await import('@/features/ai-chat/model/run-agent-turn')
+
+    const turnPromise = runAgentTurn({
+      targetChatId: chatId,
+      session: createTestSession(),
+      practiceLanguage: 'en',
+      chatComposerMode: 'text',
+      setBlurAnimateMessageId: () => undefined,
+      setError: (error) => useConversationStore.getState().setError(error),
+      processNextInQueue: async () => undefined,
+      tryRunPendingAgentReply: async () => false,
+      agentRun: {
+        beginAgentRun: () => {
+          agentRunState.generation += 1
+          return agentRunState.generation
+        },
+        isAgentRunActive: (runId) => runId === agentRunState.generation
+      }
+    })
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(getChatPipeline(chatId).pipelineStreamingAnswer).toBe(false)
+    expect(useConversationStore.getState().pipelineStreamingAnswer).toBe(false)
+
+    resolveDone?.()
+    await turnPromise
+  })
 })

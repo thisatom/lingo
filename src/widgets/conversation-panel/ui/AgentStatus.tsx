@@ -1,4 +1,5 @@
 import type { PipelineStage } from '@/entities/conversation/model/store'
+import { useSettingsStore } from '@/entities/settings/model/store'
 import { SpeakingTtsLevel } from '@/features/text-to-speech/ui/SpeakingTtsLevel'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { hostFromUrl, isBrowsableSearchTarget } from '@/shared/lib/web-search-targets'
@@ -19,6 +20,7 @@ interface AgentStatusProps {
 }
 
 export function AgentStatus({ stage }: AgentStatusProps) {
+  const reduceUiMotion = useSettingsStore((s) => s.reduceUiMotion)
   const pipelineSearchTargets = useConversationStore((s) => s.pipelineSearchTargets)
   const pipelineSearchActiveUrl = useConversationStore((s) => s.pipelineSearchActiveUrl)
 
@@ -38,6 +40,7 @@ export function AgentStatus({ stage }: AgentStatusProps) {
           className="text-[13px] leading-[1.5] font-normal"
           speed={2.2}
           spread={110}
+          disabled={reduceUiMotion}
         />
         {targets.length > 0 ? <SearchTargetList targets={targets} /> : null}
       </div>
@@ -60,6 +63,7 @@ export function AgentStatus({ stage }: AgentStatusProps) {
           className="shrink-0 text-[13px] leading-[1.5] font-normal"
           speed={2.2}
           spread={110}
+          disabled={reduceUiMotion}
         />
         <SpeakingTtsLevel />
       </div>
@@ -68,7 +72,13 @@ export function AgentStatus({ stage }: AgentStatusProps) {
 
   return (
     <div className={agentMessageClass} role="status" aria-live="polite" aria-label={label}>
-      <ShinyText text={label} className="text-[13px] leading-[1.5] font-normal" speed={2.2} spread={110} />
+      <ShinyText
+        text={label}
+        className="text-[13px] leading-[1.5] font-normal"
+        speed={2.2}
+        spread={110}
+        disabled={reduceUiMotion}
+      />
     </div>
   )
 }

@@ -71,7 +71,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
   }, [])
 
   const sessionRefs = getSharedAgentChatSessionRefs()
-  const prevActiveChatIdRef = useRef<string | null>(null)
   const optionsRef = useRef(options)
   optionsRef.current = options
 
@@ -151,14 +150,6 @@ export function useAiChat(options: UseAiChatOptions = {}) {
 
   const messages = activeChat?.messages ?? EMPTY_MESSAGES
   const activeChatId = activeChat?.id ?? null
-
-  useEffect(() => {
-    const previous = prevActiveChatIdRef.current
-    if (previous && previous !== activeChatId) {
-      chatAgentController.stop({ chatId: previous, force: true }, buildStopContext())
-    }
-    prevActiveChatIdRef.current = activeChatId
-  }, [activeChatId, buildStopContext])
 
   const agentSession = useMemo(
     () => getAgentSessionSnapshotForView(activeChatId, stage),

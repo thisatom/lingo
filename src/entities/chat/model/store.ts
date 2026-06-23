@@ -14,6 +14,11 @@ import {
 } from '@/entities/message/model/attachment'
 import type { Message, MessageSearchSource } from '@/entities/message/model/types'
 import { notifyActiveChatChange } from '@/entities/chat/model/active-chat-effects'
+import { notifyChatsReset } from '@/entities/chat/model/chat-reset-effects'
+import {
+  scheduleDeleteAttachmentsFromMessages
+} from '@/entities/message/lib/attachment-cleanup'
+import { clearAllAttachmentBlobs } from '@/entities/message/lib/attachment-storage'
 import { notifyChatDeleted } from '@/entities/chat/model/chat-delete-effects'
 import { useMessageQueueStore } from '@/entities/message-queue/model/store'
 import {
@@ -311,9 +316,15 @@ export const useChatsStore = create<ChatsState>()(
 
       deleteChat: (id) => {
         const prevActive = get().activeChatId
+        const deletedChat = get().chats.find((c) => c.id === id)
+        if (deletedChat) {
+          scheduleDeleteAttachmentsFromMessages(deletedChat.messages)
+        }
         set((state) => {
           const drafts = state.composerDraftByChatId ?? {}
           const { [id]: _removed, ...composerDraftByChatId } = drafts
+          const attachments = state.composerAttachmentsByChatId ?? {}
+          const { [id]: _removedAttachments, ...composerAttachmentsByChatId } = attachments
           const { [id]: _scroll, ...chatScrollByChatId } = state.chatScrollByChatId
           const chats = state.chats.filter((c) => c.id !== id)
           let activeChatId = state.activeChatId
@@ -331,6 +342,7 @@ export const useChatsStore = create<ChatsState>()(
               chats: [],
               activeChatId: null,
               composerDraftByChatId,
+              composerAttachmentsByChatId,
               chatHistoryPast: [],
               chatHistoryFuture: [],
               chatScrollByChatId
@@ -340,6 +352,7 @@ export const useChatsStore = create<ChatsState>()(
             chats: withSortedChats(chats),
             activeChatId,
             composerDraftByChatId,
+            composerAttachmentsByChatId,
             chatHistoryPast,
             chatHistoryFuture,
             chatScrollByChatId
@@ -424,6 +437,12 @@ export const useChatsStore = create<ChatsState>()(
         const chatId = targetChatId ?? get().activeChatId
         if (!chatId) return
 
+        const chat = get().chats.find((c) => c.id === chatId)
+        const index = chat?.messages.findIndex((m) => m.id === messageId) ?? -1
+        if (index >= 0 && chat) {
+          scheduleDeleteAttachmentsFromMessages(chat.messages.slice(index))
+        }
+
         invalidateChatApiHistoryCache(chatId)
 
         set((state) => ({
@@ -446,6 +465,12 @@ export const useChatsStore = create<ChatsState>()(
         const chatId = targetChatId ?? get().activeChatId
         if (!chatId) return
 
+        const chat = get().chats.find((c) => c.id === chatId)
+        const message = chat?.messages.find((m) => m.id === messageId)
+        if (message) {
+          scheduleDeleteAttachmentsFromMessages([message])
+        }
+
         set((state) => ({
           chats: withSortedChats(
             state.chats.map((c) => {
@@ -464,6 +489,12 @@ export const useChatsStore = create<ChatsState>()(
       removeMessagesAfter: (messageId, targetChatId) => {
         const chatId = targetChatId ?? get().activeChatId
         if (!chatId) return
+
+        const chat = get().chats.find((c) => c.id === chatId)
+        const index = chat?.messages.findIndex((m) => m.id === messageId) ?? -1
+        if (index >= 0 && chat) {
+          scheduleDeleteAttachmentsFromMessages(chat.messages.slice(index + 1))
+        }
 
         invalidateChatApiHistoryCache(chatId)
 
@@ -750,6 +781,8 @@ export const useChatsStore = create<ChatsState>()(
           chatHistoryFuture: [],
           chatScrollByChatId: {}
         })
+        void clearAllAttachmentBlobs().catch(() => undefined)
+        notifyChatsReset()
         notifyActiveChatChange()
       }
     }),

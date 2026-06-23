@@ -1,6 +1,10 @@
 import { memo } from 'react'
 import { cn } from '@/shared/lib/utils'
 import {
+  resolveUserHeaderStickyClass,
+  resolveUserHeaderStickyZIndex
+} from '@/widgets/conversation-panel/lib/conversation-turn-header'
+import {
   areConversationTurnPropsEqual,
   type ConversationTurnRenderProps
 } from '@/widgets/conversation-panel/lib/conversation-turn-render'
@@ -38,7 +42,8 @@ export const ConversationTurn = memo(function ConversationTurn({
   pipelineStage = 'idle',
   pipelineStreamingAnswer = false,
   pipelineSearchActiveUrl = null,
-  voiceCaptureLabel = null
+  voiceCaptureLabel = null,
+  userHeaderSticky = false
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
   const latestAssistantMessageId =
@@ -54,21 +59,20 @@ export const ConversationTurn = memo(function ConversationTurn({
     !pipelineStreamingAnswer &&
     (pipelineStage === 'searching' || pipelineSearchActiveUrl != null)
 
+  const headerZIndex = resolveUserHeaderStickyZIndex(isEditing, userHeaderSticky, turnIndex)
+
   return (
     <section
-      className={cn(
-        'w-full min-w-0 max-w-full scroll-mt-[18px] space-y-3.5',
-        !isLatestTurn && '[contain:layout_style]'
-      )}
+      className="w-full min-w-0 max-w-full scroll-mt-[18px] space-y-3.5"
       data-conversation-turn
       data-turn-id={turn.user.id}
     >
       <div
         className={cn(
           'w-full min-w-0 max-w-full bg-background',
-          isEditing ? 'relative' : 'sticky top-0 pb-px'
+          resolveUserHeaderStickyClass(isEditing, userHeaderSticky)
         )}
-        style={isEditing ? undefined : { zIndex: 20 + turnIndex }}
+        style={headerZIndex == null ? undefined : { zIndex: headerZIndex }}
       >
         <UserMessage
           messageId={turn.user.id}

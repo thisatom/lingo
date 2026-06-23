@@ -21,17 +21,30 @@ export function resolveWebSearchModel(userModelId: string): string {
   return withOnlineVariant(base)
 }
 
-export function extractAssistantText(message: {
+function extractAssistantTextRaw(message: {
   content?: string | Array<{ type?: string; text?: string }> | null
 }): string {
   if (!message.content) return ''
-  let raw = ''
-  if (typeof message.content === 'string') raw = message.content
-  else if (Array.isArray(message.content)) {
-    raw = message.content
+  if (typeof message.content === 'string') return message.content
+  if (Array.isArray(message.content)) {
+    return message.content
       .filter((part) => part.type === 'text' && part.text)
       .map((part) => part.text)
       .join('')
   }
-  return stripAssistantRoleMarkup(raw)
+  return ''
+}
+
+/** Final assistant text after a non-streaming completion. */
+export function extractAssistantText(message: {
+  content?: string | Array<{ type?: string; text?: string }> | null
+}): string {
+  return stripAssistantRoleMarkup(extractAssistantTextRaw(message))
+}
+
+/** Raw SSE chunk text — do not run line-based leak stripping per chunk. */
+export function extractAssistantStreamDelta(message: {
+  content?: string | Array<{ type?: string; text?: string }> | null
+}): string {
+  return extractAssistantTextRaw(message)
 }

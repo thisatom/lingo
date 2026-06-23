@@ -30,6 +30,17 @@ export function createStreamContentSync(sync: (text: string) => void) {
         cancelAnimationFrame(rafId)
         rafId = null
       }
+      if (pending !== null) {
+        sync(pending)
+        pending = null
+      }
+    },
+    /** Drop pending RAF text without writing to the store (after intentional tail removal). */
+    discard() {
+      if (rafId != null) {
+        cancelAnimationFrame(rafId)
+        rafId = null
+      }
       pending = null
     }
   }

@@ -1,3 +1,5 @@
+import { stripAssistantRoleMarkup } from '@/shared/lib/strip-assistant-role-markup'
+
 /** Plain text for TTS — no markdown, emojis, URLs, or source/citation blocks. */
 
 const SOURCES_HEADING =
@@ -20,7 +22,8 @@ function linkLabelForSpeech(label: string): string {
 }
 
 export function stripTextForSpeech(text: string): string {
-  let s = stripSourcesAndCitations(text)
+  let s = stripAssistantRoleMarkup(text.trim())
+  s = stripSourcesAndCitations(s)
 
   s = s.replace(/\p{Extended_Pictographic}/gu, '')
   s = s.replace(/[\u{1F3FB}-\u{1F3FF}\u{1F9B0}-\u{1F9B3}\u{200D}\u{FE0F}]/gu, '')

@@ -5,20 +5,11 @@ import {
   getSharedAgentChatSessionRefs
 } from '@/features/ai-chat/model/agent-chat-session'
 
-export type StopAgentOnChatDeletedOptions = {
-  pipelineBusy?: boolean
-  pendingReply?: boolean
-}
-
-/** Abort stream/TTS when a deleted chat still has in-flight agent work. */
-export function stopAgentOnChatDeleted(
-  chatId: string,
-  options: StopAgentOnChatDeletedOptions = {}
-): void {
+/** Abort stream/TTS only when the deleted chat owns the in-flight stream. */
+export function stopAgentOnChatDeleted(chatId: string): void {
   const streamChatId =
     getSharedAgentChatSessionRefs().streamTargetChatIdRef.current ?? getAgentStreamChatId()
-  const { pipelineBusy = false, pendingReply = false } = options
-  if (streamChatId !== chatId && !pipelineBusy && !pendingReply) {
+  if (streamChatId !== chatId) {
     return
   }
   executeAgentStop({ chatId, force: true }, buildDefaultAgentStopContext())

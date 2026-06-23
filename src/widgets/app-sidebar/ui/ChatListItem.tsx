@@ -73,12 +73,12 @@ export function ChatListItem({
           variant="ghost"
           size="icon"
           data-chat-row-action=""
-          triggerClassName="absolute top-1/2 right-1 z-10 -translate-y-1/2"
+          triggerClassName="pointer-events-none absolute top-1/2 right-1 z-10 -translate-y-1/2 group-hover/chat:pointer-events-auto focus-visible:pointer-events-auto"
           className={cn(
             'size-7',
-            'text-muted-foreground opacity-0 transition-opacity hover:text-foreground',
+            'pointer-events-none text-muted-foreground opacity-0 transition-opacity hover:text-foreground',
             sidebarRowActionNoHoverBgClass,
-            'group-hover/chat:opacity-100 focus-visible:opacity-100'
+            'group-hover/chat:pointer-events-auto group-hover/chat:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100'
           )}
           tooltip="Delete chat"
           aria-label="Delete chat"
@@ -97,7 +97,7 @@ export function ChatListItem({
         title="Delete this chat?"
         description={
           <>
-            <span className="font-medium text-[#d4d4d4]">&quot;{chat.title}&quot;</span> will be
+            <span className="font-medium text-foreground">&quot;{chat.title}&quot;</span> will be
             removed from your list. This cannot be undone.
           </>
         }

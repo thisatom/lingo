@@ -18,13 +18,17 @@ interface ChatSidebarIndicatorProps {
   onTogglePin: () => void
 }
 
-const pinTriggerClass = 'pointer-events-auto absolute inset-0 flex items-center justify-center'
+const pinTriggerClass = cn(
+  'absolute inset-0 flex items-center justify-center',
+  'pointer-events-none opacity-0',
+  'group-hover/chat:pointer-events-auto group-hover/chat:opacity-100',
+  'focus-visible:pointer-events-auto focus-visible:opacity-100'
+)
 
 const pinButtonClass = cn(
-  'size-6 opacity-0 transition-opacity',
+  'size-6 transition-opacity',
   'text-muted-foreground hover:text-foreground',
-  sidebarRowActionNoHoverBgClass,
-  'group-hover/chat:opacity-100 focus-visible:opacity-100'
+  sidebarRowActionNoHoverBgClass
 )
 
 export function ChatSidebarIndicator({
@@ -64,7 +68,7 @@ export function ChatSidebarIndicator({
         size="icon"
         data-chat-row-action=""
         triggerClassName={pinTriggerClass}
-        className={cn(pinButtonClass, pinned && 'text-sidebar-accent-foreground')}
+        className={cn(pinButtonClass, pinned && 'pointer-events-auto opacity-100 text-sidebar-accent-foreground')}
         tooltip={pinned ? 'Unpin chat' : 'Pin chat'}
         aria-pressed={pinned}
         onClick={(e) => {

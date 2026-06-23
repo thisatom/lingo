@@ -55,3 +55,13 @@ export async function deleteAttachmentBlob(id: string): Promise<void> {
     req.onerror = () => reject(req.error ?? new Error('delete attachment failed'))
   })
 }
+
+export async function clearAllAttachmentBlobs(): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    const req = tx.objectStore(STORE).clear()
+    req.onsuccess = () => resolve()
+    req.onerror = () => reject(req.error ?? new Error('clear attachments failed'))
+  })
+}

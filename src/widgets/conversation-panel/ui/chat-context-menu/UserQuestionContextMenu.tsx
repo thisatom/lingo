@@ -38,7 +38,8 @@ export function UserQuestionContextMenu({
             'min-w-0',
             chatNonSelectableClass,
             className,
-            onActivate && !activateDisabled && 'cursor-pointer'
+            onActivate && !activateDisabled && 'cursor-pointer',
+            activateDisabled && 'cursor-not-allowed opacity-60'
           )}
           data-user-question-block
           onClick={() => {

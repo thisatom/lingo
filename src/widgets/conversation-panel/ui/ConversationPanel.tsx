@@ -20,7 +20,9 @@ import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { CHAT_BOTTOM_INSET } from '@/widgets/conversation-panel/lib/chat-layout'
 import {
   applyScrollTop,
-  scrollViewportToBottom
+  captureVirtualizationScrollAnchor,
+  scrollViewportToBottom,
+  type VirtualizationScrollAnchor
 } from '@/widgets/conversation-panel/lib/chat-scroll-anchor'
 import {
   buildChatTailScrollSignature,
@@ -54,8 +56,12 @@ import { ConversationTurn } from './ConversationTurn'
 import { QueueAheadHint } from './QueueAheadHint'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import {
-  VirtualizedConversationTurns,
+  resolveVirtualizedTurnsActive,
   VIRTUALIZE_MESSAGE_THRESHOLD
+} from '@/widgets/conversation-panel/lib/virtualization-threshold'
+import {
+  VirtualizedConversationTurns,
+  type VirtualizedConversationScrollApi
 } from './VirtualizedConversationTurns'
 
 const ACTIVE_STAGES: PipelineStage[] = [
@@ -154,6 +160,7 @@ export function ConversationPanel({
   const atBottomRef = useRef(true)
   /** Follow the latest messages until the user scrolls up. */
   const pinToBottomRef = useRef(false)
+  const stickCoalescerRef = useRef(createRafCoalescer(() => {}))
   const assistantStreaming =
     agentBusy &&
     stage !== 'speaking' &&
@@ -193,8 +200,12 @@ export function ConversationPanel({
     CONVERSATION_DENSITY_GAP_CLASS.default
 
   const tailScrollSignature = useMemo(
-    () => buildChatTailScrollSignature(messages),
-    [messages]
+    () =>
+      buildChatTailScrollSignature(messages, {
+        pipelineStage: stage,
+        pipelineSearchActiveUrl
+      }),
+    [messages, pipelineSearchActiveUrl, stage]
   )
 
   const scrollToLatest = useCallback(
@@ -235,6 +246,7 @@ export function ConversationPanel({
   const prevShowStatusRef = useRef(showStatus)
   const prevTailScrollSignatureRef = useRef(tailScrollSignature)
   const prevAgentBusyRef = useRef(agentBusy)
+  const prevStageRef = useRef(stage)
 
   const handleAtBottomChange = useCallback(
     (value: boolean) => {
@@ -421,7 +433,7 @@ export function ConversationPanel({
         {
           pinToBottom: pinToBottomRef.current,
           isRestoring: isRestoringScrollRef.current,
-          agentReplyActive: agentBusy
+          agentBusy
         },
         viewport
       )
@@ -433,8 +445,6 @@ export function ConversationPanel({
     pinToBottomRef.current = true
     atBottomRef.current = true
   }, [agentBusy, onAtBottomChange, scrollToLatest])
-
-  const stickCoalescerRef = useRef(createRafCoalescer(() => stickToBottomIfFollowing()))
 
   useEffect(() => {
     stickCoalescerRef.current.cancel()
@@ -546,6 +556,7 @@ export function ConversationPanel({
       if (!(target instanceof Node)) return
       if (target instanceof Element && target.closest('[data-user-message-edit]')) return
       if (target instanceof Element && target.closest('[data-checkpoint-return-action]')) return
+      if (target instanceof Element && target.closest('[data-composer-root]')) return
       setEditingUserMessageId(null)
     }
 
@@ -557,16 +568,107 @@ export function ConversationPanel({
     () => groupMessagesIntoTurns(messages, { preserveEmptyUserMessageId: liveVoiceUserMessageId }),
     [liveVoiceUserMessageId, messages]
   )
-  const useVirtualizedTurns =
-    messages.length >= VIRTUALIZE_MESSAGE_THRESHOLD && !editingUserMessageId
+  const [useVirtualizedTurns, setUseVirtualizedTurns] = useState(
+    () => messages.length >= VIRTUALIZE_MESSAGE_THRESHOLD
+  )
+  const virtualizationAnchorRef = useRef<VirtualizationScrollAnchor | null>(null)
+  const virtualizedScrollApiRef = useRef<VirtualizedConversationScrollApi | null>(null)
+
+  useEffect(() => {
+    setUseVirtualizedTurns((active) => {
+      const next = resolveVirtualizedTurnsActive(messages.length, active)
+      if (next !== active) {
+        const viewport = viewportRef.current
+        if (viewport && !pinToBottomRef.current) {
+          virtualizationAnchorRef.current = captureVirtualizationScrollAnchor(viewport)
+        } else {
+          virtualizationAnchorRef.current = null
+        }
+      }
+      return next
+    })
+  }, [messages.length])
+
+  useLayoutEffect(() => {
+    const anchor = virtualizationAnchorRef.current
+    if (!anchor) return
+
+    const viewport = viewportRef.current
+    if (!viewport) {
+      virtualizationAnchorRef.current = null
+      return
+    }
+
+    if (pinToBottomRef.current) {
+      scrollToLatest('instant')
+      virtualizationAnchorRef.current = null
+      return
+    }
+
+    let cancelled = false
+    const finish = () => {
+      virtualizationAnchorRef.current = null
+    }
+
+    if (useVirtualizedTurns) {
+      const api = virtualizedScrollApiRef.current
+      if (anchor.turnId && api) {
+        api.scrollToTurn(anchor.turnId, { align: 'start' })
+      }
+      requestAnimationFrame(() => {
+        if (cancelled) return
+        applyScrollTop(viewport, anchor.scrollTop)
+        finish()
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const attemptRestore = (): boolean => {
+      if (cancelled) return true
+      if (anchor.turnId) {
+        const turnEl = viewport.querySelector(`[data-turn-id="${anchor.turnId}"]`)
+        turnEl?.scrollIntoView({ block: 'start' })
+      }
+      const { contentReady } = applyScrollTop(viewport, anchor.scrollTop)
+      if (contentReady) {
+        finish()
+        return true
+      }
+      return false
+    }
+
+    if (attemptRestore()) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const content =
+      viewport.querySelector('[data-chat-scroll-content]') ?? viewport.firstElementChild
+    const observer = new ResizeObserver(() => {
+      attemptRestore()
+    })
+    if (content) observer.observe(content)
+    const raf = requestAnimationFrame(() => attemptRestore())
+
+    return () => {
+      cancelled = true
+      observer.disconnect()
+      cancelAnimationFrame(raf)
+    }
+  }, [useVirtualizedTurns, scrollToLatest])
 
   useLayoutEffect(() => {
     if (!editingUserMessageId) return
-    const turnEl = document.querySelector(
-      `[data-turn-id="${editingUserMessageId}"]`
-    )
+    if (useVirtualizedTurns) {
+      virtualizedScrollApiRef.current?.scrollToTurn(editingUserMessageId, { align: 'center' })
+      return
+    }
+    const turnEl = document.querySelector(`[data-turn-id="${editingUserMessageId}"]`)
     turnEl?.scrollIntoView({ block: 'nearest' })
-  }, [editingUserMessageId])
+  }, [editingUserMessageId, useVirtualizedTurns])
   const hasVisibleMessages = useMemo(
     () => messages.some(messageHasVisibleContent),
     [messages]
@@ -717,6 +819,15 @@ export function ConversationPanel({
   }, [activeChatId, hasVisibleMessages, scheduleStickToBottomIfFollowing])
 
   useLayoutEffect(() => {
+    const stageChanged = stage !== prevStageRef.current
+    prevStageRef.current = stage
+    if (!stageChanged || !agentBusy) return
+    if (pinToBottomRef.current) {
+      followBottom()
+    }
+  }, [agentBusy, followBottom, stage])
+
+  useLayoutEffect(() => {
     const messagesGrew = messages.length > prevMessagesLengthRef.current
     const statusAppeared = showStatus && !prevShowStatusRef.current
     const tailChanged = tailScrollSignature !== prevTailScrollSignatureRef.current
@@ -812,6 +923,7 @@ export function ConversationPanel({
                 liveVoiceUserMessageId={liveVoiceUserMessageId}
                 onTailContentChange={scheduleStickToBottomIfFollowing}
                 pipelineSearchActiveUrl={pipelineSearchActiveUrl}
+                scrollApiRef={virtualizedScrollApiRef}
               />
             ) : (
               turns.map((turn, turnIndex) => {

@@ -7,4 +7,6 @@ export type LocalWebSearchProgress = {
   onVisitingUrl?: (url: string) => void
   /** BCP 47 locale for time/date/weather APIs (renderer practice language). */
   locale?: string
+  /** Abort when the user stops the agent or deletes the chat. */
+  signal?: AbortSignal
 }

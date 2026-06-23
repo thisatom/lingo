@@ -37,7 +37,7 @@ describe('agent-turn-cleanup', () => {
     expect(findTurnTailRemoveId(messages, 'a1')).toBe('a1')
   })
 
-  it('hasPersistedAssistantTurn detects stored assistant content', () => {
+  it('hasPersistedAssistantTurn detects stored assistant content after stream done', () => {
     const chatId = 'c1'
     useChatsStore.setState({
       chats: [
@@ -52,6 +52,28 @@ describe('agent-turn-cleanup', () => {
       activeChatId: chatId
     })
     expect(hasPersistedAssistantTurn(chatId, 'a1', '')).toBe(true)
+  })
+
+  it('hasPersistedAssistantTurn ignores partial store content before stream done', () => {
+    const chatId = 'c1'
+    useChatsStore.setState({
+      chats: [
+        {
+          id: chatId,
+          title: 'T',
+          messages: [msg('u1', 'user'), msg('a1', 'assistant', 'partial reply')],
+          updatedAt: 0,
+          createdAt: 0
+        }
+      ],
+      activeChatId: chatId
+    })
+    expect(
+      hasPersistedAssistantTurn(chatId, 'a1', 'partial reply', { streamCompleted: false })
+    ).toBe(false)
+    expect(
+      hasPersistedAssistantTurn(chatId, 'a1', 'partial reply', { streamCompleted: true })
+    ).toBe(true)
   })
 
   it('removeAgentTurnTailUnlessPersisted keeps a completed answer', () => {
@@ -80,9 +102,42 @@ describe('agent-turn-cleanup', () => {
       chatId,
       't1',
       'a1',
-      ''
+      '',
+      { streamCompleted: true }
     )
     expect(removed).toHaveLength(0)
     expect(useChatsStore.getState().chats[0]?.messages).toHaveLength(3)
+  })
+
+  it('removeAgentTurnTailUnlessPersisted removes partial assistant after stop', () => {
+    const chatId = 'c1'
+    useChatsStore.setState({
+      chats: [
+        {
+          id: chatId,
+          title: 'T',
+          messages: [
+            msg('u1', 'user'),
+            msg('t1', 'thinking', 'reasoning'),
+            msg('a1', 'assistant', 'partial reply')
+          ],
+          updatedAt: 0,
+          createdAt: 0
+        }
+      ],
+      activeChatId: chatId
+    })
+    const removed: string[] = []
+    removeAgentTurnTailUnlessPersisted(
+      (id) => {
+        removed.push(id)
+      },
+      chatId,
+      't1',
+      'a1',
+      'partial reply',
+      { streamCompleted: false }
+    )
+    expect(removed).toEqual(['t1'])
   })
 })

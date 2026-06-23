@@ -10,6 +10,8 @@ export type ConversationTurnRenderProps = {
   turnIndex: number
   activeChatId: string | null
   editingUserMessageId: string | null
+  /** Flat list only — sticky headers break inside virtualizer translateY rows. */
+  userHeaderSticky?: boolean
   actionsDisabled?: boolean
   showStopOnUserMessage?: boolean
   onStopAgent?: () => void
@@ -37,11 +39,28 @@ export type ConversationTurnRenderProps = {
   voiceCaptureLabel?: 'listening' | 'transcribing' | null
 }
 
+function userAttachmentsSignature(
+  attachments: readonly MessageAttachment[] | undefined
+): string {
+  if (!attachments?.length) return '0'
+  return attachments
+    .map(
+      (attachment) =>
+        `${attachment.id}:${attachment.kind}:${attachment.name}:${attachment.sizeBytes}:${attachment.payload.length}:${attachment.payload}`
+    )
+    .join('|')
+}
+
+function searchSourcesSignature(sources: Message['searchSources']): string {
+  if (!sources?.length) return ''
+  return sources.map((source) => `${source.url}:${source.title}`).join(';')
+}
+
 function assistantMessagesSignature(messages: readonly Message[]): string {
   return messages
     .map(
       (message) =>
-        `${message.id}:${message.role}:${message.content.length}:${message.searchSources?.length ?? 0}`
+        `${message.id}:${message.role}:${message.content}:${searchSourcesSignature(message.searchSources)}`
     )
     .join('|')
 }
@@ -55,8 +74,15 @@ export function areConversationTurnPropsEqual(
   if (prev.editingUserMessageId === prev.turn.user.id) return false
   if (next.editingUserMessageId === next.turn.user.id) return false
   if (prev.turn.id !== next.turn.id) return false
+  if (prev.turnIndex !== next.turnIndex) return false
+  if (prev.userHeaderSticky !== next.userHeaderSticky) return false
   if (prev.turn.user.content !== next.turn.user.content) return false
-  if (prev.turn.user.attachments?.length !== next.turn.user.attachments?.length) return false
+  if (
+    userAttachmentsSignature(prev.turn.user.attachments) !==
+    userAttachmentsSignature(next.turn.user.attachments)
+  ) {
+    return false
+  }
   if (prev.editingUserMessageId !== next.editingUserMessageId) return false
   if (prev.actionsDisabled !== next.actionsDisabled) return false
   if (prev.activeChatId !== next.activeChatId) return false

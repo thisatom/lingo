@@ -189,7 +189,7 @@ export function ChatComposer({
   }, [focusChatId, disabled])
 
   return (
-    <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')}>
+    <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')} data-composer-root>
       <div
         ref={zoneRef}
         className={cn(
@@ -307,8 +307,12 @@ export function ChatComposer({
               webSearchEnabled && cn(composerInputHoverClass, 'bg-accent text-foreground')
             )}
             disabled={disabled}
-            tooltip={webSearchEnabled ? 'Web search on' : 'Web search off'}
-            aria-label={webSearchEnabled ? 'Web search on' : 'Web search off'}
+            tooltip={
+              webSearchEnabled
+                ? 'Web search allowed'
+                : 'Web search off — say "search the web for…" to force lookup'
+            }
+            aria-label={webSearchEnabled ? 'Web search allowed' : 'Web search off'}
             aria-pressed={webSearchEnabled}
             onClick={() => setWebSearchEnabled(!webSearchEnabled)}
           >

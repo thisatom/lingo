@@ -34,7 +34,7 @@ function ResizableHandle({
     <ResizablePrimitive.Separator
       data-slot="resizable-handle"
       className={cn(
-        "relative w-px min-w-px max-w-px shrink-0 grow-0 bg-border p-0",
+        "relative w-px min-w-px max-w-px shrink-0 grow-0 cursor-col-resize bg-border p-0",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         className
       )}

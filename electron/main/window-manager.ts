@@ -121,6 +121,9 @@ export function createMainWindow(): BrowserWindow {
   })
 
   mainWindow.webContents.once('did-finish-load', () => {
+    if (!app.isPackaged) {
+      openDevToolsIfDev(mainWindow)
+    }
     void backgroundUpdateCheck((info) => {
       if (!mainWindow.isDestroyed()) {
         mainWindow.webContents.send('lingo:updater:available', info)

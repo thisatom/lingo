@@ -40,4 +40,9 @@ describe('stripAssistantStreamSafeMarkup', () => {
     expect(stripAssistantStreamSafeMarkup(raw)).toBe('П\nривет!')
     expect(stripAssistantRoleMarkup(raw)).toBe('П\nривет!')
   })
+
+  it('keeps partial code fences during streaming', () => {
+    const partial = 'Example:\n```typescript\nconst answer = '
+    expect(stripAssistantStreamSafeMarkup(partial)).toBe(partial)
+  })
 })

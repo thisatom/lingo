@@ -32,13 +32,15 @@ export function agentTurnTailMessageId(
   return thinkingMessageId ?? assistantMessageId
 }
 
-/** True when the assistant reply for this turn is already in the chat store. */
+/** True when the assistant reply for this turn finished streaming (`done` received). */
 export function hasPersistedAssistantTurn(
   targetChatId: string,
   assistantMessageId: string | null,
-  finalText: string
+  finalText: string,
+  options?: { streamCompleted?: boolean }
 ): boolean {
-  if (!assistantMessageId) return false
+  const streamCompleted = options?.streamCompleted ?? true
+  if (!assistantMessageId || !streamCompleted) return false
   if (finalText.trim()) return true
   const chat = useChatsStore.getState().chats.find((c) => c.id === targetChatId)
   const message = chat?.messages.find((m) => m.id === assistantMessageId)
@@ -61,9 +63,14 @@ export function removeAgentTurnTailUnlessPersisted(
   targetChatId: string,
   thinkingMessageId: string | null,
   assistantMessageId: string | null,
-  finalText: string
+  finalText: string,
+  options?: { streamCompleted?: boolean }
 ): void {
-  if (hasPersistedAssistantTurn(targetChatId, assistantMessageId, finalText)) return
+  if (
+    hasPersistedAssistantTurn(targetChatId, assistantMessageId, finalText, options)
+  ) {
+    return
+  }
   removeAgentTurnTail(
     removeMessagesFrom,
     targetChatId,

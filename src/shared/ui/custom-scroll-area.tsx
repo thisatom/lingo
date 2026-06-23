@@ -510,7 +510,7 @@ export function CustomScrollArea({
         >
           <div
             role="presentation"
-            className="absolute left-0 top-0 rounded-full transition-[background-color,opacity] duration-150"
+            className="absolute left-0 top-0 cursor-grab rounded-full transition-[background-color,opacity] duration-150 active:cursor-grabbing"
             style={thumbStyle}
             onPointerDown={onThumbPointerDown}
             onPointerMove={onThumbPointerMove}

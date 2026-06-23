@@ -74,7 +74,11 @@ export function VoiceRecordButton({
         if (disabled || isToggle) return
         if (isListening) onRelease()
       }}
-      onClick={(e) => e.preventDefault()}
+      onClick={() => {
+        if (disabled || !isToggle) return
+        if (isListening) onRelease()
+        else onPress()
+      }}
     >
       {isListening ? <Square className="fill-current" /> : <Mic />}
     </Button>

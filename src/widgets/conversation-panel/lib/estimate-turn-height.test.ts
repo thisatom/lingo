@@ -23,4 +23,38 @@ describe('estimateTurnHeightPx', () => {
     })
     expect(long).toBeGreaterThan(short)
   })
+
+  it('accounts for attachments, code blocks, and search sources', () => {
+    const plain = estimateTurnHeightPx({
+      id: 'u1',
+      user: msg('user', 'hi'),
+      assistantMessages: [msg('assistant', 'ok')]
+    })
+    const rich = estimateTurnHeightPx({
+      id: 'u2',
+      user: {
+        ...msg('user', 'see attached'),
+        attachments: [
+          {
+            id: 'a1',
+            kind: 'image',
+            name: 'photo.png',
+            mimeType: 'image/png',
+            payload: 'data:image/png;base64,abc',
+            sizeBytes: 12
+          }
+        ]
+      },
+      assistantMessages: [
+        {
+          ...msg('assistant', '```ts\nconsole.log(1)\n```'),
+          searchSources: [
+            { title: 'Docs', url: 'https://example.com' },
+            { title: 'Guide', url: 'https://example.org' }
+          ]
+        }
+      ]
+    })
+    expect(rich).toBeGreaterThan(plain)
+  })
 })
