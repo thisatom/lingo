@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { ChevronDown, Search, X } from '@/shared/ui/icons'
+import { FieldContextMenu } from '@/features/chat-composer/ui/FieldContextMenu'
+import { composerStackPanelHeaderClass } from '@/widgets/chat-composer/lib/composer-stack-panel'
 import { cn } from '@/shared/lib/utils'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
@@ -16,7 +18,8 @@ type Props = {
   searchQuery: string
   onSearchQueryChange: (value: string) => void
   searchOpen: boolean
-  onToggleSearch: () => void
+  onSearchClick: () => void
+  searchInputRef: RefObject<HTMLInputElement | null>
   searchPlaceholder?: string
 }
 
@@ -40,11 +43,14 @@ export function ComposerStackPanelHeader({
   searchQuery,
   onSearchQueryChange,
   searchOpen,
-  onToggleSearch,
+  onSearchClick,
+  searchInputRef,
   searchPlaceholder = 'Search…'
 }: Props) {
+  const showSearchField = !listCollapsed && searchOpen
+
   return (
-    <div className="px-3 py-2">
+    <div className={composerStackPanelHeaderClass(listCollapsed)}>
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs">
           <span className="shrink-0 font-medium text-foreground">
@@ -59,18 +65,20 @@ export function ComposerStackPanelHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <TooltipIconButton
-            type="button"
-            variant="ghost"
-            size="iconSm"
-            className={cn(searchToggleClass, searchOpen && 'text-foreground')}
-            tooltip={searchOpen ? 'Close search' : 'Search'}
-            aria-label={searchOpen ? 'Close search' : 'Search list'}
-            aria-pressed={searchOpen}
-            onClick={onToggleSearch}
-          >
-            <Search className="size-3.5" />
-          </TooltipIconButton>
+          {!listCollapsed ? (
+            <TooltipIconButton
+              type="button"
+              variant="ghost"
+              size="iconSm"
+              className={cn(searchToggleClass, searchOpen && 'text-foreground')}
+              tooltip={searchOpen ? 'Close search' : 'Search'}
+              aria-label={searchOpen ? 'Close search' : 'Search list'}
+              aria-pressed={searchOpen}
+              onClick={onSearchClick}
+            >
+              <Search className="size-3.5" />
+            </TooltipIconButton>
+          ) : null}
           <button
             type="button"
             className="flex shrink-0 cursor-pointer items-center gap-0.5 whitespace-nowrap text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -80,41 +88,50 @@ export function ComposerStackPanelHeader({
           >
             {listCollapsed ? collapseShowLabel : collapseHideLabel}
             <ChevronDown
-              className={cn('size-3 opacity-70 transition-transform', listCollapsed && '-rotate-90')}
+              className={cn(
+                'size-3 opacity-70 transition-transform duration-200',
+                !listCollapsed && 'rotate-180'
+              )}
               aria-hidden
             />
           </button>
         </div>
       </div>
 
-      {searchOpen ? (
-        <div className="relative mt-2">
-          <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(event) => onSearchQueryChange(event.target.value)}
-            placeholder={searchPlaceholder}
-            className={cn(
-              'h-7 w-full rounded-md border border-border bg-input py-0 pl-8 pr-8 text-xs leading-none text-foreground',
-              'placeholder:text-muted-foreground outline-none focus-visible:border-ring'
-            )}
-            aria-label={searchPlaceholder}
-          />
-          {searchQuery ? (
-            <button
-              type="button"
-              className="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
-              aria-label="Clear search"
-              onClick={() => onSearchQueryChange('')}
-            >
-              <X className="size-3.5" />
-            </button>
-          ) : null}
-        </div>
+      {showSearchField ? (
+        <FieldContextMenu fieldRef={searchInputRef} onValueChange={onSearchQueryChange}>
+          <div className="relative mt-2">
+            <Search
+              className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <input
+              ref={searchInputRef}
+              type="text"
+              inputMode="search"
+              autoComplete="off"
+              value={searchQuery}
+              onChange={(event) => onSearchQueryChange(event.target.value)}
+              placeholder={searchPlaceholder}
+              className={cn(
+                'h-7 w-full rounded-md border border-border bg-input py-0 pl-7 text-xs leading-none text-foreground',
+                searchQuery ? 'pr-7' : 'pr-2',
+                'placeholder:text-muted-foreground outline-none focus-visible:border-ring'
+              )}
+              aria-label={searchPlaceholder}
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                className="absolute right-1.5 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+                onClick={() => onSearchQueryChange('')}
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+        </FieldContextMenu>
       ) : null}
     </div>
   )

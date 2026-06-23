@@ -235,7 +235,8 @@
   }
 
   input,
-  textarea {
+  textarea,
+  [role='alert'] {
     user-select: text;
   }
 

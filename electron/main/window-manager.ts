@@ -7,7 +7,6 @@ import {
 } from '@incanta/custom-electron-titlebar/main'
 import { getTitlebarTheme } from '../../src/shared/config/titlebar'
 import { backgroundUpdateCheck } from './app-update'
-import { openDevToolsIfDev } from './devtools'
 import { resolveAppIconPath } from './icon'
 import { resolvePreloadScript } from './paths'
 import { registerWindowShortcuts } from './window-shortcuts'
@@ -15,6 +14,13 @@ import { setupGracefulShutdown } from './shutdown'
 import { packagedRendererUrl } from './renderer-protocol'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+function openDevToolsIfDev(win: BrowserWindow): void {
+  if (win.webContents.isDestroyed()) return
+  if (process.env.NODE_ENV === 'production' && !process.env.ELECTRON_RENDERER_URL) return
+  if (win.webContents.isDevToolsOpened()) return
+  win.webContents.openDevTools({ mode: 'detach' })
+}
 
 /** Vite dev server may bind to 127.0.0.1 while electron-vite sets localhost — fix ERR_FAILED on Windows. */
 export function resolveDevRendererUrl(): string {

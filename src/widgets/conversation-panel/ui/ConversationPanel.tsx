@@ -18,6 +18,7 @@ import { useSettingsStore } from '@/entities/settings/model/store'
 import { CONVERSATION_DENSITY_GAP_CLASS } from '@/shared/lib/appearance'
 import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { CHAT_BOTTOM_INSET } from '@/widgets/conversation-panel/lib/chat-layout'
+import { shouldDismissUserMessageEdit } from '@/widgets/conversation-panel/lib/user-message-edit-dismiss'
 import {
   applyScrollTop,
   scrollViewportToBottom,
@@ -580,11 +581,7 @@ export function ConversationPanel({
     if (!editingUserMessageId) return
 
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target
-      if (!(target instanceof Node)) return
-      if (target instanceof Element && target.closest('[data-user-message-edit]')) return
-      if (target instanceof Element && target.closest('[data-checkpoint-return-action]')) return
-      if (target instanceof Element && target.closest('[data-composer-root]')) return
+      if (!shouldDismissUserMessageEdit(event.target)) return
       setEditingUserMessageId(null)
     }
 

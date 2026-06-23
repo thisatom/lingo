@@ -1,6 +1,7 @@
 import { FileText, X } from '@/shared/ui/icons'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { useAttachmentDisplayUrl } from '@/features/chat-attachments/model/useAttachmentDisplayUrl'
+import { TooltipWrap } from '@/shared/ui/tooltip-wrap'
 import { cn } from '@/shared/lib/utils'
 
 function QueueAttachmentThumb({ item }: { item: MessageAttachment }) {
@@ -39,11 +40,13 @@ export function QueuedMessageAttachments({ attachments, className, onRemove, onO
         )
 
         return (
-          <span
+          <TooltipWrap
             key={item.id}
-            className="inline-flex max-w-[140px] items-center gap-0.5 rounded border border-border bg-muted py-0.5 pl-0.5 pr-0.5 text-[10px] text-muted-foreground"
-            title={item.name}
+            label={item.name}
+            side="top"
+            contentClassName="max-w-sm break-all"
           >
+            <span className="inline-flex max-w-[140px] items-center gap-0.5 rounded border border-border bg-muted py-0.5 pl-0.5 pr-0.5 text-[10px] text-muted-foreground">
             {interactive ? (
               <button
                 type="button"
@@ -69,7 +72,8 @@ export function QueuedMessageAttachments({ attachments, className, onRemove, onO
                 <X className="size-2.5" />
               </button>
             ) : null}
-          </span>
+            </span>
+          </TooltipWrap>
         )
       })}
     </div>

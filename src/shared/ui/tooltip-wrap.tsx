@@ -21,9 +21,14 @@ export function TooltipWrap({
   contentClassName
 }: TooltipWrapProps) {
   return (
-    <Tooltip>
+    <Tooltip delayDuration={240}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side} align={align} sideOffset={sideOffset} className={contentClassName}>
+      <TooltipContent
+        side={side}
+        align={align}
+        sideOffset={sideOffset}
+        className={contentClassName}
+      >
         {label}
       </TooltipContent>
     </Tooltip>
@@ -57,21 +62,25 @@ export function TooltipIconButton({
     typeof tooltip === 'string' || typeof tooltip === 'number' ? String(tooltip) : undefined
 
   return (
-    <TooltipWrap
-      label={tooltip}
-      side={tooltipSide}
-      align={tooltipAlign}
-      sideOffset={tooltipSideOffset}
-    >
-      <Button
-        type={type}
-        disabled={disabled}
-        className={cn(className, triggerClassName)}
-        {...props}
-        aria-label={ariaLabelProp ?? ariaFallback}
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>
+        <Button
+          type={type}
+          disabled={disabled}
+          className={cn(className, triggerClassName)}
+          {...props}
+          aria-label={ariaLabelProp ?? ariaFallback}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent
+        side={tooltipSide}
+        align={tooltipAlign}
+        sideOffset={tooltipSideOffset}
       >
-        {children}
-      </Button>
-    </TooltipWrap>
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
   )
 }

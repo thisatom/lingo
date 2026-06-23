@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { NewChat } from '@/shared/ui/icons'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { getChatPipeline } from '@/features/ai-chat/lib/chat-pipeline-registry'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { useChatSearchHotkey } from '@/features/chat-search/model/useChatSearchHotkey'
 import { ChatSearchDialog } from '@/features/chat-search/ui/ChatSearchDialog'
+import { navigateToChat, chatRoutePath } from '@/features/chat/lib/chat-route'
 import { groupChatsByDate } from '@/shared/lib/chat-sidebar'
 import { Button } from '@/shared/ui/button'
 import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
@@ -32,6 +33,7 @@ import { SidebarUserFooter } from './SidebarUserFooter'
 
 export function AppSidebar() {
   const location = useLocation()
+  const navigate = useNavigate()
   const chats = useChatsStore((s) => s.chats)
   const activeChatId = useChatsStore((s) => s.activeChatId)
   const createChat = useChatsStore((s) => s.createChat)
@@ -72,7 +74,7 @@ export function AppSidebar() {
       agentActive={
         !isSettings && isSidebarAgentStage(getChatPipeline(chat.id).stage)
       }
-      onOpen={() => selectChat(chat.id)}
+      onOpen={() => navigateToChat(navigate, chat.id, selectChat)}
       onTogglePin={() => togglePinChat(chat.id)}
       onDelete={() => deleteChat(chat.id)}
     />
@@ -103,7 +105,10 @@ export function AppSidebar() {
                 size="sm"
                 variant="outline"
                 aria-label="New chat"
-                onClick={() => createChat()}
+                onClick={() => {
+                  const id = createChat()
+                  navigate(chatRoutePath(id))
+                }}
               >
                 <NewChat className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-left">New chat</span>

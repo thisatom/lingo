@@ -1,22 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
+import { ComposerTextareaContextMenu } from '@/features/chat-composer/ui/ComposerTextareaContextMenu'
 import { X } from '@/shared/ui/icons'
 import { ArrowUp, Mic, Square } from 'lucide-react'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import { useComposerPaste } from '@/features/chat-attachments/model/useComposerPaste'
-import { QueuedMessageAttachments } from '@/features/chat-attachments/ui/QueuedMessageAttachments'
 import { ComposerFileInput } from '@/features/chat-attachments/ui/ComposerFileInput'
+import {
+  composerStackPanelFlexShrinkClass,
+  composerTextareaScrollClass
+} from '@/widgets/chat-composer/lib/composer-stack-panel'
+import { ComposerAttachmentsPanel } from '@/widgets/chat-composer/ui/ComposerAttachmentsPanel'
+import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
 import { UserQuestionContextMenu } from './chat-context-menu/UserQuestionContextMenu'
 import { MessageBodyClamp } from './MessageBodyClamp'
 import { UserMessageAttachments } from '@/features/chat-attachments/ui/UserMessageAttachments'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { UserMessageActionButton } from './UserMessageActionButton'
+import { composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
 import { MarkdownContent } from '@/shared/ui/markdown-content'
-import { chatSelectableClass, userMessageBubbleClass } from './agent-layout'
+import { chatSelectableClass, userMessageBodyClass, userMessageFilesOnlyClass, userMessageShellClass } from './agent-layout'
 import { cn } from '@/shared/lib/utils'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
-const INPUT_MIN_HEIGHT_PX = 32
+const INPUT_MIN_HEIGHT_PX = 24
 
 function resizeTextarea(el: HTMLTextAreaElement) {
   el.style.height = `${INPUT_MIN_HEIGHT_PX}px`
@@ -150,85 +157,27 @@ export function UserMessage({
 
   if (isEditing) {
     return (
-      <div className="group/message w-full min-w-0 max-w-full" data-user-message-edit>
-        <div
-          className={cn(
-            userMessageBubbleClass,
-            'flex w-full max-w-full flex-col gap-2 px-2 py-2',
-            'transition-colors focus-within:border-muted-foreground/40',
-            disabled && 'opacity-60'
-          )}
-        >
-          {hasAttachments ? (
-            <QueuedMessageAttachments
-              attachments={editAttachments}
+      <div
+        className={cn(
+          userMessageShellClass,
+          'max-h-[min(70dvh,32rem)] transition-colors focus-within:border-muted-foreground/40',
+          disabled && 'opacity-60'
+        )}
+        data-user-message-edit
+      >
+        {hasAttachments ? (
+          <div className={composerStackPanelFlexShrinkClass}>
+            <ComposerAttachmentsPanel
+              embedded
+              items={editAttachments}
               onRemove={(id) => setEditAttachments((prev) => prev.filter((a) => a.id !== id))}
-              className="px-0.5"
+              listId={`user-message-edit-attachments-${messageId}`}
             />
-          ) : null}
+          </div>
+        ) : null}
 
-          <div className="grid min-h-8 w-full grid-cols-[24px_24px_24px_1fr_24px] items-center gap-1">
-            <TooltipIconButton
-              variant="ghost"
-              size="iconSm"
-              className="justify-self-center rounded-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              tooltip="Cancel"
-              disabled={disabled}
-              onClick={handleCancel}
-            >
-              <X className="size-3.5" />
-            </TooltipIconButton>
-
-            <ComposerFileInput
-              existingCount={editAttachments.length}
-              disabled={disabled}
-              onAdd={handleAddAttachments}
-              onError={onAttachmentError}
-            />
-
-            {voiceSupported && onVoicePress && onVoiceStop ? (
-              isVoiceListening ? (
-                <TooltipIconButton
-                  type="button"
-                  variant="destructive"
-                  size="iconSm"
-                  className="justify-self-center rounded-full"
-                  disabled={disabled || voiceBusy}
-                  tooltip="Stop recording"
-                  aria-label="Stop recording"
-                  onClick={onVoiceStop}
-                >
-                  <Square className="size-3.5 fill-current" strokeWidth={0} />
-                </TooltipIconButton>
-              ) : (
-                <TooltipIconButton
-                  type="button"
-                  variant="ghost"
-                  size="iconSm"
-                  className="justify-self-center rounded-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  disabled={disabled || voiceBusy}
-                  tooltip="Speak"
-                  aria-label="Speak"
-                  onClick={onVoicePress}
-                >
-                  <Mic className="size-3.5" strokeWidth={2} />
-                </TooltipIconButton>
-              )
-            ) : (
-              <TooltipIconButton
-                type="button"
-                variant="ghost"
-                size="iconSm"
-                className="justify-self-center rounded-full text-muted-foreground"
-                disabled
-                tabIndex={-1}
-                tooltip="Speech unavailable"
-                aria-label="Speech unavailable"
-              >
-                <Mic className="size-3.5" strokeWidth={2} />
-              </TooltipIconButton>
-            )}
-
+        <CustomScrollArea variant="menu" className={composerTextareaScrollClass}>
+          <ComposerTextareaContextMenu onValueChange={setDraft} textareaRef={textareaRef}>
             <textarea
               ref={textareaRef}
               value={draft}
@@ -241,8 +190,8 @@ export function UserMessage({
               style={{ height: INPUT_MIN_HEIGHT_PX }}
               className={cn(
                 chatSelectableClass,
-                'max-h-40 min-h-8 w-full resize-none bg-transparent px-1 py-1',
-                'text-[13px] leading-[1.5] text-foreground placeholder:text-muted-foreground',
+                'block min-h-6 w-full resize-none overflow-hidden bg-transparent',
+                'px-3 pt-2 pb-1 text-[13px] leading-5 text-foreground placeholder:text-muted-foreground',
                 'outline-none disabled:cursor-not-allowed'
               )}
               onInput={(e) => resizeTextarea(e.currentTarget)}
@@ -257,54 +206,123 @@ export function UserMessage({
                 }
               }}
             />
+          </ComposerTextareaContextMenu>
+        </CustomScrollArea>
 
+        <div className="flex shrink-0 items-center gap-0.5 px-2 pb-2 pt-0.5">
+          <TooltipIconButton
+            variant="ghost"
+            size="iconSm"
+            className={composerToolbarIconClass}
+            tooltip="Cancel"
+            disabled={disabled}
+            onClick={handleCancel}
+          >
+            <X className="size-3.5" />
+          </TooltipIconButton>
+
+          <ComposerFileInput
+            existingCount={editAttachments.length}
+            disabled={disabled}
+            onAdd={handleAddAttachments}
+            onError={onAttachmentError}
+          />
+
+          {voiceSupported && onVoicePress && onVoiceStop ? (
+            isVoiceListening ? (
+              <TooltipIconButton
+                type="button"
+                variant="destructive"
+                size="iconSm"
+                className="shrink-0 rounded-full"
+                disabled={disabled || voiceBusy}
+                tooltip="Stop recording"
+                aria-label="Stop recording"
+                onClick={onVoiceStop}
+              >
+                <Square className="size-3.5 fill-current" strokeWidth={0} />
+              </TooltipIconButton>
+            ) : (
+              <TooltipIconButton
+                type="button"
+                variant="ghost"
+                size="iconSm"
+                className={composerToolbarIconClass}
+                disabled={disabled || voiceBusy}
+                tooltip="Speak"
+                aria-label="Speak"
+                onClick={onVoicePress}
+              >
+                <Mic className="size-3.5" strokeWidth={2} />
+              </TooltipIconButton>
+            )
+          ) : (
             <TooltipIconButton
+              type="button"
+              variant="ghost"
               size="iconSm"
-              className={cn(
-                'justify-self-center rounded-full transition-colors',
-                canSend
-                  ? 'bg-foreground text-background hover:bg-foreground/90'
-                  : 'bg-muted text-muted-foreground'
-              )}
-              disabled={!canSend}
-              tooltip="Send"
-              onClick={handleSubmit}
+              className={composerToolbarIconClass}
+              disabled
+              tabIndex={-1}
+              tooltip="Speech unavailable"
+              aria-label="Speech unavailable"
             >
-              <ArrowUp className="size-3.5" strokeWidth={2} />
+              <Mic className="size-3.5" strokeWidth={2} />
             </TooltipIconButton>
-          </div>
+          )}
+
+          <div className="min-w-0 flex-1" />
+
+          <TooltipIconButton
+            size="iconSm"
+            className={cn(
+              'shrink-0 rounded-full transition-colors',
+              canSend
+                ? 'bg-foreground text-background hover:bg-foreground/90'
+                : 'bg-muted text-muted-foreground'
+            )}
+            disabled={!canSend}
+            tooltip="Send"
+            onClick={handleSubmit}
+          >
+            <ArrowUp className="size-3.5" strokeWidth={2} />
+          </TooltipIconButton>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={cn('relative w-full min-w-0 max-w-full', userMessageBubbleClass)}>
-      <UserQuestionContextMenu
-        prompt={content}
-        chatId={chatId}
-        className="block min-w-0 w-full"
-        activateDisabled={disabled && !showStop}
-        onActivate={showStop ? undefined : onEnterEdit}
-      >
-        <MessageBodyClamp bodyClassName="pr-8">
-          {attachments && attachments.length > 0 ? (
-            <UserMessageAttachments attachments={attachments} />
-          ) : null}
-          {content.trim() ? (
-            <MarkdownContent content={content} variant="user" />
-          ) : voiceCaptureLabel ? (
-            <p className="text-sm italic text-muted-foreground">
-              {voiceCaptureLabel === 'transcribing' ? 'Transcribing…' : 'Listening…'}
-            </p>
-          ) : null}
-        </MessageBodyClamp>
-      </UserQuestionContextMenu>
-      <UserMessageActionButton
-        mode={showStop ? 'stop' : 'edit'}
-        disabled={disabled && !showStop}
-        onClick={showStop ? () => onStopAgent?.() : onEnterEdit}
-      />
+    <div className={userMessageShellClass}>
+      <div className={userMessageBodyClass}>
+        <UserQuestionContextMenu
+          prompt={content}
+          chatId={chatId}
+          className="block min-w-0 w-full"
+          activateDisabled={disabled && !showStop}
+          onActivate={showStop ? undefined : onEnterEdit}
+        >
+          <MessageBodyClamp bodyClassName="pr-8">
+            {content.trim() ? (
+              <MarkdownContent content={content} variant="user" />
+            ) : voiceCaptureLabel ? (
+              <p className={userMessageFilesOnlyClass}>
+                {voiceCaptureLabel === 'transcribing' ? 'Transcribing…' : 'Listening…'}
+              </p>
+            ) : attachments && attachments.length > 0 ? (
+              <p className={userMessageFilesOnlyClass}>Attached files</p>
+            ) : null}
+          </MessageBodyClamp>
+        </UserQuestionContextMenu>
+        <UserMessageActionButton
+          mode={showStop ? 'stop' : 'edit'}
+          disabled={disabled && !showStop}
+          onClick={showStop ? () => onStopAgent?.() : onEnterEdit}
+        />
+      </div>
+      {attachments && attachments.length > 0 ? (
+        <UserMessageAttachments attachments={attachments} messageId={messageId} />
+      ) : null}
     </div>
   )
 }

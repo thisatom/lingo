@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUp, CornerDownLeft, Pencil, Trash2 } from '@/shared/ui/icons'
 import type { QueuedMessage } from '@/entities/message-queue/model/store'
+import { FieldContextMenu } from '@/features/chat-composer/ui/FieldContextMenu'
 import { QueuedMessageAttachments } from '@/features/chat-attachments/ui/QueuedMessageAttachments'
 import {
+  COMPOSER_STACK_PANEL_DEFAULT_COLLAPSED,
   composerStackPanelShellClass,
-  filterQueuedByQuery
+  filterQueuedByQuery,
+  toggleStackPanelCollapse
 } from '@/widgets/chat-composer/lib/composer-stack-panel'
+import { useComposerPanelSearch } from '@/widgets/chat-composer/lib/use-composer-panel-search'
 import { ComposerStackPanelHeader } from '@/widgets/chat-composer/ui/ComposerStackPanelHeader'
 import { cn } from '@/shared/lib/utils'
 import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
@@ -44,9 +48,16 @@ export function ChatMessageQueue({
 }: ChatMessageQueueProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
-  const [listCollapsed, setListCollapsed] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [listCollapsed, setListCollapsed] = useState(COMPOSER_STACK_PANEL_DEFAULT_COLLAPSED)
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const {
+    searchOpen,
+    searchQuery,
+    setSearchQuery,
+    searchInputRef,
+    toggleSearch,
+    resetSearch
+  } = useComposerPanelSearch()
 
   const filteredItems = useMemo(
     () => filterQueuedByQuery(items, searchQuery),
@@ -55,12 +66,11 @@ export function ChatMessageQueue({
 
   useEffect(() => {
     if (items.length === 0) {
-      setSearchOpen(false)
-      setSearchQuery('')
+      resetSearch()
       setEditingId(null)
       setEditDraft('')
     }
-  }, [items.length])
+  }, [items.length, resetSearch])
 
   if (items.length === 0) return null
 
@@ -78,33 +88,27 @@ export function ChatMessageQueue({
     setEditDraft('')
   }
 
-  const showHeaderDivider = !embedded || !listCollapsed || searchOpen
-
   return (
-    <div className={cn(composerStackPanelShellClass(embedded), className)}>
-      <div className={cn(showHeaderDivider && 'border-b border-border')}>
-        <ComposerStackPanelHeader
-          count={items.length}
-          countLabel="Queued"
-          metaIcon={<CornerDownLeft className="size-3 shrink-0" />}
-          metaSuffix="to Send"
-          listCollapsed={listCollapsed}
-          onToggleCollapse={() => setListCollapsed((collapsed) => !collapsed)}
-          collapseShowLabel="Show queue"
-          collapseHideLabel="Hide queue"
-          listId="chat-message-queue-list"
-          searchQuery={searchQuery}
-          onSearchQueryChange={setSearchQuery}
-          searchOpen={searchOpen}
-          onToggleSearch={() =>
-            setSearchOpen((open) => {
-              if (open) setSearchQuery('')
-              return !open
-            })
-          }
-          searchPlaceholder="Search queue…"
-        />
-      </div>
+    <div className={cn(composerStackPanelShellClass(embedded, className, 'bottom', listCollapsed))}>
+      <ComposerStackPanelHeader
+        count={items.length}
+        countLabel="Queued"
+        metaIcon={<CornerDownLeft className="size-3 shrink-0" />}
+        metaSuffix="to Send"
+        listCollapsed={listCollapsed}
+        onToggleCollapse={() =>
+          toggleStackPanelCollapse(listCollapsed, setListCollapsed, resetSearch)
+        }
+        collapseShowLabel="Show queue"
+        collapseHideLabel="Hide queue"
+        listId="chat-message-queue-list"
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        searchOpen={searchOpen}
+        onSearchClick={() => toggleSearch(() => setListCollapsed(false))}
+        searchInputRef={searchInputRef}
+        searchPlaceholder="Search queue…"
+      />
 
       {!listCollapsed ? (
         <CustomScrollArea variant="menu" className="max-h-60">
@@ -118,24 +122,27 @@ export function ChatMessageQueue({
                 return (
                   <li key={item.id} className="group flex min-h-8 items-center gap-2 px-3 py-1">
                     {isEditing ? (
-                      <textarea
-                        value={editDraft}
-                        onChange={(e) => setEditDraft(e.target.value)}
-                        onBlur={() => commitEdit(item)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            commitEdit(item)
-                          }
-                          if (e.key === 'Escape') {
-                            setEditingId(null)
-                            setEditDraft('')
-                          }
-                        }}
-                        autoFocus
-                        rows={1}
-                        className="min-h-6 min-w-0 flex-1 resize-none rounded-md border border-border bg-input px-2 py-0.5 text-xs leading-5 text-foreground outline-none focus-visible:border-ring"
-                      />
+                      <FieldContextMenu fieldRef={editTextareaRef} onValueChange={setEditDraft}>
+                        <textarea
+                          ref={editTextareaRef}
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          onBlur={() => commitEdit(item)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              commitEdit(item)
+                            }
+                            if (e.key === 'Escape') {
+                              setEditingId(null)
+                              setEditDraft('')
+                            }
+                          }}
+                          autoFocus
+                          rows={1}
+                          className="min-h-6 min-w-0 flex-1 resize-none rounded-md border border-border bg-input px-2 py-0.5 text-xs leading-5 text-foreground outline-none focus-visible:border-ring"
+                        />
+                      </FieldContextMenu>
                     ) : (
                       <div className="flex min-h-5 min-w-0 flex-1 items-center gap-1.5">
                         {item.attachments && item.attachments.length > 0 ? (

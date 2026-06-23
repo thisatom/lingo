@@ -14,6 +14,10 @@ import { useSettingsStore } from '@/entities/settings/model/store'
 import { VoiceRecordButton, type VoiceInteractionMode } from '@/features/voice-capture/ui/VoiceRecordButton'
 import { composerInputHoverClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { CHAT_MODE_LABELS, composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
+import {
+  composerStackPanelFlexShrinkClass,
+  composerTextareaScrollClass
+} from '@/widgets/chat-composer/lib/composer-stack-panel'
 import { ComposerAgentMenuSelect } from '@/widgets/chat-composer/ui/ComposerAgentMenuSelect'
 import { ComposerAttachmentsPanel } from '@/widgets/chat-composer/ui/ComposerAttachmentsPanel'
 import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
@@ -28,7 +32,7 @@ import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 const INPUT_MIN_HEIGHT_PX = 24
 
 const composerShellClass = cn(
-  'flex w-full flex-col overflow-hidden rounded-3xl border border-border bg-chat-composer',
+  'flex w-full max-h-[min(70dvh,calc(100dvh-5.5rem))] flex-col overflow-hidden rounded-3xl border border-border bg-chat-composer',
   'transition-[border-color] duration-150',
   'focus-within:border-ring/70',
   'has-[:focus-visible]:border-ring/70'
@@ -212,6 +216,21 @@ export function ChatComposer({
     (queuedMessages?.length ?? 0) > 0 &&
     Boolean(onUpdateQueuedMessage && onRemoveQueuedMessage && onSendQueuedMessageNow)
 
+  useEffect(() => {
+    const shell = zoneRef.current
+    if (!shell) return
+
+    const syncTextareaHeight = () => {
+      const el = textareaRef.current
+      if (el) resizeTextarea(el)
+    }
+
+    syncTextareaHeight()
+    const observer = new ResizeObserver(syncTextareaHeight)
+    observer.observe(shell)
+    return () => observer.disconnect()
+  }, [showAttachmentPanel, showQueuePanel])
+
   return (
     <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')} data-composer-root>
       <div
@@ -238,24 +257,28 @@ export function ChatComposer({
         ) : null}
 
         {showQueuePanel ? (
-          <ChatMessageQueue
-            embedded
-            items={queuedMessages!}
-            onUpdate={onUpdateQueuedMessage!}
-            onRemove={onRemoveQueuedMessage!}
-            onSendNow={onSendQueuedMessageNow!}
-          />
+          <div className={composerStackPanelFlexShrinkClass}>
+            <ChatMessageQueue
+              embedded
+              items={queuedMessages!}
+              onUpdate={onUpdateQueuedMessage!}
+              onRemove={onRemoveQueuedMessage!}
+              onSendNow={onSendQueuedMessageNow!}
+            />
+          </div>
         ) : null}
 
         {showAttachmentPanel ? (
-          <ComposerAttachmentsPanel
-            embedded
-            items={attachments}
-            onRemove={onRemoveAttachment!}
-          />
+          <div className={composerStackPanelFlexShrinkClass}>
+            <ComposerAttachmentsPanel
+              embedded
+              items={attachments}
+              onRemove={onRemoveAttachment!}
+            />
+          </div>
         ) : null}
 
-        <CustomScrollArea variant="menu" className="max-h-40 w-full">
+        <CustomScrollArea variant="menu" className={composerTextareaScrollClass}>
           <ComposerTextareaContextMenu onValueChange={onChange} textareaRef={textareaRef}>
             <textarea
               ref={textareaRef}

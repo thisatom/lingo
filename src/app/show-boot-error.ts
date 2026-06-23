@@ -10,10 +10,10 @@ export function showBootError(message: string): void {
   root.innerHTML = ''
   const panel = document.createElement('div')
   panel.style.cssText =
-    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;height:100%;padding:24px;text-align:center;font:13px/1.5 system-ui,sans-serif;color:#d1d1d1'
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;height:100%;padding:24px;text-align:center;font:13px/1.5 system-ui,sans-serif;color:#d1d1d1;user-select:text;-webkit-user-select:text'
   panel.innerHTML = `
     <h1 style="margin:0;font-size:18px;font-weight:600">Lingo failed to start</h1>
-    <p style="margin:0;max-width:36rem;color:#9a9a9a">${escapeHtml(message || 'Unknown error')}</p>
+    <p style="margin:0;max-width:36rem;color:#9a9a9a;user-select:text;-webkit-user-select:text">${escapeHtml(message || 'Unknown error')}</p>
     <button type="button" style="margin-top:4px;border:1px solid #303030;background:#252525;color:inherit;border-radius:6px;padding:6px 12px;cursor:pointer">Reload</button>
   `
   panel.querySelector('button')?.addEventListener('click', () => window.location.reload())

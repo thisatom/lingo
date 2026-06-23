@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
@@ -7,6 +7,8 @@ import {
   buildChatCommandSearchGroups,
   buildChatCommandSearchValue
 } from '@/features/chat-search/lib/chat-command-search'
+import { navigateToChat } from '@/features/chat/lib/chat-route'
+import { parseChatIdFromInput } from '@/features/chat/lib/parse-chat-id'
 import {
   CommandDialog,
   CommandEmpty,
@@ -35,20 +37,30 @@ function ChatCommandRow({ chat }: { chat: { id: string; title: string; updatedAt
 
 export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) {
   const navigate = useNavigate()
+  const [search, setSearch] = useState('')
   const chats = useChatsStore((s) => s.chats)
   const selectChat = useChatsStore((s) => s.selectChat)
   const sidebarShowDateGroups = useSettingsStore((s) => s.sidebarShowDateGroups ?? true)
   const sidebarChatSort = useSettingsStore((s) => s.sidebarChatSort)
+
+  useEffect(() => {
+    if (!open) setSearch('')
+  }, [open])
 
   const { pinned, dateGroups, flat } = useMemo(
     () => buildChatCommandSearchGroups(chats, sidebarShowDateGroups, sidebarChatSort),
     [chats, sidebarShowDateGroups, sidebarChatSort]
   )
 
+  const parsedChatId = useMemo(() => parseChatIdFromInput(search), [search])
+  const chatFromParsedId = useMemo(
+    () => (parsedChatId ? chats.find((chat) => chat.id === parsedChatId) : undefined),
+    [chats, parsedChatId]
+  )
+
   const pickChat = (id: string) => {
-    selectChat(id)
+    if (!navigateToChat(navigate, id, selectChat)) return
     onOpenChange(false)
-    navigate('/')
   }
 
   return (
@@ -56,10 +68,33 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
       open={open}
       onOpenChange={onOpenChange}
       title="Search chats"
-      description="Find and open a chat by title or date"
+      description="Find and open a chat by title, date, or chat ID"
     >
-      <CommandPaletteInput placeholder="Search chats by title or date…" />
+      <CommandPaletteInput
+        placeholder="Search by title, date, or chat ID…"
+        value={search}
+        onValueChange={setSearch}
+      />
       <CommandList variant="palette">
+        {chatFromParsedId ? (
+          <CommandGroup variant="palette" heading="Chat ID">
+            <CommandItem
+              variant="palette"
+              value={chatFromParsedId.id}
+              onSelect={() => pickChat(chatFromParsedId.id)}
+            >
+              <div className="flex w-full min-w-0 flex-col gap-0.5">
+                <span className="truncate">{chatFromParsedId.title}</span>
+                <span className="truncate text-xs text-muted-foreground tabular-nums">
+                  {chatFromParsedId.id}
+                </span>
+              </div>
+            </CommandItem>
+          </CommandGroup>
+        ) : null}
+
+        {chatFromParsedId ? <CommandSeparator variant="palette" /> : null}
+
         <CommandEmpty variant="palette">No chats found</CommandEmpty>
 
         {pinned.length > 0 ? (

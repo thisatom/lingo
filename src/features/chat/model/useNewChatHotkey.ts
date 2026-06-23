@@ -1,20 +1,18 @@
 import { useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useChatsStore } from '@/entities/chat/model/store'
+import { chatRoutePath } from '@/features/chat/lib/chat-route'
 import { isNewChatShortcut } from '@/shared/lib/keyboard-shortcut'
 
 /** Ctrl+N (Cmd+N on macOS) — create a new chat and open the main view. */
 export function useNewChatHotkey(): void {
   const navigate = useNavigate()
-  const { pathname } = useLocation()
   const createChat = useChatsStore((s) => s.createChat)
 
   useEffect(() => {
     const run = () => {
-      createChat()
-      if (pathname.startsWith('/settings')) {
-        navigate('/')
-      }
+      const id = createChat()
+      navigate(chatRoutePath(id))
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -35,5 +33,5 @@ export function useNewChatHotkey(): void {
       window.removeEventListener('keydown', onKeyDown, true)
       offNative?.()
     }
-  }, [createChat, navigate, pathname])
+  }, [createChat, navigate])
 }

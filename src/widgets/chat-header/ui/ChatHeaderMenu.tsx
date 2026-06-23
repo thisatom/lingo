@@ -1,7 +1,9 @@
 import { MoreHorizontal } from '@/shared/ui/icons'
+import { useNavigate } from 'react-router-dom'
 import type { Message } from '@/entities/message/model/types'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { formatChatMessagesForCopy } from '@/features/chat-actions/lib/format-chat-messages'
+import { chatRoutePath } from '@/features/chat/lib/chat-route'
 import { copyToClipboard } from '@/shared/lib/copy-to-clipboard'
 import {
   sidebarMenuItemClass,
@@ -23,11 +25,13 @@ interface ChatHeaderMenuProps {
 }
 
 export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {
+  const navigate = useNavigate()
   const forkChat = useChatsStore((s) => s.forkChat)
 
   const handleFork = () => {
     if (!chatId) return
-    forkChat(chatId)
+    const forkedId = forkChat(chatId)
+    navigate(chatRoutePath(forkedId))
   }
 
   const handleCopyMessages = () => {
@@ -36,7 +40,7 @@ export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {
     void copyToClipboard(text)
   }
 
-  const handleCopyRequestId = () => {
+  const handleCopyChatId = () => {
     if (!chatId) return
     void copyToClipboard(chatId)
   }
@@ -73,9 +77,9 @@ export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {
         <DropdownMenuItem
           className={sidebarMenuItemClass}
           disabled={!chatId}
-          onSelect={handleCopyRequestId}
+          onSelect={handleCopyChatId}
         >
-          Copy request ID
+          Copy chat ID
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

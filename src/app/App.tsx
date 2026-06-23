@@ -18,6 +18,7 @@ export function App() {
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<MainPage />} />
+            <Route path="/c/:chatId" element={<MainPage />} />
             <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
             <Route path="/settings/:section" element={<SettingsPage />} />
           </Route>

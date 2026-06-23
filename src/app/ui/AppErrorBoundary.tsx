@@ -22,7 +22,10 @@ export class AppErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="flex h-full min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center text-foreground">
+        <div
+          role="alert"
+          className="flex h-full min-h-screen select-text flex-col items-center justify-center gap-3 bg-background px-6 text-center text-foreground"
+        >
           <h1 className="text-lg font-semibold">Lingo failed to start</h1>
           <p className="max-w-lg text-sm text-muted-foreground">
             {this.state.error.message || 'Unknown renderer error'}

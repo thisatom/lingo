@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAiChat } from '@/features/ai-chat/model/useAiChat'
 import { useLlmChatReady } from '@/features/ai-chat/model/useLlmChatReady'
 import { useChatContextUsage } from '@/features/chat-context/model/useChatContextUsage'
@@ -38,6 +39,8 @@ import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
 import { SidebarExpandButton } from '@/widgets/app-sidebar/ui/SidebarExpandButton'
 import { BackgroundStreamHint } from '@/features/ai-chat/ui/BackgroundStreamHint'
+import { useChatRouteSync } from '@/features/chat/model/useChatRouteSync'
+import { navigateToChat } from '@/features/chat/lib/chat-route'
 import { bindChatBottomInset } from '@/widgets/conversation-panel/lib/sync-chat-bottom-inset'
 
 function isErrorRetryable(message: string): boolean {
@@ -45,6 +48,8 @@ function isErrorRetryable(message: string): boolean {
 }
 
 export function MainPage() {
+  useChatRouteSync()
+  const navigate = useNavigate()
   const [chatAtBottom, setChatAtBottom] = useState(true)
   const [showScrollToLatest, setShowScrollToLatest] = useState(false)
   const chatScrollRef = useRef<{
@@ -505,7 +510,7 @@ export function MainPage() {
             {backgroundStreamChatId ? (
               <BackgroundStreamHint
                 streamChatId={backgroundStreamChatId}
-                onOpenChat={selectChat}
+                onOpenChat={(chatId) => navigateToChat(navigate, chatId, selectChat)}
               />
             ) : null}
 

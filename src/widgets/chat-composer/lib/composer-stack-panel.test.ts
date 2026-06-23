@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { QueuedMessage } from '@/entities/message-queue/model/store'
 import {
+  COMPOSER_STACK_PANEL_DEFAULT_COLLAPSED,
   filterAttachmentsByQuery,
-  filterQueuedByQuery
+  filterQueuedByQuery,
+  toggleStackPanelCollapse
 } from '@/widgets/chat-composer/lib/composer-stack-panel'
 
 describe('composer stack panel filters', () => {
@@ -23,5 +25,25 @@ describe('composer stack panel filters', () => {
     ]
     expect(filterQueuedByQuery(items, 'hello')).toHaveLength(1)
     expect(filterQueuedByQuery(items, 'spec')).toHaveLength(1)
+  })
+
+  it('defaults stack panels to collapsed', () => {
+    expect(COMPOSER_STACK_PANEL_DEFAULT_COLLAPSED).toBe(true)
+  })
+
+  it('toggleStackPanelCollapse expands or collapses and clears search on hide', () => {
+    let collapsed = true
+    const resetSearch = vi.fn()
+    toggleStackPanelCollapse(collapsed, (next) => {
+      collapsed = next
+    }, resetSearch)
+    expect(collapsed).toBe(false)
+    expect(resetSearch).not.toHaveBeenCalled()
+
+    toggleStackPanelCollapse(collapsed, (next) => {
+      collapsed = next
+    }, resetSearch)
+    expect(collapsed).toBe(true)
+    expect(resetSearch).toHaveBeenCalledOnce()
   })
 })

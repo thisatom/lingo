@@ -13,10 +13,18 @@ export const messageTextClass = cn(chatTextClass, 'text-foreground/90')
 const chatMessageBubbleBorderClass =
   'border border-chat-message-border transition-[border-color] hover:border-chat-message-border-hover'
 
-export const userMessageBubbleClass = cn(
-  'relative w-full min-w-0 max-w-full overflow-hidden rounded-2xl bg-chat-assistant px-3 py-1.5',
+export const userMessageShellClass = cn(
+  'relative flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl bg-chat-assistant',
   chatMessageBubbleBorderClass
 )
+
+/** Text body inside {@link userMessageShellClass} — no own border. */
+export const userMessageBodyClass = 'relative px-3 py-1.5'
+
+/** @deprecated Use {@link userMessageShellClass} */
+export const userMessageBubbleClass = userMessageShellClass
+
+export const userMessageFilesOnlyClass = 'text-sm italic text-muted-foreground'
 
 export const userMessageTextClass = cn(
   messageTextClass,

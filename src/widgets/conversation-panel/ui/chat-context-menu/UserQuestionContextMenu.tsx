@@ -73,7 +73,7 @@ export function UserQuestionContextMenu({
             if (chatId) void copyToClipboard(chatId)
           }}
         >
-          Copy request ID
+          Copy chat ID
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
