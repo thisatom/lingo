@@ -116,6 +116,19 @@ export interface TtsSynthesizeResponse {
   mimeType: string
 }
 
+export interface TranslateTextRequest {
+  text: string
+  /** ISO code or `auto`. */
+  from?: string
+  /** Target ISO code. */
+  to: string
+}
+
+export interface TranslateTextResponse {
+  text: string
+  detectedLanguage?: string
+}
+
 import type { ResolvedTheme } from './app-theme'
 
 export type { ResolvedTheme } from './app-theme'
@@ -202,6 +215,9 @@ export interface LingoApi {
   }
   tts: {
     synthesize: (request: TtsSynthesizeRequest) => Promise<TtsSynthesizeResponse>
+  }
+  translate?: {
+    text: (request: TranslateTextRequest) => Promise<TranslateTextResponse>
   }
   link: {
     preview: (url: string) => Promise<LinkPreviewResponse>

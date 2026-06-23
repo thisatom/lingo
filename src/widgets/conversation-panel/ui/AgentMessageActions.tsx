@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { ReplyTranslatePopover } from '@/features/message-translate/ui/ReplyTranslatePopover'
+import { ReplySpeakButton } from '@/features/text-to-speech/ui/ReplySpeakButton'
 import { Check, Copy, RotateCw } from '@/shared/ui/icons'
 import { copyToClipboard } from '@/shared/lib/copy-to-clipboard'
 import { cn } from '@/shared/lib/utils'
@@ -46,6 +48,9 @@ export function AgentMessageActions({
       >
         {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
       </TooltipIconButton>
+
+      <ReplySpeakButton content={content} />
+      <ReplyTranslatePopover content={content} />
 
       {onRegenerate ? (
         <TooltipIconButton

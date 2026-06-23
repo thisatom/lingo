@@ -10,7 +10,7 @@ type WhisperTranscribeOptions = Record<string, unknown> & {
   model: string
 }
 
-type TranscribeFn = (options: WhisperTranscribeOptions) => Promise<{
+export type TranscribeFn = (options: WhisperTranscribeOptions) => Promise<{
   transcription: string[][] | string[]
 }>
 

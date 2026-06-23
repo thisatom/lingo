@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { setActiveChatPipelineStage } from '@/features/ai-chat/lib/pipeline-stage'
 import { useSettingsStore } from '@/entities/settings/model/store'
+import { sttLanguageParam } from '@/shared/config/practice-languages'
 import {
   mapSpeechError,
   mapTranscriptionError
 } from '@/features/speech-to-text/lib/speech-errors'
-import { ensureWavForLocalStt } from '@/features/speech-to-text/lib/ensure-wav-for-stt'
+import { preparePcmForLocalStt } from '@/features/speech-to-text/lib/prepare-pcm-for-stt'
 import {
   isAudioCaptureSupported,
   startAudioCapture,
@@ -137,12 +138,12 @@ export function useRecordedVoiceInput({ enabled }: Options) {
     }
 
     try {
-      const wavAudio = await ensureWavForLocalStt(audio.audioBase64, audio.format)
+      const pcmAudio = await preparePcmForLocalStt(audio.audioBase64, audio.format)
       const { text } = await withTimeout(
         getLingo().stt.transcribe({
-          audioBase64: wavAudio.audioBase64,
-          format: wavAudio.format,
-          language: practiceLanguage
+          audioBase64: pcmAudio.audioBase64,
+          format: pcmAudio.format,
+          language: sttLanguageParam(practiceLanguage)
         }),
         STT_TIMEOUT_MS,
         'STT_TIMEOUT'

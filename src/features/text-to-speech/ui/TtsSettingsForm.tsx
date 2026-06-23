@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import {
+  resolvePracticeLanguage,
+  isPracticeLanguageAuto
+} from '@/shared/config/practice-languages'
+import {
   playTtsFromBase64,
   stopTtsPlayback
 } from '@/features/text-to-speech/model/playTts'
@@ -40,6 +44,8 @@ export function TtsSettingsForm() {
   const practiceLanguage = useSettingsStore((s) => s.practiceLanguage)
   const ttsEnabled = useSettingsStore((s) => s.ttsEnabled)
   const setTtsEnabled = useSettingsStore((s) => s.setTtsEnabled)
+  const agentSpeechLoopEnabled = useSettingsStore((s) => s.agentSpeechLoopEnabled)
+  const setAgentSpeechLoopEnabled = useSettingsStore((s) => s.setAgentSpeechLoopEnabled)
   const ttsSpeechRate = useSettingsStore((s) => s.ttsSpeechRate)
   const setTtsSpeechRate = useSettingsStore((s) => s.setTtsSpeechRate)
   const ttsVoiceId = useSettingsStore((s) => s.ttsVoiceId)
@@ -50,9 +56,14 @@ export function TtsSettingsForm() {
   const [previewState, setPreviewState] = useState<'idle' | 'loading' | 'playing'>('idle')
   const [previewError, setPreviewError] = useState<string | null>(null)
 
-  const voiceOptions = useMemo(
-    () => getTtsVoiceOptionsForLanguage(practiceLanguage),
+  const resolvedLanguage = useMemo(
+    () => resolvePracticeLanguage(practiceLanguage),
     [practiceLanguage]
+  )
+
+  const voiceOptions = useMemo(
+    () => getTtsVoiceOptionsForLanguage(resolvedLanguage),
+    [resolvedLanguage]
   )
 
   const voiceSelectValue =
@@ -66,7 +77,7 @@ export function TtsSettingsForm() {
     if (!ttsVoiceId || ttsVoiceId === '' || ttsVoiceId === TTS_VOICE_AUTO) return
     if (voiceOptions.some((o) => o.id === ttsVoiceId)) return
     setTtsVoiceId(TTS_VOICE_AUTO)
-  }, [practiceLanguage, ttsVoiceId, voiceOptions, setTtsVoiceId])
+  }, [resolvedLanguage, ttsVoiceId, voiceOptions, setTtsVoiceId])
 
   const rateDescription =
     TTS_SPEECH_RATE_OPTIONS.find((o) => o.value === ttsSpeechRate)?.description ??
@@ -81,9 +92,9 @@ export function TtsSettingsForm() {
     setPreviewState('loading')
     stopTtsPlayback()
     try {
-      const phrase = getTtsPreviewPhrase(practiceLanguage)
+      const phrase = getTtsPreviewPhrase(resolvedLanguage)
       const result = await getLingo().tts.synthesize(
-        buildTtsSynthesizeRequest(phrase, practiceLanguage)
+        buildTtsSynthesizeRequest(phrase, resolvedLanguage)
       )
       setPreviewState('playing')
       await playTtsFromBase64(result.audioBase64, result.mimeType)
@@ -111,6 +122,21 @@ export function TtsSettingsForm() {
             checked={ttsEnabled}
             onCheckedChange={(checked) => setTtsEnabled(Boolean(checked))}
             aria-label="Speak assistant replies"
+          />
+        </div>
+
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Continuous conversation</p>
+            <p className={settingsRowDescriptionClass}>
+              In Agent Speech mode, reopen the mic automatically after each reply (and after
+              spoken answers finish).
+            </p>
+          </div>
+          <Switch
+            checked={agentSpeechLoopEnabled}
+            onCheckedChange={(checked) => setAgentSpeechLoopEnabled(Boolean(checked))}
+            aria-label="Continuous Agent Speech loop"
           />
         </div>
 
@@ -176,8 +202,11 @@ export function TtsSettingsForm() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Voice</p>
             <p className={settingsRowDescriptionClass}>
-              Automatic picks a neural voice for the model language (
-              {practiceLanguage.toUpperCase()}) set under Agent.
+              Automatic picks a neural voice for{' '}
+              {isPracticeLanguageAuto(practiceLanguage)
+                ? 'the detected model language (Auto)'
+                : `the model language (${resolvedLanguage.toUpperCase()})`}{' '}
+              set under Agent.
             </p>
           </div>
           <Select

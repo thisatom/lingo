@@ -6,7 +6,14 @@ import { getSecret } from './secrets'
 import { openRouterConfig } from '../../src/shared/config/openrouter'
 import { normalizeOpenRouterModelId } from '../../src/shared/config/openrouter'
 
+import { isPracticeLanguageAuto } from '../../src/shared/config/practice-languages'
+
 function systemPrompt(practiceLanguage?: string): string {
+  if (isPracticeLanguageAuto(practiceLanguage ?? '')) {
+    return `You are Lingo, a friendly language practice partner.
+Respond in the same language the user writes in unless they switch languages. Keep replies concise (2-4 sentences).
+Gently correct mistakes when needed. Ask a follow-up question to keep the conversation going.`
+  }
   const lang = practiceLanguage ?? 'en'
   return `You are Lingo, a friendly language practice partner. The user is practicing conversational ${lang}.
 Respond in ${lang} unless they use another language. Keep replies concise (2-4 sentences).

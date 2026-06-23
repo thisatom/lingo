@@ -6,11 +6,9 @@ import { Readable } from 'node:stream'
 import { fetch } from 'undici'
 
 const WHISPER_HF_BASE = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
-const VAD_HF_BASE = 'https://huggingface.co/ggml-org/whisper-vad/resolve/main'
 
 /** Quantized small — multilingual, ~181 MB download. */
 export const WHISPER_MODEL_FILE = 'ggml-small-q5_1.bin'
-export const WHISPER_VAD_MODEL_FILE = 'ggml-silero-v6.2.0.bin'
 
 const MODEL_SPECS = [
   {
@@ -18,12 +16,6 @@ const MODEL_SPECS = [
     label: 'Whisper small (q5_1)',
     url: `${WHISPER_HF_BASE}/${WHISPER_MODEL_FILE}`,
     minBytes: 100_000_000
-  },
-  {
-    fileName: WHISPER_VAD_MODEL_FILE,
-    label: 'Silero VAD',
-    url: `${VAD_HF_BASE}/${WHISPER_VAD_MODEL_FILE}`,
-    minBytes: 500_000
   }
 ] as const
 
@@ -46,10 +38,6 @@ function resolveModelsDir(): string {
 
 export function getWhisperModelPath(): string {
   return join(resolveModelsDir(), WHISPER_MODEL_FILE)
-}
-
-export function getWhisperVadModelPath(): string {
-  return join(resolveModelsDir(), WHISPER_VAD_MODEL_FILE)
 }
 
 async function fileSize(filePath: string): Promise<number | null> {

@@ -6,7 +6,8 @@ import type {
   LlmBackend,
   SecretProviderId,
   SttTranscribeRequest,
-  TtsSynthesizeRequest
+  TtsSynthesizeRequest,
+  TranslateTextRequest
 } from '@/shared/types/ipc'
 import { SECRET_PROVIDER_IDS } from '@/shared/types/secret-providers'
 
@@ -85,6 +86,12 @@ export const ttsSynthesizeRequestSchema = z.object({
   rate: z.string().max(16).optional()
 })
 
+export const translateTextRequestSchema = z.object({
+  text: z.string().min(1).max(100_000),
+  from: z.string().max(32).optional(),
+  to: z.string().min(2).max(32)
+})
+
 export const linkPreviewUrlSchema = z.string().trim().min(1).max(8_192)
 
 export const streamChannelSchema = z
@@ -111,6 +118,10 @@ export function parseSttTranscribeRequest(input: unknown): SttTranscribeRequest 
 
 export function parseTtsSynthesizeRequest(input: unknown): TtsSynthesizeRequest {
   return parseOrThrow(ttsSynthesizeRequestSchema, input, 'TTS request')
+}
+
+export function parseTranslateTextRequest(input: unknown): TranslateTextRequest {
+  return parseOrThrow(translateTextRequestSchema, input, 'translate request')
 }
 
 export function parseLinkPreviewUrl(input: unknown): string {

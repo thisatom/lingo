@@ -45,6 +45,7 @@ export const ConversationTurn = memo(function ConversationTurn({
   voiceCaptureLabel = null,
   userHeaderSticky = false,
   lastReplyMessageId = null,
+  showReplyActions = false,
   onRegenerateAssistantMessage
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
@@ -150,7 +151,7 @@ export const ConversationTurn = memo(function ConversationTurn({
                 parseThrottleMs={isAnswerStream ? 50 : undefined}
                 showFooterActions={
                   message.id === lastReplyMessageId &&
-                  !isAnswerStream &&
+                  showReplyActions &&
                   message.content.trim().length > 0
                 }
                 onRegenerate={

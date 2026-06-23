@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   collapseInternalDuplicateTranscript,
   collapseRepeatedShortTokens,
+  isLikelyGarbledTranscript,
   isLikelyWhisperHallucination,
+  isTranscriptSuspiciousForDuration,
   isWhisperTimestampToken,
+  parseWhisperCppBatchTranscription,
   parseWhisperCppTranscription,
   sanitizeWhisperTranscript,
   stripCumulativeWhisperTranscript,
@@ -63,6 +66,35 @@ describe('parseWhisperCppTranscription', () => {
   })
 })
 
+describe('parseWhisperCppBatchTranscription', () => {
+  it('joins all speech segments for a full recording', () => {
+    expect(
+      parseWhisperCppBatchTranscription([
+        '00:00:00,160',
+        'Первая',
+        '00:00:03,170',
+        'вторая фраза'
+      ])
+    ).toBe('Первая вторая фраза')
+  })
+
+  it('joins word tokens when whisper returns a flat list', () => {
+    expect(parseWhisperCppBatchTranscription(['Так,', 'ну', 'сейчас', 'я', 'говорю'])).toBe(
+      'Так, ну сейчас я говорю'
+    )
+  })
+})
+
+describe('isLikelyGarbledTranscript', () => {
+  it('flags stem echo at the end', () => {
+    expect(isLikelyGarbledTranscript('Так, ну сейчас я крошу, крош')).toBe(true)
+  })
+
+  it('accepts normal trailing words', () => {
+    expect(isLikelyGarbledTranscript('Я поел яичницу и сейчас буду пить чай')).toBe(false)
+  })
+})
+
 describe('stripCumulativeWhisperTranscript', () => {
   it('removes carry-over from the previous recording in the same worker', () => {
     const previous = 'Длинный текст из прошлой записи'
@@ -85,6 +117,21 @@ describe('collapseRepeatedShortTokens', () => {
   })
 })
 
+describe('isTranscriptSuspiciousForDuration', () => {
+  it('rejects a one-word greeting on long audio', () => {
+    expect(isTranscriptSuspiciousForDuration('Привет', 16_000 * 12)).toBe(true)
+  })
+
+  it('accepts a real sentence on long audio', () => {
+    expect(
+      isTranscriptSuspiciousForDuration(
+        'Я поел яичницу и сейчас буду пить чай с печеньками',
+        16_000 * 12
+      )
+    ).toBe(false)
+  })
+})
+
 describe('isLikelyWhisperHallucination', () => {
   it('flags dominant short filler loops', () => {
     const hallucinated =
@@ -95,5 +142,10 @@ describe('isLikelyWhisperHallucination', () => {
   it('accepts normal short phrases', () => {
     expect(isLikelyWhisperHallucination('Покатит?')).toBe(false)
     expect(isLikelyWhisperHallucination('Hello, how are you today?')).toBe(false)
+  })
+
+  it('flags common silence hallucinations', () => {
+    expect(isLikelyWhisperHallucination('Привет')).toBe(true)
+    expect(isLikelyWhisperHallucination('Thank you for watching')).toBe(true)
   })
 })

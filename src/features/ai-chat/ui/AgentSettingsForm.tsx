@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useSettingsStore, type ChatComposerMode } from '@/entities/settings/model/store'
-import { PRACTICE_LANGUAGE_OPTIONS } from '@/shared/config/practice-languages'
+import { practiceLanguageOptionsForSelect, translationTargetOptionsForSelect } from '@/shared/config/practice-languages'
 import {
   settingsSelectContentClass,
   settingsSelectItemClass,
@@ -51,16 +51,24 @@ export function AgentSettingsForm() {
   const setCheckpointReturnConfirmEnabled = useSettingsStore(
     (s) => s.setCheckpointReturnConfirmEnabled
   )
+  const translationSourceLanguage = useSettingsStore((s) => s.translationSourceLanguage)
+  const translationTargetLanguage = useSettingsStore((s) => s.translationTargetLanguage)
+  const setTranslationSourceLanguage = useSettingsStore((s) => s.setTranslationSourceLanguage)
+  const setTranslationTargetLanguage = useSettingsStore((s) => s.setTranslationTargetLanguage)
 
-  const languageOptions = useMemo(() => {
-    if (practiceLanguage && !PRACTICE_LANGUAGE_OPTIONS.some((o) => o.value === practiceLanguage)) {
-      return [
-        { value: practiceLanguage, label: `${practiceLanguage} (current)` },
-        ...PRACTICE_LANGUAGE_OPTIONS
-      ]
-    }
-    return PRACTICE_LANGUAGE_OPTIONS
-  }, [practiceLanguage])
+  const languageOptions = useMemo(
+    () => practiceLanguageOptionsForSelect(practiceLanguage),
+    [practiceLanguage]
+  )
+
+  const translationSourceOptions = useMemo(
+    () => practiceLanguageOptionsForSelect(translationSourceLanguage),
+    [translationSourceLanguage]
+  )
+  const translationTargetOptions = useMemo(
+    () => translationTargetOptionsForSelect(translationTargetLanguage),
+    [translationTargetLanguage]
+  )
 
   return (
     <section>
@@ -72,7 +80,8 @@ export function AgentSettingsForm() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Model language</p>
             <p className={settingsRowDescriptionClass}>
-              Language for assistant replies, system prompts, and speech recognition.
+              Language for assistant replies and speech recognition. Auto follows the language you
+              speak or type.
             </p>
           </div>
           <Select value={practiceLanguage} onValueChange={setPracticeLanguage}>
@@ -199,6 +208,66 @@ export function AgentSettingsForm() {
             </SelectTrigger>
             <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
               {COMPOSER_MODE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className={settingsSelectItemClass}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <p className={settingsSubsectionTitleClass}>Translation</p>
+      <div className={settingsCardClass}>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Default source language</p>
+            <p className={settingsRowDescriptionClass}>
+              Used when you translate an assistant reply from the message toolbar. Auto detects
+              the reply language.
+            </p>
+          </div>
+          <Select
+            value={translationSourceLanguage}
+            onValueChange={setTranslationSourceLanguage}
+          >
+            <SelectTrigger
+              id="translation-source-language"
+              size="sm"
+              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
+              {translationSourceOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className={settingsSelectItemClass}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Default target language</p>
+            <p className={settingsRowDescriptionClass}>
+              Where replies are translated to by default. You can change it in the translate
+              popover on each message.
+            </p>
+          </div>
+          <Select
+            value={translationTargetLanguage}
+            onValueChange={setTranslationTargetLanguage}
+          >
+            <SelectTrigger
+              id="translation-target-language"
+              size="sm"
+              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
+              {translationTargetOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value} className={settingsSelectItemClass}>
                   {opt.label}
                 </SelectItem>

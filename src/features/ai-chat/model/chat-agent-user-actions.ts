@@ -15,7 +15,7 @@ import {
   PENDING_COMPOSER_CHAT_ID,
   PENDING_VOICE_MESSAGE_ID
 } from '@/entities/chat/lib/pending-composer'
-import { markPendingAgentReply } from '@/features/ai-chat/lib/pending-agent-reply'
+import { markPendingAgentReply, hasPendingAgentReply } from '@/features/ai-chat/lib/pending-agent-reply'
 import {
   setActiveChatPipelineStage,
   setPipelineStageForChat
@@ -222,7 +222,10 @@ export async function commitVoiceUserMessageAction(
     return chatId
   }
 
-  await deps.runAssistantReply(chatId)
+  const ok = await deps.runAssistantReply(chatId)
+  if (!ok && hasPendingAgentReply(chatId)) {
+    return chatId
+  }
   return chatId
 }
 

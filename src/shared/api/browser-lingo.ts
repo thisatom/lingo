@@ -9,6 +9,7 @@ import {
 import { fetchWebLinkPreview } from '@/shared/api/web-link-preview'
 import { transcribeWebAudio } from '@/shared/api/web-stt'
 import { synthesizeWebSpeech } from '@/shared/api/web-tts'
+import { translateTextWeb } from '@/shared/api/web-translate'
 import { openRouterConfig } from '@/shared/config/openrouter'
 import { streamOpenRouterChat } from '@/shared/lib/openrouter-chat-stream'
 import type {
@@ -22,7 +23,8 @@ import type {
   ResolvedTheme,
   SecretProviderId,
   SttTranscribeRequest,
-  TtsSynthesizeRequest
+  TtsSynthesizeRequest,
+  TranslateTextRequest
 } from '@/shared/types/ipc'
 
 const WEB_VERSION =
@@ -119,6 +121,9 @@ export function createBrowserLingoApi(): LingoApi {
     },
     tts: {
       synthesize: (request: TtsSynthesizeRequest) => synthesizeWebSpeech(request)
+    },
+    translate: {
+      text: (request: TranslateTextRequest) => translateTextWeb(request)
     },
     link: {
       preview: (url: string) => fetchWebLinkPreview(url)

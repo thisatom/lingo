@@ -46,6 +46,7 @@ import {
   messageHasVisibleContent,
   voiceCaptureLabelForUserMessage
 } from '@/widgets/conversation-panel/lib/group-turns'
+import { isReplyActionsReady } from '@/widgets/conversation-panel/lib/reply-actions-ready'
 import { cn } from '@/shared/lib/utils'
 import {
   initialHiddenTurnCount,
@@ -600,6 +601,11 @@ export function ConversationPanel({
     }
     return null
   }, [turns])
+  const latestReplyActionsReady = isReplyActionsReady({
+    agentBusy,
+    pipelineStreamingAnswer,
+    stage
+  })
   const [hiddenTurnCount, setHiddenTurnCount] = useState(0)
 
   useEffect(() => {
@@ -921,6 +927,7 @@ export function ConversationPanel({
                       : undefined
                   }
                   lastReplyMessageId={lastReplyMessageId}
+                  showReplyActions={isLatestTurn && latestReplyActionsReady}
                   onRegenerateAssistantMessage={onRegenerateAssistantMessage}
                 />
               )

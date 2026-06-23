@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { completeOnboarding } from '@/features/onboarding/lib/complete-onboarding'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { OpenRouterModelCombobox } from '@/features/manage-api-keys/ui/OpenRouterModelCombobox'
-import { PRACTICE_LANGUAGE_OPTIONS } from '@/shared/config/practice-languages'
+import { practiceLanguageOptionsForSelect } from '@/shared/config/practice-languages'
 import {
   settingsInputClass,
   settingsSelectContentClass,
@@ -74,18 +74,10 @@ export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const languageOptions = useMemo(() => {
-    if (
-      practiceLanguage &&
-      !PRACTICE_LANGUAGE_OPTIONS.some((o) => o.value === practiceLanguage)
-    ) {
-      return [
-        { value: practiceLanguage, label: `${practiceLanguage} (current)` },
-        ...PRACTICE_LANGUAGE_OPTIONS
-      ]
-    }
-    return PRACTICE_LANGUAGE_OPTIONS
-  }, [practiceLanguage])
+  const languageOptions = useMemo(
+    () => practiceLanguageOptionsForSelect(practiceLanguage),
+    [practiceLanguage]
+  )
 
   useEffect(() => {
     if (!open) return

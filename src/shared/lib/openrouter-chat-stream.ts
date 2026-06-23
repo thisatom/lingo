@@ -7,6 +7,7 @@ import type {
 import { resolveChatCompletionsUrl } from '@/shared/config/custom-llm'
 import { customLlmConfig } from '@/shared/config/custom-llm'
 import { openRouterConfig } from '@/shared/config/openrouter'
+import { isPracticeLanguageAuto } from '@/shared/config/practice-languages'
 import { normalizeAlternatingChatPayloads } from '@/shared/lib/chat-api-alternation'
 import {
   customEndpointRequiresApiKey,
@@ -177,6 +178,7 @@ function systemPrompt(
   languagePractice = true
 ): string {
   const lang = practiceLanguage ?? 'en'
+  const autoLanguage = isPracticeLanguageAuto(practiceLanguage)
   const today = formatTodayLine()
   const ocrNote =
     ' Image attachments may appear as **Text extracted from image (OCR)** blocks — treat that as the image content.'
@@ -222,9 +224,11 @@ Rules:
 - Use clear structure (lists, steps) when it helps.${ocrNote}${localSearchNote}`
   }
 
-  return `You are Lingo, a friendly language practice partner. The user practices conversational ${lang}.
+  return `You are Lingo, a friendly language practice partner. The user practices conversational ${
+    autoLanguage ? 'skills in any language they choose' : lang
+  }.
 ${today}
-Respond in ${lang}. Match the user's intent: short drills can be brief; explanations and stories should be as long as needed.
+${autoLanguage ? 'Respond in the same language the user writes in.' : `Respond in ${lang}.`} Match the user's intent: short drills can be brief; explanations and stories should be as long as needed.
 Rules:
 - Finish every reply completely; never stop mid-sentence.
 - Stay consistent with the conversation above; if something is unclear, ask one short clarifying question.

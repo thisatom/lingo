@@ -24,6 +24,10 @@ import {
   isOpenRouterFreeModel
 } from '@/shared/config/openrouter-free-models'
 import { TTS_VOICE_AUTO, isKnownTtsVoiceId, normalizeTtsVoiceId } from '@/shared/config/tts-voices'
+import {
+  normalizeTranslationSourceLanguage,
+  normalizeTranslationTargetLanguage
+} from '@/shared/config/practice-languages'
 import { isSidebarChatSort, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
 import { LLM_MAX_TOKENS_DEFAULT, normalizeLlmMaxTokens } from '@/shared/lib/llm-max-tokens'
 import { isTtsSpeechRate, type TtsSpeechRate } from '@/shared/lib/tts-rate'
@@ -87,6 +91,8 @@ interface SettingsState {
   reduceUiMotion: boolean
   /** Speak assistant replies in Conversation / Agent Speech mode. */
   ttsEnabled: boolean
+  /** Reopen the mic after each Agent Speech reply (continuous conversation loop). */
+  agentSpeechLoopEnabled: boolean
   ttsSpeechRate: TtsSpeechRate
   /** Edge voice id; empty = automatic from practice language. */
   ttsVoiceId: string
@@ -100,6 +106,10 @@ interface SettingsState {
   modelAutoFallback: boolean
   /** Max completion tokens (`max_tokens`); `0` = no limit (omit on API). */
   llmMaxTokens: number
+  /** Default source language for reply translation (`auto` = detect). */
+  translationSourceLanguage: string
+  /** Default target language for reply translation. */
+  translationTargetLanguage: string
   sidebarShowDateGroups: boolean
   sidebarChatSort: SidebarChatSort
   /** Ask before returning to checkpoint edit flow. */
@@ -129,6 +139,7 @@ interface SettingsState {
   setConversationDensity: (density: ConversationDensity) => void
   setReduceUiMotion: (enabled: boolean) => void
   setTtsEnabled: (enabled: boolean) => void
+  setAgentSpeechLoopEnabled: (enabled: boolean) => void
   setTtsSpeechRate: (rate: TtsSpeechRate) => void
   setTtsVoiceId: (voiceId: string) => void
   setTtsVolume: (volume: number) => void
@@ -137,6 +148,8 @@ interface SettingsState {
   setLanguagePracticeEnabled: (enabled: boolean) => void
   setModelAutoFallback: (enabled: boolean) => void
   setLlmMaxTokens: (maxTokens: number) => void
+  setTranslationSourceLanguage: (language: string) => void
+  setTranslationTargetLanguage: (language: string) => void
   setSidebarShowDateGroups: (show: boolean) => void
   setSidebarChatSort: (sort: SidebarChatSort) => void
   setCheckpointReturnConfirmEnabled: (enabled: boolean) => void
@@ -169,6 +182,7 @@ type PersistedSettings = Pick<
   | 'conversationDensity'
   | 'reduceUiMotion'
   | 'ttsEnabled'
+  | 'agentSpeechLoopEnabled'
   | 'ttsSpeechRate'
   | 'ttsVoiceId'
   | 'ttsVolume'
@@ -177,6 +191,8 @@ type PersistedSettings = Pick<
   | 'languagePracticeEnabled'
   | 'modelAutoFallback'
   | 'llmMaxTokens'
+  | 'translationSourceLanguage'
+  | 'translationTargetLanguage'
   | 'sidebarShowDateGroups'
   | 'sidebarChatSort'
   | 'checkpointReturnConfirmEnabled'
@@ -208,6 +224,7 @@ const DEFAULT_SETTINGS: Omit<
   | 'setConversationDensity'
   | 'setReduceUiMotion'
   | 'setTtsEnabled'
+  | 'setAgentSpeechLoopEnabled'
   | 'setTtsSpeechRate'
   | 'setTtsVoiceId'
   | 'setTtsVolume'
@@ -216,6 +233,8 @@ const DEFAULT_SETTINGS: Omit<
   | 'setLanguagePracticeEnabled'
   | 'setModelAutoFallback'
   | 'setLlmMaxTokens'
+  | 'setTranslationSourceLanguage'
+  | 'setTranslationTargetLanguage'
   | 'setSidebarShowDateGroups'
   | 'setSidebarChatSort'
   | 'setCheckpointReturnConfirmEnabled'
@@ -245,6 +264,7 @@ const DEFAULT_SETTINGS: Omit<
   conversationDensity: DEFAULT_APPEARANCE.conversationDensity,
   reduceUiMotion: DEFAULT_APPEARANCE.reduceUiMotion,
   ttsEnabled: true,
+  agentSpeechLoopEnabled: true,
   ttsSpeechRate: 'normal',
   ttsVoiceId: TTS_VOICE_AUTO,
   ttsVolume: TTS_VOLUME_DEFAULT,
@@ -253,6 +273,8 @@ const DEFAULT_SETTINGS: Omit<
   languagePracticeEnabled: true,
   modelAutoFallback: true,
   llmMaxTokens: LLM_MAX_TOKENS_DEFAULT,
+  translationSourceLanguage: 'auto',
+  translationTargetLanguage: 'en',
   sidebarShowDateGroups: true,
   sidebarChatSort: 'updated-desc',
   checkpointReturnConfirmEnabled: true,
@@ -346,6 +368,8 @@ export const useSettingsStore = create<SettingsState>()(
         }),
       setReduceUiMotion: (reduceUiMotion) => set({ reduceUiMotion: Boolean(reduceUiMotion) }),
       setTtsEnabled: (ttsEnabled) => set({ ttsEnabled }),
+      setAgentSpeechLoopEnabled: (agentSpeechLoopEnabled) =>
+        set({ agentSpeechLoopEnabled: Boolean(agentSpeechLoopEnabled) }),
       setTtsSpeechRate: (ttsSpeechRate) =>
         set({ ttsSpeechRate: isTtsSpeechRate(ttsSpeechRate) ? ttsSpeechRate : 'normal' }),
       setTtsVoiceId: (ttsVoiceId) =>
@@ -360,6 +384,14 @@ export const useSettingsStore = create<SettingsState>()(
       setLanguagePracticeEnabled: (languagePracticeEnabled) => set({ languagePracticeEnabled }),
       setModelAutoFallback: (modelAutoFallback) => set({ modelAutoFallback }),
       setLlmMaxTokens: (llmMaxTokens) => set({ llmMaxTokens: normalizeLlmMaxTokens(llmMaxTokens) }),
+      setTranslationSourceLanguage: (translationSourceLanguage) =>
+        set({
+          translationSourceLanguage: normalizeTranslationSourceLanguage(translationSourceLanguage)
+        }),
+      setTranslationTargetLanguage: (translationTargetLanguage) =>
+        set({
+          translationTargetLanguage: normalizeTranslationTargetLanguage(translationTargetLanguage)
+        }),
       setSidebarShowDateGroups: (sidebarShowDateGroups) => set({ sidebarShowDateGroups }),
       setSidebarChatSort: (sidebarChatSort) => set({ sidebarChatSort }),
       setCheckpointReturnConfirmEnabled: (checkpointReturnConfirmEnabled) =>
@@ -369,7 +401,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'lingo-settings',
-      version: 24,
+      version: 26,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
         llmBackend: state.llmBackend,
@@ -394,6 +426,7 @@ export const useSettingsStore = create<SettingsState>()(
         conversationDensity: state.conversationDensity,
         reduceUiMotion: state.reduceUiMotion,
         ttsEnabled: state.ttsEnabled,
+        agentSpeechLoopEnabled: state.agentSpeechLoopEnabled,
         ttsSpeechRate: state.ttsSpeechRate,
         ttsVoiceId: state.ttsVoiceId,
         ttsVolume: state.ttsVolume,
@@ -402,6 +435,8 @@ export const useSettingsStore = create<SettingsState>()(
         languagePracticeEnabled: state.languagePracticeEnabled,
         modelAutoFallback: state.modelAutoFallback,
         llmMaxTokens: state.llmMaxTokens,
+        translationSourceLanguage: state.translationSourceLanguage,
+        translationTargetLanguage: state.translationTargetLanguage,
         sidebarShowDateGroups: state.sidebarShowDateGroups,
         sidebarChatSort: state.sidebarChatSort,
         checkpointReturnConfirmEnabled: state.checkpointReturnConfirmEnabled,
@@ -562,6 +597,26 @@ export const useSettingsStore = create<SettingsState>()(
               : DEFAULT_APPEARANCE.codeTextScale
           }
         }
+        if (version < 26) {
+          state = {
+            ...state,
+            translationSourceLanguage: normalizeTranslationSourceLanguage(
+              state.translationSourceLanguage
+            ),
+            translationTargetLanguage: normalizeTranslationTargetLanguage(
+              state.translationTargetLanguage
+            )
+          }
+        }
+        if (version < 25) {
+          state = {
+            ...state,
+            agentSpeechLoopEnabled:
+              typeof state.agentSpeechLoopEnabled === 'boolean'
+                ? state.agentSpeechLoopEnabled
+                : true
+          }
+        }
         if (version < 24) {
           state = {
             ...state,
@@ -662,6 +717,12 @@ export const useSettingsStore = create<SettingsState>()(
               ? saved.languagePracticeEnabled
               : current.languagePracticeEnabled,
           llmMaxTokens: normalizeLlmMaxTokens(saved.llmMaxTokens ?? current.llmMaxTokens),
+          translationSourceLanguage: normalizeTranslationSourceLanguage(
+            saved.translationSourceLanguage ?? current.translationSourceLanguage
+          ),
+          translationTargetLanguage: normalizeTranslationTargetLanguage(
+            saved.translationTargetLanguage ?? current.translationTargetLanguage
+          ),
           checkpointReturnConfirmEnabled:
             typeof saved.checkpointReturnConfirmEnabled === 'boolean'
               ? saved.checkpointReturnConfirmEnabled
@@ -676,6 +737,10 @@ export const useSettingsStore = create<SettingsState>()(
                 : TTS_VOICE_AUTO
               : current.ttsVoiceId,
           ttsVolume: normalizeTtsVolume(saved.ttsVolume ?? current.ttsVolume),
+          agentSpeechLoopEnabled:
+            typeof saved.agentSpeechLoopEnabled === 'boolean'
+              ? saved.agentSpeechLoopEnabled
+              : current.agentSpeechLoopEnabled,
           appTheme: isAppTheme(saved.appTheme) ? saved.appTheme : current.appTheme,
           uiFontFamily: isUiFontFamily(saved.uiFontFamily)
             ? saved.uiFontFamily

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useConversationStore } from '@/entities/conversation/model/store'
-import { setActiveChatPipelineStage } from '@/features/ai-chat/lib/pipeline-stage'
 import { useSettingsStore } from '@/entities/settings/model/store'
+import { setActiveChatPipelineStage } from '@/features/ai-chat/lib/pipeline-stage'
+import { sttLanguageParam } from '@/shared/config/practice-languages'
+import { preparePcmForLocalStt } from '@/features/speech-to-text/lib/prepare-pcm-for-stt'
 import {
   mapSpeechError,
   mapTranscriptionError
@@ -123,10 +125,11 @@ export function useVoiceCapture() {
       }
 
       try {
+        const pcmAudio = await preparePcmForLocalStt(audio.audioBase64, audio.format)
         const { text } = await getLingo().stt.transcribe({
-          audioBase64: audio.audioBase64,
-          format: audio.format,
-          language: practiceLanguage
+          audioBase64: pcmAudio.audioBase64,
+          format: pcmAudio.format,
+          language: sttLanguageParam(practiceLanguage)
         })
         if (!text.trim()) {
           reportSpeechError('no-speech')

@@ -1,5 +1,6 @@
 import {
   SPEECH_CHUNK_COMMA_FLUSH,
+  SPEECH_CHUNK_FIRST_MIN_CHARS,
   SPEECH_CHUNK_MAX_CHARS,
   SPEECH_CHUNK_MIN_CHARS
 } from '@/features/text-to-speech/lib/speech-chunk-options'
@@ -62,10 +63,12 @@ function splitLongFragment(fragment: string, maxChars: number): string[] {
 
 function mergeSpeechChunks(
   sentences: string[],
-  flush: boolean
+  flush: boolean,
+  eagerFirst: boolean
 ): { chunks: string[]; trailingBuffer: string } {
   const chunks: string[] = []
   let buffer = ''
+  const minChars = eagerFirst ? SPEECH_CHUNK_FIRST_MIN_CHARS : SPEECH_CHUNK_MIN_CHARS
 
   const pushBuffer = () => {
     const t = buffer.trim()
@@ -86,7 +89,11 @@ function mergeSpeechChunks(
     const candidate = buffer ? `${buffer} ${trimmed}` : trimmed
     if (candidate.length <= SPEECH_CHUNK_MAX_CHARS) {
       buffer = candidate
-      if (buffer.length >= SPEECH_CHUNK_MIN_CHARS && buffer.length >= SPEECH_CHUNK_MAX_CHARS * 0.82) {
+      const readyBySize =
+        buffer.length >= minChars &&
+        (eagerFirst || buffer.length >= SPEECH_CHUNK_MAX_CHARS * 0.82)
+      const readyBySentence = /[.!?…]$/.test(trimmed)
+      if (readyBySize || readyBySentence) {
         pushBuffer()
       }
       continue
@@ -105,7 +112,11 @@ function mergeSpeechChunks(
   return { chunks, trailingBuffer: flush ? '' : buffer }
 }
 
-function extractSentences(pending: string, flush: boolean): { sentences: string[]; remainder: string } {
+function extractSentences(
+  pending: string,
+  flush: boolean,
+  eagerFirst: boolean
+): { sentences: string[]; remainder: string } {
   const sentences: string[] = []
   let i = 0
 
@@ -119,9 +130,11 @@ function extractSentences(pending: string, flush: boolean): { sentences: string[
 
   let remainder = pending.slice(i)
 
-  if (!flush && remainder.length >= SPEECH_CHUNK_COMMA_FLUSH) {
+  const commaFlushAt = eagerFirst ? SPEECH_CHUNK_FIRST_MIN_CHARS * 3 : SPEECH_CHUNK_COMMA_FLUSH
+  if (!flush && remainder.length >= commaFlushAt) {
     const comma = remainder.lastIndexOf(', ')
-    if (comma >= SPEECH_CHUNK_MIN_CHARS) {
+    const minClause = eagerFirst ? SPEECH_CHUNK_FIRST_MIN_CHARS : SPEECH_CHUNK_MIN_CHARS
+    if (comma >= minClause) {
       const clause = remainder.slice(0, comma + 1).trim()
       if (clause.length >= 2) sentences.push(clause)
       remainder = remainder.slice(comma + 2)
@@ -146,10 +159,11 @@ function extractSentences(pending: string, flush: boolean): { sentences: string[
  */
 export function takeSpeechChunks(
   pending: string,
-  flush: boolean
+  flush: boolean,
+  eagerFirst = false
 ): { chunks: string[]; remainder: string } {
-  const { sentences, remainder: rawRemainder } = extractSentences(pending, flush)
-  const { chunks, trailingBuffer } = mergeSpeechChunks(sentences, flush)
+  const { sentences, remainder: rawRemainder } = extractSentences(pending, flush, eagerFirst)
+  const { chunks, trailingBuffer } = mergeSpeechChunks(sentences, flush, eagerFirst)
   const remainder = flush
     ? ''
     : [trailingBuffer, rawRemainder].filter((s) => s.length > 0).join(' ')
@@ -159,8 +173,9 @@ export function takeSpeechChunks(
 /** @deprecated Use takeSpeechChunks — kept for tests/callers expecting sentence arrays. */
 export function takeCompleteSentences(
   pending: string,
-  flush: boolean
+  flush: boolean,
+  eagerFirst = false
 ): { sentences: string[]; remainder: string } {
-  const { chunks, remainder } = takeSpeechChunks(pending, flush)
+  const { chunks, remainder } = takeSpeechChunks(pending, flush, eagerFirst)
   return { sentences: chunks, remainder }
 }

@@ -77,12 +77,23 @@ jobs:
         run: npx electron-builder --${{ matrix.platform }} --publish never
         shell: bash
 
+      - name: List packaged files
+        run: ls -lah release/
+        shell: bash
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: lingo-${{ matrix.platform }}
-          path: release/*
+          path: |
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+            release/*.dmg
+            release/*.zip
+            release/*.tar.gz
           if-no-files-found: error
+          retention-days: 7
 
   release:
     needs: build
@@ -92,17 +103,42 @@ jobs:
       contents: write
 
     steps:
-      - name: Download build artifacts
+      - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release-artifacts
-          pattern: lingo-*
-          merge-multiple: true
+          name: lingo-win
+          path: release-artifacts/win
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: lingo-linux
+          path: release-artifacts/linux
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: lingo-mac
+          path: release-artifacts/mac
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-upload
+          find release-artifacts -type f \
+            \( -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \
+               -o -name '*.dmg' -o -name '*.zip' -o -name '*.tar.gz' \) \
+            -exec cp -v {} release-upload/ \;
+          echo "Assets to publish:"
+          ls -lh release-upload/
+          test "$(find release-upload -type f | wc -l)" -gt 0
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-artifacts/**
+          tag_name: ${{ github.ref_name }}
+          name: Lingo ${{ github.ref_name }}
+          files: release-upload/*
+          fail_on_unmatched_files: true
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

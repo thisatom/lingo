@@ -59,7 +59,10 @@ import {
   type WebSearchSource
 } from '@/shared/lib/web-search-targets'
 import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
-import { formatQueuePreview } from '@/entities/message-queue/lib/format-queue-preview'
+import { getLastUserMessageContent } from '@/shared/lib/web-search-intent'
+import {
+  resolvePracticeLanguage
+} from '@/shared/config/practice-languages'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import type { ChatStreamController } from '@/shared/types/ipc'
 
@@ -118,6 +121,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
 
   const runId = agentRun.beginAgentRun()
   const llmSettings = useSettingsStore.getState()
+  const storedPracticeLanguage = llmSettings.practiceLanguage
   const addMessage = useChatsStore.getState().addMessage
   const removeMessagesFrom = useChatsStore.getState().removeMessagesFrom
   const removeMessage = useChatsStore.getState().removeMessage
@@ -165,6 +169,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
   const chatMessages =
     useChatsStore.getState().chats.find((c) => c.id === targetChatId)?.messages ?? []
   const webSearchForTurn = resolveWebSearchForChatTurn(llmSettings, chatMessages)
+  const lastUserMessageText = getLastUserMessageContent(history)
 
   if (webSearchForTurn) {
     setPipelineStageForChat(targetChatId, 'searching')
@@ -187,6 +192,30 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
   let streamCompleted = false
   const agentSpeechMode = chatComposerMode === 'conversation'
   const playTts = shouldPlayAgentTts(llmSettings.ttsEnabled, chatComposerMode)
+  let answerTts: StreamingSentenceTts | null = null
+
+  const ensureAnswerTts = (): StreamingSentenceTts | null => {
+    if (!playTts || !isViewingChat(targetChatId)) return null
+    if (!answerTts) {
+      const locale = resolvePracticeLanguage(storedPracticeLanguage, {
+        userText: lastUserMessageText,
+        assistantText: finalText
+      })
+      answerTts = createStreamingSentenceTts({
+        locale,
+        runId,
+        targetChatId,
+        onSpeaking: () => setPipelineStageForChat(targetChatId, 'speaking')
+      })
+      session.setStreamingTts(answerTts)
+    }
+    return answerTts
+  }
+
+  const feedAnswerTts = (text: string): void => {
+    if (!text.trim()) return
+    ensureAnswerTts()?.feed(text)
+  }
 
   const syncAssistantText = (text: string) => {
     if (!text) return
@@ -223,7 +252,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     const stream = getLingo().chat.stream(
       {
         messages: history,
-        practiceLanguage,
+        practiceLanguage: storedPracticeLanguage,
         ...buildChatStreamLlmFields(llmSettings),
         webSearch: webSearchForTurn,
         languagePractice: llmSettings.languagePracticeEnabled
@@ -291,6 +320,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
             setPipelineStreamingAnswerForChat(targetChatId, true)
             clearPipelineDetailForChat(targetChatId)
             streamSync.push(text)
+            feedAnswerTts(finalText)
           }
           persistTurnSearchSources()
         },
@@ -316,6 +346,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
           thinkingSync.flushNow(effects.flushThinkingText)
           if (effects.flushAnswerText) {
             streamSync.flushNow(effects.flushAnswerText)
+            feedAnswerTts(finalText)
           }
           setPipelineStreamingAnswerForChat(targetChatId, false)
           persistTurnSearchSources()
@@ -357,7 +388,10 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     setPipelineStreamingAnswerForChat(targetChatId, false)
     persistTurnSearchSources()
     if (isAgentRunActive(runId)) {
-      setPipelineStageForChat(targetChatId, 'idle')
+      const awaitingTts = playTts && finalText.trim() && isViewingChat(targetChatId)
+      if (!awaitingTts) {
+        setPipelineStageForChat(targetChatId, 'idle')
+      }
     }
 
     if (!isAgentRunActive(runId)) {
@@ -423,15 +457,10 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
 
     const playAnswerTts = async (): Promise<void> => {
       if (!playTts || !finalText.trim() || !isViewingTargetChat) return
-      if (!isAgentRunActive(runId)) return
 
-      setPipelineStageForChat(targetChatId, 'speaking')
-      const tts = createStreamingSentenceTts({
-        locale: practiceLanguage,
-        runId,
-        targetChatId
-      })
-      session.setStreamingTts(tts)
+      const tts = ensureAnswerTts()
+      if (!tts) return
+
       try {
         await finishStreamingTtsPlayback(tts, finalText, (message) => {
           if (isAgentRunActive(runId)) {
@@ -442,6 +471,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
         if (session.getStreamingTts() === tts) {
           session.setStreamingTts(null)
         }
+        answerTts = null
       }
     }
 
@@ -538,7 +568,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
 
     if (isAgentRunActive(runId)) {
       const tts = session.getStreamingTts()
-      if (tts) {
+      if (tts && !streamCompleted) {
         tts.cancel()
         session.setStreamingTts(null)
       }

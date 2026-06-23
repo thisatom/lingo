@@ -6,10 +6,14 @@ import {
 /** Reply likely stopped before a natural sentence end (token limit or stream cut). */
 export function looksCutOffMidSentence(answer: string): boolean {
   const reply = answer.trim()
+  if (!reply) return false
   if (/```[\s\S]*$/.test(reply) && !/```[\s\S]*```/.test(reply)) return true
-  if (reply.length < 100) return false
   if (/[.!?…)"'\]\u3002\uFF01\uFF1F\uFF09]$/.test(reply)) return false
   if (/[,;:—–\-(\[{«\u201C]$/.test(reply)) return true
+  // Trailing clause after dash without completion (e.g. "…разговор — дайте").
+  if (/[—–-]\s*[\p{L}\p{N}]{2,}$/u.test(reply) && reply.length >= 40) return true
+  // Long assistant reply ending mid-sentence.
+  if (reply.length >= 48 && /[\p{L}\p{N}]$/u.test(reply)) return true
   return false
 }
 

@@ -7,6 +7,7 @@ import {
   getAgentSessionSnapshot,
   isAgentSessionBusy
 } from '@/features/ai-chat/lib/agent-session-snapshot'
+import { useSettingsStore } from '@/entities/settings/model/store'
 import { isPlaybackOnlyConversationError } from '@/features/ai-chat/lib/post-reply'
 import { useConversationStore } from '@/entities/conversation/model/store'
 
@@ -75,6 +76,7 @@ export function useLiveConversationLoop({
 
   const scheduleAutoListen = useCallback(() => {
     if (modeRef.current !== 'conversation' || !activeRef.current) return
+    if (!useSettingsStore.getState().agentSpeechLoopEnabled) return
     if (voiceStage === 'listening' || voiceStage === 'transcribing') return
     if (agentPhase !== 'idle' || voiceBusy || speechError) return
 

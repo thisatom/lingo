@@ -1,16 +1,18 @@
-import { availableParallelism } from 'node:os'
 import { decodeWavPcm16ToFloat32 } from '../../src/features/speech-to-text/lib/wav-pcm'
+import { STT_PCM_F32_FORMAT } from '../../src/features/speech-to-text/lib/pcm-base64'
 import { hasEnoughSpeechEnergy } from '../../src/features/speech-to-text/lib/speech-vad'
 import {
+  isLikelyGarbledTranscript,
   isLikelyWhisperHallucination,
-  parseWhisperCppTranscription,
-  sanitizeWhisperTranscript,
-  stripCumulativeWhisperTranscript
+  isTranscriptSuspiciousForDuration,
+  parseWhisperCppBatchTranscription,
+  sanitizeWhisperTranscript
 } from '../../src/features/speech-to-text/lib/whisper-transcript'
 import {
   ensureWhisperModels,
   getWhisperModelPath
 } from './whisper-model'
+import { runWhisperTranscription, warmWhisperInference } from './whisper-inference'
 import { getWhisperTranscribe } from './whisper-native'
 
 export {
@@ -24,8 +26,6 @@ const MAX_AUDIO_SAMPLES = 16_000 * 120
 const WHISPER_SAMPLE_RATE = 16_000
 
 let transcribeChain: Promise<unknown> = Promise.resolve()
-/** Previous raw whisper output in this worker — realtime mode may prepend it to the next clip. */
-let previousWhisperTranscript = ''
 
 function enqueueStt<T>(fn: () => Promise<T>): Promise<T> {
   const next = transcribeChain.then(fn, fn)
@@ -38,12 +38,28 @@ function normalizeLanguage(code: string | undefined): string | undefined {
   return code.trim().split('-')[0].toLowerCase()
 }
 
+function decodeSttAudio(bytes: Buffer, format: string): Float32Array {
+  if (format === STT_PCM_F32_FORMAT) {
+    const sampleCount = Math.floor(bytes.length / 4)
+    const out = new Float32Array(sampleCount)
+    for (let i = 0; i < sampleCount; i++) {
+      out[i] = bytes.readFloatLE(i * 4)
+    }
+    return out
+  }
+  if (format === 'wav') {
+    return decodeWavPcm16ToFloat32(bytes)
+  }
+  throw new Error('LOCAL_STT_UNSUPPORTED_FORMAT')
+}
+
 function mapSttError(error: unknown): Error {
   if (error instanceof Error) {
     const known = [
       'RECORDING_TOO_SHORT',
       'RECORDING_TOO_LONG',
       'LOCAL_STT_REQUIRES_WAV',
+      'LOCAL_STT_UNSUPPORTED_FORMAT',
       'INVALID_WAV',
       'UNSUPPORTED_WAV_ENCODING',
       'UNSUPPORTED_SAMPLE_RATE',
@@ -67,7 +83,8 @@ function mapSttError(error: unknown): Error {
 
 export async function warmLocalSttModel(): Promise<void> {
   await ensureWhisperModels()
-  getWhisperTranscribe()
+  const transcribe = getWhisperTranscribe()
+  await warmWhisperInference(transcribe, getWhisperModelPath())
 }
 
 export async function transcribeAudioLocal(options: {
@@ -79,10 +96,9 @@ export async function transcribeAudioLocal(options: {
     try {
       const bytes = Buffer.from(options.audioBase64, 'base64')
       if (bytes.length < MIN_AUDIO_BYTES) throw new Error('RECORDING_TOO_SHORT')
-      if (options.format !== 'wav') throw new Error('LOCAL_STT_REQUIRES_WAV')
 
       const language = normalizeLanguage(options.language)
-      const audioData = decodeWavPcm16ToFloat32(bytes)
+      const audioData = decodeSttAudio(bytes, options.format)
 
       if (audioData.length > MAX_AUDIO_SAMPLES) throw new Error('RECORDING_TOO_LONG')
       if (audioData.length < 1200 || !hasEnoughSpeechEnergy(audioData, WHISPER_SAMPLE_RATE)) {
@@ -93,34 +109,28 @@ export async function transcribeAudioLocal(options: {
         '[lingo stt] Transcribe',
         audioData.length,
         'samples',
-        language ?? 'auto'
+        language ?? 'auto',
+        options.format
       )
 
       await ensureWhisperModels()
       const transcribe = getWhisperTranscribe()
-
       const modelPath = getWhisperModelPath()
 
-      const result = await transcribe({
+      const result = await runWhisperTranscription(transcribe, {
         pcmf32: audioData,
-        model: modelPath,
-        ...(language ? { language, detect_language: false } : {}),
-        translate: false,
-        use_gpu: false,
-        no_timestamps: true,
-        comma_in_time: false,
-        no_prints: true,
-        // Audio is already trimmed/normalized in renderer — internal VAD drops short phrases.
-        vad: false,
-        n_threads: Math.max(1, availableParallelism() - 1)
+        modelPath,
+        language
       })
 
-      const parsed = parseWhisperCppTranscription(result.transcription)
-      const withoutCarryOver = stripCumulativeWhisperTranscript(previousWhisperTranscript, parsed)
-      previousWhisperTranscript = parsed
-
-      const cleaned = sanitizeWhisperTranscript(withoutCarryOver)
-      if (!cleaned || isLikelyWhisperHallucination(cleaned)) {
+      const parsed = parseWhisperCppBatchTranscription(result.transcription)
+      const cleaned = sanitizeWhisperTranscript(parsed)
+      if (
+        !cleaned ||
+        isLikelyGarbledTranscript(cleaned) ||
+        isLikelyWhisperHallucination(cleaned) ||
+        isTranscriptSuspiciousForDuration(cleaned, audioData.length, WHISPER_SAMPLE_RATE)
+      ) {
         throw new Error('NO_SPEECH')
       }
 

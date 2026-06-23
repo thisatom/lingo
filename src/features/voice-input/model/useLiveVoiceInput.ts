@@ -79,13 +79,24 @@ export function useLiveVoiceInput(handlers: LiveVoiceHandlers) {
       }
       const messageId = conversationMessageIdRef.current
       conversationMessageIdRef.current = ''
+      if (!text) {
+        if (messageId) handlers.onConversationCancel(messageId)
+        return null
+      }
       if (messageId) await handlers.onConversationCommit(messageId)
       return text || null
     }
 
     if (useLocal) {
       const text = (await recorded.stop())?.trim() ?? null
-      if (!text) return null
+      if (!text) {
+        const messageId = conversationMessageIdRef.current
+        conversationMessageIdRef.current = ''
+        if (messageId && !(handlers.mode === 'text' || handlers.isEditSpeech?.())) {
+          handlers.onConversationCancel(messageId)
+        }
+        return null
+      }
 
       if (handlers.mode === 'text' || handlers.isEditSpeech?.()) {
         const final = applyTextDraft(text)

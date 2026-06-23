@@ -38,6 +38,7 @@ export type ConversationTurnRenderProps = {
   liveVoiceUserMessageId?: string | null
   voiceCaptureLabel?: 'listening' | 'transcribing' | null
   lastReplyMessageId?: string | null
+  showReplyActions?: boolean
   onRegenerateAssistantMessage?: (messageId: string) => void
 }
 

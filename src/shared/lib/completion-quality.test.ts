@@ -13,8 +13,14 @@ describe('looksCutOffMidSentence', () => {
 
   it('does not flag long prose without terminal punctuation alone', () => {
     const prose = 'a'.repeat(150)
-    expect(looksCutOffMidSentence(prose)).toBe(false)
+    expect(looksCutOffMidSentence(prose)).toBe(true)
     expect(looksCutOffMidSentence(`${prose}.`)).toBe(false)
+  })
+
+  it('flags Russian answers cut off after an em dash', () => {
+    const cut =
+      'Похоже, вы просто делитесь своими мыслями. Если вам нужна помощь с чем-то конкретным — будь то вопрос, задача или просто разговор — дайте'
+    expect(looksCutOffMidSentence(cut)).toBe(true)
   })
 })
 
@@ -48,7 +54,7 @@ describe('shouldRetryIncompleteCompletion', () => {
         finishReason: 'stop',
         userMessage: 'hello'
       })
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('retries cut-off answers for custom backends when finish_reason is stop', () => {
@@ -62,7 +68,7 @@ describe('shouldRetryIncompleteCompletion', () => {
     ).toBe(true)
   })
 
-  it('skips heuristic retry for custom backends without cut signals', () => {
+  it('retries long unpunctuated answers for custom backends when cut off', () => {
     const cut = 'a'.repeat(150)
     expect(
       shouldRetryIncompleteCompletion({
@@ -71,7 +77,7 @@ describe('shouldRetryIncompleteCompletion', () => {
         userMessage: 'hi',
         customBackend: true
       })
-    ).toBe(false)
+    ).toBe(true)
     expect(
       shouldRetryIncompleteCompletion({
         answer: cut,

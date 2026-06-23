@@ -1,5 +1,26 @@
 const TOKEN_PATTERN = /[\p{L}\p{N}']+/gu
 
+/** Whisper often hallucinates these on silence or truncated audio. */
+const COMMON_HALLUCINATION_PHRASES = new Set([
+  'привет',
+  'hello',
+  'hi',
+  'hey',
+  'thanks',
+  'thank you',
+  'thank you for watching',
+  'thanks for watching',
+  'спасибо',
+  'subscribe',
+  'subtitles',
+  'субтитры',
+  'продолжение следует',
+  'you',
+  'bye',
+  'goodbye',
+  'пока'
+])
+
 /** whisper.cpp time tokens — including malformed negative offsets from realtime mode. */
 const WHISPER_TIMESTAMP = /\b\d{1,2}(?::-?\d{1,3}){1,2}[.,]-?\d{1,4}\b/g
 
@@ -97,6 +118,17 @@ export function parseWhisperCppTranscription(
   return extractLastSpeechSegment(parts)
 }
 
+/** Batch mic recording — join every speech token, not only the last realtime block. */
+export function parseWhisperCppBatchTranscription(
+  transcription: string[][] | string[] | undefined
+): string {
+  const parts = splitTranscriptionParts(transcription)
+  if (parts.length === 0) return ''
+  const speech = parts.filter((part) => !isWhisperTimestampToken(part))
+  if (speech.length === 0) return ''
+  return speech.join(' ').replace(/\s+/g, ' ').trim()
+}
+
 /** Collapse runs like "ну, ну, ну, …" that Whisper often hallucinates on silence. */
 export function collapseRepeatedShortTokens(
   text: string,
@@ -136,6 +168,15 @@ export function isLikelyWhisperHallucination(text: string): boolean {
   const tokens = trimmed.match(TOKEN_PATTERN) ?? []
   if (tokens.length === 0) return true
 
+  const normalizedPhrase = trimmed
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s']/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (COMMON_HALLUCINATION_PHRASES.has(normalizedPhrase)) {
+    return true
+  }
+
   const counts = new Map<string, number>()
   for (const token of tokens) {
     const norm = normalizeToken(token)
@@ -162,9 +203,52 @@ export function isLikelyWhisperHallucination(text: string): boolean {
   return false
 }
 
+/** Transcript too short for the recorded duration — likely truncated or hallucinated. */
+export function isTranscriptSuspiciousForDuration(
+  text: string,
+  sampleCount: number,
+  sampleRate = 16_000
+): boolean {
+  const seconds = sampleCount / sampleRate
+  if (seconds < 5) return false
+
+  const tokens = text.match(TOKEN_PATTERN) ?? []
+  const normalizedPhrase = text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s']/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (seconds >= 6 && tokens.length <= 2 && COMMON_HALLUCINATION_PHRASES.has(normalizedPhrase)) {
+    return true
+  }
+  if (seconds >= 14 && tokens.length <= 2) return true
+  if (seconds >= 22 && tokens.length <= 3 && text.trim().length < 28) return true
+  return false
+}
+
+/** Echo / stem stutter at the end — e.g. "крошу, крош" from misheard audio. */
+export function isLikelyGarbledTranscript(text: string): boolean {
+  const tokens = text.trim().match(TOKEN_PATTERN) ?? []
+  if (tokens.length < 2) return false
+
+  const prev = normalizeToken(tokens[tokens.length - 2]!.replace(/^[,.\-–—:;]+|[,.\-–—:;]+$/g, ''))
+  const last = normalizeToken(tokens[tokens.length - 1]!.replace(/^[,.\-–—:;]+|[,.\-–—:;]+$/g, ''))
+  if (prev.length < 2 || last.length < 2) return false
+
+  const shorter = Math.min(prev.length, last.length)
+  const longer = Math.max(prev.length, last.length)
+  if (shorter / longer < 0.45) return false
+
+  return prev.startsWith(last) || last.startsWith(prev)
+}
+
 export function sanitizeWhisperTranscript(text: string): string {
   let cleaned = stripWhisperTimestamps(text)
-  cleaned = collapseInternalDuplicateTranscript(cleaned)
+  if (cleaned.length >= 120) {
+    cleaned = collapseInternalDuplicateTranscript(cleaned)
+  }
   cleaned = cleaned.replace(/\s+/g, ' ').trim()
   cleaned = collapseRepeatedShortTokens(cleaned)
   return cleaned.replace(/[,.\-–—:;]+$/g, '').trim()

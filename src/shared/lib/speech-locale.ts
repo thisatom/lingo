@@ -19,6 +19,11 @@ const LOCALE_MAP: Record<string, string> = {
 /** Maps practice language (ISO) to BCP-47 for Web Speech API. */
 export function toSpeechLocale(language: string): string {
   const normalized = language.trim().toLowerCase()
+  if (normalized === 'auto') {
+    return typeof navigator !== 'undefined' && navigator.language
+      ? navigator.language
+      : 'en-US'
+  }
   if (normalized.includes('-')) return normalized
   return LOCALE_MAP[normalized] ?? `${normalized}-${normalized.toUpperCase()}`
 }

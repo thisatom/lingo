@@ -10,7 +10,8 @@ import type {
   LingoApi,
   SecretProviderId,
   SttTranscribeRequest,
-  TtsSynthesizeRequest
+  TtsSynthesizeRequest,
+  TranslateTextRequest
 } from '../../src/shared/types/ipc'
 import { applyTitlebarTheme, initCustomTitlebar, updateTitlebarCaption } from './titlebar'
 import {
@@ -105,6 +106,10 @@ const lingo: LingoApi = {
   tts: {
     synthesize: (request: TtsSynthesizeRequest) =>
       ipcRenderer.invoke('lingo:tts:synthesize', request)
+  },
+  translate: {
+    text: (request: TranslateTextRequest) =>
+      ipcRenderer.invoke('lingo:translate:text', request)
   },
   link: {
     preview: (url: string) => ipcRenderer.invoke('lingo:link:preview', url)

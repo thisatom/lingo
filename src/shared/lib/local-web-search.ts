@@ -1,3 +1,4 @@
+import { isPracticeLanguageAuto, resolvePracticeLanguage } from '@/shared/config/practice-languages'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { enrichSearchResultsWithPageContent } from '@/shared/lib/local-page-research'
 import { LocalWebSearchError } from '@/shared/lib/local-web-search-errors'
@@ -19,15 +20,16 @@ const PRACTICE_LOCALE: Record<string, string> = {
 
 export function localeForPracticeLanguage(practiceLanguage?: string): string | undefined {
   const lang = practiceLanguage?.trim()
-  if (!lang) return undefined
-  return PRACTICE_LOCALE[lang]
+  if (!lang || isPracticeLanguageAuto(lang)) return undefined
+  return PRACTICE_LOCALE[lang.split('-')[0]?.toLowerCase() ?? '']
 }
 
 function resolveSearchLocale(localeOverride?: string): string {
   const trimmed = localeOverride?.trim()
   if (trimmed) return trimmed
   try {
-    const lang = useSettingsStore.getState().practiceLanguage ?? 'en'
+    const stored = useSettingsStore.getState().practiceLanguage ?? 'en'
+    const lang = resolvePracticeLanguage(stored)
     const fromStore = PRACTICE_LOCALE[lang]
     if (fromStore) return fromStore
   } catch {

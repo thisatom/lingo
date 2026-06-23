@@ -209,9 +209,7 @@ export function MainPage() {
         if (realChatId) {
           syncSessionChatIdRef.current(realChatId)
         }
-        if (isLiveConversationActiveRef.current) {
-          scheduleAutoListenRef.current?.()
-        }
+        // Auto-listen resumes from onLiveConversationTurnComplete after the agent reply.
       },
       onConversationCancel: (messageId: string) => {
         const chatId = voiceCaptureChatIdRef.current
