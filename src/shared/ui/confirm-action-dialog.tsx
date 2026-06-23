@@ -59,7 +59,7 @@ export function ConfirmActionDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className={confirmActionDialogContentClass}>
         <div className={confirmActionDialogHeaderClass}>
-          <div className="min-w-0 flex-1 space-y-2 pr-1">
+          <div className="min-w-0 flex-1 space-y-1 pr-1">
             <AlertDialogTitle className={confirmActionDialogTitleClass}>{title}</AlertDialogTitle>
             <AlertDialogDescription className={confirmActionDialogDescriptionClass}>
               {description}
@@ -77,7 +77,7 @@ export function ConfirmActionDialog({
 
         <div className={confirmActionDialogSeparatorClass} aria-hidden />
 
-        <div className="flex items-center justify-between gap-3 px-5 py-3">
+        <div className="flex items-center justify-between gap-2 px-4 py-2">
           {showDontAskAgain ? (
             <div className="flex min-w-0 items-center gap-2">
               <Checkbox

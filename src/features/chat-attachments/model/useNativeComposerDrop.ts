@@ -79,7 +79,7 @@ export function useNativeComposerDrop({
     if (el && observer) observer.observe(el)
     window.addEventListener('resize', syncRect)
 
-    const unsubscribe = window.lingo.files.onDesktopFileDrop((payload) => {
+    const unsubscribeDrop = window.lingo.files.onDesktopFileDrop((payload) => {
       setDragOverIfChanged(false)
       const files = filesFromDroppedReadResults(payload.results)
       runComposerAttachmentPipeline(
@@ -90,8 +90,11 @@ export function useNativeComposerDrop({
       )
     })
 
+    const unsubscribeDragOver = window.lingo.files.onComposerDragOver?.(setDragOverIfChanged)
+
     return () => {
-      unsubscribe()
+      unsubscribeDrop()
+      unsubscribeDragOver?.()
       observer?.disconnect()
       window.removeEventListener('resize', syncRect)
       window.lingo.files?.setComposerDropRect(null)
@@ -104,6 +107,8 @@ export function useNativeComposerDrop({
       setDragOver(false)
       return
     }
+
+    if (isElectronApp()) return
 
     const onDragEnter = (event: DragEvent) => {
       event.preventDefault()
@@ -128,9 +133,7 @@ export function useNativeComposerDrop({
     const onDrop = (event: DragEvent) => {
       event.preventDefault()
       setDragOverIfChanged(false)
-      if (!isElectronApp()) {
-        processWebDrop(event.dataTransfer)
-      }
+      processWebDrop(event.dataTransfer)
     }
 
     const attach = (el: HTMLElement) => {
@@ -150,18 +153,11 @@ export function useNativeComposerDrop({
     const el = zoneRef.current
     if (!el) return
 
-    if (isElectronApp()) {
-      window.lingo?.files?.setComposerDropRect(rectFromElement(el))
-    }
-
     attach(el)
     return () => {
       detach(el)
       dragOverRef.current = false
       setDragOver(false)
-      if (isElectronApp()) {
-        window.lingo?.files?.setComposerDropRect(null)
-      }
     }
   }, [enabled, processWebDrop, setDragOverIfChanged])
 

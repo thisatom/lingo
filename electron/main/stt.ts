@@ -1,10 +1,12 @@
 import type { SttTranscribeRequest, SttTranscribeResponse } from '../../src/shared/types/ipc'
-import { transcribeAudioLocal } from './local-stt'
+import { transcribeInWorker } from './stt-host'
 
-/** On-device Whisper in the main process (no renderer CSP / CDN). */
+/** On-device Whisper in an isolated child process (ONNX segfault must not kill the app). */
 export async function transcribeAudio(
   request: SttTranscribeRequest
 ): Promise<SttTranscribeResponse> {
-  const text = await transcribeAudioLocal(request)
+  const text = await transcribeInWorker(request)
   return { text }
 }
+
+export { warmSttWorker, shutdownSttWorker } from './stt-host'

@@ -14,9 +14,13 @@ export type DesktopFileDropPayload = {
 }
 
 type DropHandler = (payload: DesktopFileDropPayload) => void
+type DragOverHandler = (over: boolean) => void
 
 let composerDropRect: ComposerDropRect = null
 let dropHandler: DropHandler | null = null
+let dragOverHandler: DragOverHandler | null = null
+let dragOverActive = false
+let dropInFlight = false
 
 export function setComposerDropRect(rect: ComposerDropRect): void {
   composerDropRect = rect
@@ -24,6 +28,19 @@ export function setComposerDropRect(rect: ComposerDropRect): void {
 
 export function setDesktopFileDropHandler(handler: DropHandler | null): void {
   dropHandler = handler
+}
+
+export function setComposerDragOverHandler(handler: DragOverHandler | null): void {
+  dragOverHandler = handler
+  if (!handler) {
+    dragOverActive = false
+  }
+}
+
+function setDragOverActive(over: boolean): void {
+  if (dragOverActive === over) return
+  dragOverActive = over
+  dragOverHandler?.(over)
 }
 
 function isPointInComposer(clientX: number, clientY: number): boolean {
@@ -49,7 +66,7 @@ function pathsFromDataTransfer(dataTransfer: DataTransfer | null): string[] {
       // not backed by disk
     }
   }
-  return paths
+  return [...new Set(paths)]
 }
 
 function notifyDrop(payload: DesktopFileDropPayload): void {
@@ -61,10 +78,6 @@ let fileDropCaptureInstalled = false
 /**
  * OS file drops are handled in preload (webUtils + real File objects). Renderer
  * only supplies the composer hit-rect and receives read results via callback.
- *
- * dragover must always call preventDefault (even outside the composer rect).
- * In sandboxed Electron, renderer document listeners may not run for OS file
- * drags; gating preventDefault on the composer rect shows the forbidden cursor.
  */
 export function installPreloadFileDropCapture(): void {
   if (fileDropCaptureInstalled) return
@@ -75,10 +88,14 @@ export function installPreloadFileDropCapture(): void {
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'copy'
     }
+    setDragOverActive(isPointInComposer(event.clientX, event.clientY))
   }
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault()
+    setDragOverActive(false)
+
+    if (dropInFlight) return
     if (!isPointInComposer(event.clientX, event.clientY)) return
 
     const paths = pathsFromDataTransfer(event.dataTransfer)
@@ -87,6 +104,7 @@ export function installPreloadFileDropCapture(): void {
       return
     }
 
+    dropInFlight = true
     void ipcRenderer
       .invoke('lingo:files:readDroppedPaths', paths)
       .then((payload: DesktopFileDropPayload) => {
@@ -96,12 +114,21 @@ export function installPreloadFileDropCapture(): void {
         const message = error instanceof Error ? error.message : 'Could not read dropped files'
         notifyDrop({ results: [], errors: [message] })
       })
+      .finally(() => {
+        window.setTimeout(() => {
+          dropInFlight = false
+        }, 50)
+      })
+  }
+
+  const onDragLeave = (event: DragEvent) => {
+    if (event.relatedTarget != null) return
+    setDragOverActive(false)
   }
 
   document.addEventListener('dragover', allowDrop, true)
   document.addEventListener('drop', onDrop, true)
-  window.addEventListener('dragover', allowDrop, true)
-  window.addEventListener('drop', onDrop, true)
+  document.addEventListener('dragleave', onDragLeave, true)
 }
 
 export function ensurePreloadFileDropCapture(): void {

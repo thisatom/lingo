@@ -17,7 +17,7 @@ Each step runs in the process that fits it — **not** everything in the rendere
 
 ```
 Mic (renderer) → MediaRecorder → enhance (EQ/noise gate) → WAV base64
-       → IPC lingo:stt:transcribe (main: Whisper small + onnxruntime-node)
+       → IPC lingo:stt:transcribe (main: whisper.cpp via @kutalia/whisper-node-addon)
        → text in composer / user message
        → IPC lingo:chat:stream (main: OpenRouter)
        → assistant text in UI
@@ -27,19 +27,19 @@ Mic (renderer) → MediaRecorder → enhance (EQ/noise gate) → WAV base64
 | Step | Process | Why |
 |------|---------|-----|
 | Record + level meter | Renderer | Needs `getUserMedia` / Web Audio |
-| Transcribe | **Main** | No CSP; native ONNX; model cache in `userData/transformers-cache` |
+| Transcribe | **Main** | whisper.cpp native addon; models in `userData/whisper-models` |
 | Chat | **Main** | API keys in keytar |
 | TTS | **Main** | `edge-tts-universal` |
 | Playback | Renderer | `HTMLAudioElement` + output device from settings |
 
-**Do not** run Transformers.js in the renderer for desktop STT: it pulls WASM from jsDelivr and fights `index.html` CSP (`connect-src`, `script-src`).
+**Do not** run Transformers.js in the renderer for desktop STT: use main-process whisper.cpp instead.
 
 ## Libraries (existing stack)
 
 | Layer | Library / API | Role |
 |-------|----------------|------|
 | Live STT (interim + final) | [`react-speech-recognition`](https://www.npmjs.com/package/react-speech-recognition) | Wraps **Web Speech API** (`SpeechRecognition` / `webkitSpeechRecognition`). Delivers `interimTranscript` + `finalTranscript` while the mic is open. |
-| Batch STT (desktop) | **Local Whisper small** in `electron/main/local-stt.ts` via IPC | `Xenova/whisper-small` (q8). Audio preprocessed in `enhance-speech-audio.ts` before IPC. |
+| Batch STT (desktop) | **whisper.cpp** in `electron/main/local-stt.ts` via IPC | `@kutalia/whisper-node-addon`, `ggml-small-q5_0` + Silero VAD. Audio preprocessed in `enhance-speech-audio.ts` before IPC. |
 | Recording (fallback) | `MediaRecorder` (`media-recorder-capture.ts`) | Preferred in Electron; no AudioWorklet/CSP/blob issues. |
 | Recording (optional) | WAV + AudioWorklet (`wav-recorder.ts` + `public/audio/*.worklet.js`) | Higher-quality mono PCM for Whisper; second choice after MediaRecorder. |
 | TTS (conversation only) | `edge-tts` in main + `playTtsFromBase64` | Assistant reply spoken when `chatComposerMode === 'conversation'`. |
@@ -65,7 +65,7 @@ browserSupportsSpeechRecognition()?
 
 **Why not Web Speech in Electron?** Chromium exposes the API, but uploads to Google often fail (`chunked_data_pipe_upload_data_stream` / error `-2`). The level meter can show signal from the **selected** mic while Web Speech listens on the **system default** → empty transcript and “No speech detected”.
 
-- **Local Whisper path**: same mic stream as the level meter → reliable STT; text appears after you press ✓ (no live typing in Text mode). Model downloads in **main** on first transcribe (~150 MB for `whisper-small`). Renderer runs `enhanceSpeechAudio` (high-pass, noise gate, presence EQ, normalize, trim silence) before IPC.
+- **Local Whisper path**: same mic stream as the level meter → reliable STT; text appears after you press ✓ (no live typing in Text mode). Models download in **main** on first transcribe (~180 MB Whisper + VAD). Renderer runs `enhanceSpeechAudio` (high-pass, normalize, trim silence) before IPC.
 - **Browser path**: live interim text in the composer / message bubble (web only).
 
 ## State machine (voice session)
@@ -116,7 +116,7 @@ Files: `useAiChat.ts` (`beginVoiceUserMessage`, `updateVoiceUserMessage`, `commi
 ## CSP & Electron notes
 
 - `index.html` CSP applies only to the **renderer**. OpenRouter + Google hosts for chat/Web Speech. Hugging Face / jsDelivr are **not** required — STT and model downloads happen in main.
-- `electron.vite.config.ts`: `@huggingface/transformers` and `onnxruntime-node` are **external** in the main bundle (dynamic `import()` at first transcribe).
+- `electron.vite.config.ts`: `@kutalia/whisper-node-addon` is **external** in the main bundle (loaded from `node_modules` at runtime).
 - AudioWorklet must load from `public/audio/*.worklet.js` (not `blob:` URLs).
 - Prefer `MediaRecorder` over worklet in Electron.
 

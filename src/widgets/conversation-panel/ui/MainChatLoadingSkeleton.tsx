@@ -5,7 +5,7 @@ import { Spinner } from '@/shared/ui/spinner'
 export function MainChatLoadingSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      <header className="flex shrink-0 items-center gap-2 p-2">
+      <header className="flex shrink-0 items-center gap-2 bg-transparent p-2">
         <Skeleton className="size-6 shrink-0 rounded-md" />
         <Skeleton className="h-5 min-w-0 flex-1 max-w-[12rem] rounded-sm" />
         <Skeleton className="size-7 shrink-0 rounded-md" />

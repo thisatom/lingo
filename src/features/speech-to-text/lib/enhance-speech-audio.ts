@@ -1,8 +1,9 @@
 import type { MicNoiseSuppression } from './mic-noise-suppression'
+import { trimSpeechBounds } from './speech-vad'
 import { WHISPER_SAMPLE_RATE } from './speech-audio-constants'
 
-const TARGET_RMS = 0.1
-const MAX_GAIN = 8
+const TARGET_RMS = 0.12
+const MAX_GAIN = 10
 
 export interface EnhanceSpeechOptions {
   level?: MicNoiseSuppression
@@ -25,6 +26,7 @@ export function enhanceSpeechAudio(
   let samples = highPassFilter(input, sampleRate, 80)
 
   if (level === 'light') {
+    samples = trimSpeechBounds(samples, sampleRate, { paddingMs: 280 })
     return normalizeRms(samples, TARGET_RMS, MAX_GAIN)
   }
 

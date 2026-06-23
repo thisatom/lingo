@@ -1,7 +1,8 @@
 import { app, BrowserWindow, session } from 'electron'
-import { registerDevToolsShortcut, unregisterDevToolsShortcut, openDevToolsIfDev } from './devtools'
+import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools'
 import { registerIpcHandlers } from './ipc'
 import { warmOpenRouterConnection } from './openrouter-fetch'
+import { warmSttWorker } from './stt'
 import { registerRendererScheme, setupRendererProtocol } from './renderer-protocol'
 import { setupSessionContentSecurityPolicy } from './session-csp'
 import { loadEnvBootstrap, warmSecretsCache } from './secrets'
@@ -48,6 +49,7 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
         await loadEnvBootstrap()
         await warmSecretsCache()
         void warmOpenRouterConnection()
+        warmSttWorker()
       } catch (error) {
         console.error('[lingo] Failed to load API key bootstrap:', error)
       }
@@ -64,5 +66,6 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
 
   app.on('will-quit', () => {
     unregisterDevToolsShortcut()
+    void import('./stt').then(({ shutdownSttWorker }) => shutdownSttWorker())
   })
 }

@@ -55,6 +55,7 @@ export function UserMessageActionButton({
       disabled={disabled}
       onClick={(event) => {
         event.stopPropagation()
+        if (disabled) return
         onClick()
       }}
     >

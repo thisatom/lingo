@@ -65,12 +65,14 @@ import { isVisionCapableModel, messagesHaveImages } from '@/shared/lib/vision-mo
 export { normalizeOpenRouterModelId } from '@/shared/config/openrouter'
 
 type SendEvent = (event: ChatStreamEvent) => void
-type PromptMode = 'research' | 'practice' | 'vision'
+type PromptMode = 'research' | 'practice' | 'vision' | 'general'
 
 export type OpenRouterStreamRequest = {
   messages: ChatMessagePayload[]
   model?: string
   practiceLanguage?: string
+  /** When false, use general assistant prompt instead of language practice. */
+  languagePractice?: boolean
   llmBackend?: LlmBackend
   customLlm?: CustomLlmConfig
   webSearch?: boolean
@@ -169,7 +171,11 @@ function formatTodayLine(): string {
   return `Today is ${date} (year ${now.getFullYear()}). Use this for date/year questions.`
 }
 
-function systemPrompt(practiceLanguage: string | undefined, mode: PromptMode): string {
+function systemPrompt(
+  practiceLanguage: string | undefined,
+  mode: PromptMode,
+  languagePractice = true
+): string {
   const lang = practiceLanguage ?? 'en'
   const today = formatTodayLine()
   const ocrNote =
@@ -178,28 +184,42 @@ function systemPrompt(practiceLanguage: string | undefined, mode: PromptMode): s
     ' Messages may include **Web search results (local)** blocks — treat them as live web excerpts; mention source titles in prose. Source links appear in the chat UI separately.'
 
   if (mode === 'vision') {
+    const tutoringRule = languagePractice
+      ? '- For language practice with images, you may still correct mistakes and ask follow-ups, but prioritize visual questions first.\n'
+      : '- General chat mode: do NOT correct grammar or steer toward language drills unless the user asks.\n'
     return `You are Lingo, a helpful AI assistant with vision.
 ${today}
 The user can attach images to messages. You receive those images in the conversation and CAN see them.
 Rules:
 - Describe, analyze, compare, and answer questions about attached images (objects, scenes, diagrams, screenshots, handwriting).
 - Read visible text in images when asked (OCR-style).
-- Answer in the same language the user writes in (often ${lang}).
+- Answer in the same language the user writes in.
 - If the user sends only an image, describe what you see and offer relevant help.
-- For language practice with images, you may still correct mistakes and ask follow-ups, but prioritize visual questions first.
-- NEVER claim you cannot see images when they are attached in this thread.`
+${tutoringRule}- NEVER claim you cannot see images when they are attached in this thread.`
   }
 
   if (mode === 'research') {
     return `You are Lingo, a helpful AI assistant with live web search.
 ${today}
-Answer in the same language the user writes in (often ${lang}).
+Answer in the same language the user writes in.
 Rules:
 - Answer the user's question directly and completely (at least 2–4 sentences for factual questions).
 - Use web search when you need current or factual information beyond today's date.
 - When local web search excerpts are present, answer from them and mention source titles in prose.
 - NEVER stop mid-sentence. NEVER reply with only a few words unless asked.
 - If the user asks the current year or date, state it clearly from today's date above.${ocrNote}${localSearchNote}`
+  }
+
+  if (mode === 'general') {
+    return `You are Lingo, a helpful general-purpose AI assistant.
+${today}
+Language-practice mode is OFF. This is a normal chat, not a language lesson.
+Rules:
+- Answer the user's actual question or task directly.
+- Do NOT correct grammar, suggest vocabulary drills, or steer the conversation toward language learning unless the user explicitly asks for that.
+- Match the language the user writes in; do not force replies in ${lang} if the user uses another language.
+- NEVER stop mid-sentence unless the user asked for a very short reply.
+- Use clear structure (lists, steps) when it helps.${ocrNote}${localSearchNote}`
   }
 
   return `You are Lingo, a friendly language practice partner. The user practices conversational ${lang}.
@@ -209,6 +229,10 @@ Rules:
 - Finish every reply completely; never stop mid-sentence.
 - Stay consistent with the conversation above; if something is unclear, ask one short clarifying question.
 - Gently correct mistakes when relevant; ask a follow-up when it helps practice.${ocrNote}`
+}
+
+function isLanguagePracticeEnabled(request: OpenRouterStreamRequest): boolean {
+  return request.languagePractice !== false
 }
 
 function payloadHasContent(content: ChatMessagePayload['content']): boolean {
@@ -246,11 +270,12 @@ function filterHistoryForApi(
 function buildMessages(
   messages: ChatMessagePayload[],
   practiceLanguage: string | undefined,
-  mode: PromptMode
+  mode: PromptMode,
+  languagePractice = true
 ): Array<{ role: string; content: string | ChatMessagePayload['content'] }> {
   const researchMode = mode === 'research'
   return [
-    { role: 'system', content: systemPrompt(practiceLanguage, mode) },
+    { role: 'system', content: systemPrompt(practiceLanguage, mode, languagePractice) },
     ...filterHistoryForApi(messages, researchMode).map((m) => ({
       role: m.role,
       content: m.content
@@ -793,7 +818,12 @@ async function completeWithLocalWebSearch(
     applyCompletionMaxTokens(
       {
         model: userModelId.trim(),
-        messages: buildMessages(augmented, practiceLanguage, 'research'),
+        messages: buildMessages(
+          augmented,
+          practiceLanguage,
+          'research',
+          isLanguagePracticeEnabled(request)
+        ),
         temperature: 0.3
       },
       request
@@ -835,7 +865,12 @@ async function tryNativeWebSearch(
     applyCompletionMaxTokens(
       {
         model: userModelId.trim(),
-        messages: buildMessages(apiMessages, practiceLanguage, 'research'),
+        messages: buildMessages(
+          apiMessages,
+          practiceLanguage,
+          'research',
+          isLanguagePracticeEnabled(request)
+        ),
         temperature: 0.3
       },
       request
@@ -844,6 +879,15 @@ async function tryNativeWebSearch(
 
   attachWebCapabilities(body, userModelId)
   await completeWithWebSearch(request, apiKey, body, send, lastUserMessage, signal, fetchImpl)
+}
+
+function resolveTextPromptMode(
+  request: OpenRouterStreamRequest,
+  forceWebSearch: boolean
+): PromptMode {
+  if (forceWebSearch) return 'research'
+  if (request.languagePractice === false) return 'general'
+  return 'practice'
 }
 
 async function completeRegularTextChat(
@@ -858,14 +902,19 @@ async function completeRegularTextChat(
   forceWebSearch: boolean
 ): Promise<void> {
   const researchMode = forceWebSearch
-  const promptMode: PromptMode = researchMode ? 'research' : 'practice'
+  const promptMode = resolveTextPromptMode(request, forceWebSearch)
 
   const body = withCustomCompletionExtras(
     request,
     applyCompletionMaxTokens(
       {
         model: userModelId.trim(),
-        messages: buildMessages(apiMessages, practiceLanguage, promptMode),
+        messages: buildMessages(
+          apiMessages,
+          practiceLanguage,
+          promptMode,
+          isLanguagePracticeEnabled(request)
+        ),
         temperature: researchMode ? 0.3 : 0.7
       },
       request
@@ -1057,7 +1106,12 @@ export async function streamOpenRouterChat(
         applyCompletionMaxTokens(
           {
             model: tryModelId.trim(),
-            messages: buildMessages(apiMessages, request.practiceLanguage, 'vision'),
+            messages: buildMessages(
+              apiMessages,
+              request.practiceLanguage,
+              'vision',
+              isLanguagePracticeEnabled(request)
+            ),
             temperature: 0.7
           },
           request

@@ -9,15 +9,15 @@ export interface TitlebarColors {
 
 const TITLEBAR_THEMES: Record<ResolvedTheme, TitlebarColors> = {
   dark: {
-    background: '#121212',
+    background: '#181818',
     foreground: '#e4e4e4',
     itemHover: '#333333',
     overlayHeight: 32
   },
   light: {
-    background: '#f5f5f5',
+    background: '#ebebeb',
     foreground: '#1e1e1e',
-    itemHover: '#e0e0e0',
+    itemHover: '#d8d8d8',
     overlayHeight: 32
   }
 }

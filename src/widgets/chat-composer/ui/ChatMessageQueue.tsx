@@ -1,8 +1,14 @@
-import { useState } from 'react'
-import { ArrowUp, ChevronDown, CornerDownLeft, Pencil, Trash2 } from '@/shared/ui/icons'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowUp, CornerDownLeft, Pencil, Trash2 } from '@/shared/ui/icons'
 import type { QueuedMessage } from '@/entities/message-queue/model/store'
 import { QueuedMessageAttachments } from '@/features/chat-attachments/ui/QueuedMessageAttachments'
+import {
+  composerStackPanelShellClass,
+  filterQueuedByQuery
+} from '@/widgets/chat-composer/lib/composer-stack-panel'
+import { ComposerStackPanelHeader } from '@/widgets/chat-composer/ui/ComposerStackPanelHeader'
 import { cn } from '@/shared/lib/utils'
+import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
 import { TooltipIconButton, TooltipWrap } from '@/shared/ui/tooltip-wrap'
 
 interface ChatMessageQueueProps {
@@ -10,6 +16,8 @@ interface ChatMessageQueueProps {
   onUpdate: (id: string, content: string) => void
   onRemove: (id: string) => void
   onSendNow: (id: string) => void
+  /** Inside ChatComposer shell — no outer border, divider below. */
+  embedded?: boolean
   className?: string
 }
 
@@ -31,11 +39,28 @@ export function ChatMessageQueue({
   onUpdate,
   onRemove,
   onSendNow,
+  embedded = false,
   className
 }: ChatMessageQueueProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
   const [listCollapsed, setListCollapsed] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredItems = useMemo(
+    () => filterQueuedByQuery(items, searchQuery),
+    [items, searchQuery]
+  )
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setSearchOpen(false)
+      setSearchQuery('')
+      setEditingId(null)
+      setEditDraft('')
+    }
+  }, [items.length])
 
   if (items.length === 0) return null
 
@@ -53,128 +78,131 @@ export function ChatMessageQueue({
     setEditDraft('')
   }
 
+  const showHeaderDivider = !embedded || !listCollapsed || searchOpen
+
   return (
-    <div
-      className={cn(
-        'overflow-hidden rounded-xl border border-border bg-surface-raised shadow-sm',
-        className
-      )}
-    >
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs">
-          <span className="font-medium text-foreground">{items.length} Queued</span>
-          <CornerDownLeft className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="text-muted-foreground">to Send</span>
-        </div>
-        <button
-          type="button"
-          className="flex shrink-0 cursor-pointer items-center gap-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          aria-expanded={!listCollapsed}
-          aria-controls="chat-message-queue-list"
-          onClick={() => setListCollapsed((collapsed) => !collapsed)}
-        >
-          Start Multitasking
-          <ChevronDown
-            className={cn('size-3 opacity-70 transition-transform', listCollapsed && '-rotate-90')}
-            aria-hidden
-          />
-        </button>
+    <div className={cn(composerStackPanelShellClass(embedded), className)}>
+      <div className={cn(showHeaderDivider && 'border-b border-border')}>
+        <ComposerStackPanelHeader
+          count={items.length}
+          countLabel="Queued"
+          metaIcon={<CornerDownLeft className="size-3 shrink-0" />}
+          metaSuffix="to Send"
+          listCollapsed={listCollapsed}
+          onToggleCollapse={() => setListCollapsed((collapsed) => !collapsed)}
+          collapseShowLabel="Show queue"
+          collapseHideLabel="Hide queue"
+          listId="chat-message-queue-list"
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          searchOpen={searchOpen}
+          onToggleSearch={() =>
+            setSearchOpen((open) => {
+              if (open) setSearchQuery('')
+              return !open
+            })
+          }
+          searchPlaceholder="Search queue…"
+        />
       </div>
 
       {!listCollapsed ? (
-        <ul id="chat-message-queue-list" className="divide-y divide-border">
-          {items.map((item) => {
-            const isEditing = editingId === item.id
+        <CustomScrollArea variant="menu" className="max-h-60">
+          {filteredItems.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">No messages match your search.</p>
+          ) : (
+            <ul id="chat-message-queue-list" className="divide-y divide-border">
+              {filteredItems.map((item) => {
+                const isEditing = editingId === item.id
 
-            return (
-              <li
-                key={item.id}
-                className="group flex min-h-8 items-center gap-2 px-3 py-1"
-              >
-                {isEditing ? (
-                  <textarea
-                    value={editDraft}
-                    onChange={(e) => setEditDraft(e.target.value)}
-                    onBlur={() => commitEdit(item)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        commitEdit(item)
-                      }
-                      if (e.key === 'Escape') {
-                        setEditingId(null)
-                        setEditDraft('')
-                      }
-                    }}
-                    autoFocus
-                    rows={1}
-                    className="min-h-6 min-w-0 flex-1 resize-none rounded-md border border-border bg-input px-2 py-0.5 text-xs leading-5 text-foreground outline-none focus-visible:border-ring"
-                  />
-                ) : (
-                  <div className="flex min-h-5 min-w-0 flex-1 items-center gap-1.5">
-                    {item.attachments && item.attachments.length > 0 ? (
-                      <QueuedMessageAttachments attachments={item.attachments} />
-                    ) : null}
-                    {item.content.trim() ? (
-                      <QueuedMessagePreview content={item.content} />
-                    ) : item.attachments && item.attachments.length > 0 ? (
-                      <p className="line-clamp-1 text-xs leading-5 text-muted-foreground">
-                        {item.attachments.length} attachment
-                        {item.attachments.length === 1 ? '' : 's'}
-                      </p>
-                    ) : null}
-                  </div>
-                )}
+                return (
+                  <li key={item.id} className="group flex min-h-8 items-center gap-2 px-3 py-1">
+                    {isEditing ? (
+                      <textarea
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        onBlur={() => commitEdit(item)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            commitEdit(item)
+                          }
+                          if (e.key === 'Escape') {
+                            setEditingId(null)
+                            setEditDraft('')
+                          }
+                        }}
+                        autoFocus
+                        rows={1}
+                        className="min-h-6 min-w-0 flex-1 resize-none rounded-md border border-border bg-input px-2 py-0.5 text-xs leading-5 text-foreground outline-none focus-visible:border-ring"
+                      />
+                    ) : (
+                      <div className="flex min-h-5 min-w-0 flex-1 items-center gap-1.5">
+                        {item.attachments && item.attachments.length > 0 ? (
+                          <QueuedMessageAttachments attachments={item.attachments} />
+                        ) : null}
+                        {item.content.trim() ? (
+                          <QueuedMessagePreview content={item.content} />
+                        ) : item.attachments && item.attachments.length > 0 ? (
+                          <p className="line-clamp-1 text-xs leading-5 text-muted-foreground">
+                            {item.attachments.length} attachment
+                            {item.attachments.length === 1 ? '' : 's'}
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
 
-                <div
-                  className={cn(
-                    'flex shrink-0 items-center gap-0.5 transition-opacity',
-                    isEditing
-                      ? 'pointer-events-auto opacity-100'
-                      : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'
-                  )}
-                >
-                  <TooltipIconButton
-                    type="button"
-                    variant="ghost"
-                    size="iconSm"
-                    className="size-7 text-muted-foreground hover:text-foreground"
-                    tooltip="Edit"
-                    aria-label="Edit queued message"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => startEdit(item)}
-                  >
-                    <Pencil className="size-3.5" />
-                  </TooltipIconButton>
-                  <TooltipIconButton
-                    type="button"
-                    variant="ghost"
-                    size="iconSm"
-                    className="size-7 text-muted-foreground hover:text-foreground"
-                    tooltip="Send now"
-                    aria-label="Send queued message now"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => onSendNow(item.id)}
-                  >
-                    <ArrowUp className="size-3.5" />
-                  </TooltipIconButton>
-                  <TooltipIconButton
-                    type="button"
-                    variant="ghost"
-                    size="iconSm"
-                    className="size-7 text-muted-foreground hover:text-foreground"
-                    tooltip="Remove"
-                    aria-label="Remove from queue"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => onRemove(item.id)}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </TooltipIconButton>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+                    <div
+                      className={cn(
+                        'flex shrink-0 items-center gap-0.5 transition-opacity',
+                        isEditing
+                          ? 'pointer-events-auto opacity-100'
+                          : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'
+                      )}
+                    >
+                      <TooltipIconButton
+                        type="button"
+                        variant="ghost"
+                        size="iconSm"
+                        className="size-7 text-muted-foreground hover:text-foreground"
+                        tooltip="Edit"
+                        aria-label="Edit queued message"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => startEdit(item)}
+                      >
+                        <Pencil className="size-3.5" />
+                      </TooltipIconButton>
+                      <TooltipIconButton
+                        type="button"
+                        variant="ghost"
+                        size="iconSm"
+                        className="size-7 text-muted-foreground hover:text-foreground"
+                        tooltip="Send now"
+                        aria-label="Send queued message now"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => onSendNow(item.id)}
+                      >
+                        <ArrowUp className="size-3.5" />
+                      </TooltipIconButton>
+                      <TooltipIconButton
+                        type="button"
+                        variant="ghost"
+                        size="iconSm"
+                        className="size-7 text-muted-foreground hover:text-foreground"
+                        tooltip="Remove"
+                        aria-label="Remove from queue"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => onRemove(item.id)}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </TooltipIconButton>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </CustomScrollArea>
       ) : null}
     </div>
   )

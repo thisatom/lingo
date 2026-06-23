@@ -37,6 +37,8 @@ export type ConversationTurnRenderProps = {
   pipelineSearchActiveUrl?: string | null
   liveVoiceUserMessageId?: string | null
   voiceCaptureLabel?: 'listening' | 'transcribing' | null
+  lastReplyMessageId?: string | null
+  onRegenerateAssistantMessage?: (messageId: string) => void
 }
 
 function userAttachmentsSignature(

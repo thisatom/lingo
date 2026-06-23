@@ -10,13 +10,16 @@ import {
   chatSelectableClass
 } from './agent-layout'
 import { WebSearchSources } from './WebSearchSources'
+import { AgentMessageActions } from './AgentMessageActions'
 
 interface AgentMessageProps {
   content: string
   searchSources?: MessageSearchSource[]
   showSearchSpinner?: boolean
   parseThrottleMs?: number
-  showStreamingCursor?: boolean
+  showFooterActions?: boolean
+  onRegenerate?: () => void
+  regenerateDisabled?: boolean
 }
 
 export const AgentMessage = memo(function AgentMessage({
@@ -24,7 +27,9 @@ export const AgentMessage = memo(function AgentMessage({
   searchSources,
   showSearchSpinner = false,
   parseThrottleMs,
-  showStreamingCursor = false
+  showFooterActions = false,
+  onRegenerate,
+  regenerateDisabled = false
 }: AgentMessageProps) {
   const hasSearchUi = Boolean(searchSources?.length || showSearchSpinner)
   const hasAnswer = content.trim().length > 0
@@ -48,8 +53,14 @@ export const AgentMessage = memo(function AgentMessage({
           content={content}
           variant="typography"
           parseThrottleMs={parseThrottleMs}
-          showStreamingCursor={showStreamingCursor}
           className={cn(agentMessageClass, chatSelectableClass, hasSearchUi && 'pt-0')}
+        />
+      ) : null}
+      {showFooterActions && hasAnswer ? (
+        <AgentMessageActions
+          content={content}
+          onRegenerate={onRegenerate}
+          regenerateDisabled={regenerateDisabled}
         />
       ) : null}
     </ChatTextContextMenu>

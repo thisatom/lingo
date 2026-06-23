@@ -158,7 +158,10 @@ export function useRecordedVoiceInput({ enabled }: Options) {
       hardReset()
       const msg = error instanceof Error ? error.message : 'STT_FAILED'
       if (msg.includes('RECORDING_TOO_SHORT')) reportError('RECORDING_TOO_SHORT')
+      else if (msg.includes('RECORDING_TOO_LONG')) reportError('RECORDING_TOO_LONG')
       else if (msg.includes('NO_SPEECH')) reportError('no-speech')
+      else if (msg.includes('STT_MODEL_LOAD_FAILED')) reportError('STT_MODEL_LOAD_FAILED')
+      else if (msg.includes('STT_WORKER_CRASHED')) reportError('STT_WORKER_CRASHED')
       else if (msg.includes('STT_TIMEOUT')) reportError('network')
       else reportError(msg)
       return null

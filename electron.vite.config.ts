@@ -36,9 +36,20 @@ function copyAppResources(): Plugin {
   }
 }
 
+function copySttWorkerPreload(): Plugin {
+  const src = resolve(__dirname, 'electron/main/stt-worker-preload.cjs')
+  return {
+    name: 'copy-stt-worker-preload',
+    closeBundle() {
+      if (!existsSync(src)) return
+      cpSync(src, resolve(__dirname, 'out/main/stt-worker-preload.cjs'))
+    }
+  }
+}
+
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin(), copyAppResources()],
+    plugins: [externalizeDepsPlugin(), copyAppResources(), copySttWorkerPreload()],
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src')
@@ -46,11 +57,12 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        input: resolve(__dirname, 'electron/main/index.ts'),
+        input: {
+          index: resolve(__dirname, 'electron/main/index.ts'),
+          'stt-worker': resolve(__dirname, 'electron/main/stt-worker.ts')
+        },
         external: [
-          '@huggingface/transformers',
-          'onnxruntime-node',
-          'onnxruntime-common'
+          '@kutalia/whisper-node-addon',
         ]
       }
     }

@@ -23,10 +23,10 @@ files:
 asar: true
 asarUnpack:
   - '**/*.node'
+  - '**/*.so'
+  - '**/*.so.*'
   - '**/node_modules/keytar/**'
-  - '**/node_modules/onnxruntime-node/**'
-  - '**/node_modules/onnxruntime-common/**'
-  - '**/node_modules/@huggingface/transformers/**'
+  - '**/node_modules/@kutalia/whisper-node-addon/**'
 
 npmRebuild: true
 buildDependenciesFromSource: false

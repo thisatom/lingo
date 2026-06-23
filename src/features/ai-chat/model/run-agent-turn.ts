@@ -225,7 +225,8 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
         messages: history,
         practiceLanguage,
         ...buildChatStreamLlmFields(llmSettings),
-        webSearch: webSearchForTurn
+        webSearch: webSearchForTurn,
+        languagePractice: llmSettings.languagePracticeEnabled
       },
       {
         onSearching: () => {

@@ -16,6 +16,7 @@ import { applyTitlebarTheme, initCustomTitlebar, updateTitlebarCaption } from '.
 import {
   ensurePreloadFileDropCapture,
   setComposerDropRect,
+  setComposerDragOverHandler,
   setDesktopFileDropHandler
 } from './file-drop-paths'
 
@@ -153,6 +154,10 @@ const lingo: LingoApi = {
     },
     setComposerDropRect: (rect: ComposerDropRect) => {
       setComposerDropRect(rect)
+    },
+    onComposerDragOver: (handler: (over: boolean) => void) => {
+      setComposerDragOverHandler(handler)
+      return () => setComposerDragOverHandler(null)
     },
     onDesktopFileDrop: (handler: (payload: DesktopFileDropPayload) => void) => {
       setDesktopFileDropHandler(handler)

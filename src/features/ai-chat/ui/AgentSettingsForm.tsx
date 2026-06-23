@@ -214,7 +214,7 @@ export function AgentSettingsForm() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Confirm before return to checkpoint</p>
             <p className={settingsRowDescriptionClass}>
-              Show a confirmation dialog before starting a new run from a checkpoint.
+              Show a confirmation dialog before submitting an edit that removes later messages.
             </p>
           </div>
           <Switch

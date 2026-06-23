@@ -33,6 +33,7 @@ export function useStreamMarkdownValue(
 ): string {
   const [display, setDisplay] = useState(value)
   const latestRef = useRef(value)
+  const displayRef = useRef(value)
   const rafRef = useRef<number | null>(null)
   const timerRef = useRef<number | null>(null)
   const lastCommitRef = useRef(0)
@@ -44,12 +45,14 @@ export function useStreamMarkdownValue(
       if (timerRef.current != null) clearTimeout(timerRef.current)
       rafRef.current = null
       timerRef.current = null
+      displayRef.current = value
       setDisplay(value)
       return
     }
 
     const commit = () => {
       lastCommitRef.current = performance.now()
+      displayRef.current = latestRef.current
       setDisplay(latestRef.current)
     }
 
@@ -68,6 +71,16 @@ export function useStreamMarkdownValue(
         timerRef.current = null
         schedule()
       }, minIntervalMs - elapsed)
+    }
+
+    const lag = latestRef.current.length - displayRef.current.length
+    if (displayRef.current.length === 0 && latestRef.current.length > 0) {
+      commit()
+      return
+    }
+    if (lag > 240) {
+      commit()
+      return
     }
 
     schedule()

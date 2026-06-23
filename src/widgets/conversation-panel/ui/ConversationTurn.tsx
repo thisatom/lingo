@@ -43,7 +43,9 @@ export const ConversationTurn = memo(function ConversationTurn({
   pipelineStreamingAnswer = false,
   pipelineSearchActiveUrl = null,
   voiceCaptureLabel = null,
-  userHeaderSticky = false
+  userHeaderSticky = false,
+  lastReplyMessageId = null,
+  onRegenerateAssistantMessage
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
   const latestAssistantMessageId =
@@ -145,8 +147,18 @@ export const ConversationTurn = memo(function ConversationTurn({
                 content={message.content}
                 searchSources={message.searchSources}
                 showSearchSpinner={showSearchSpinner}
-                parseThrottleMs={isAnswerStream ? 80 : undefined}
-                showStreamingCursor={isAnswerStream}
+                parseThrottleMs={isAnswerStream ? 50 : undefined}
+                showFooterActions={
+                  message.id === lastReplyMessageId &&
+                  !isAnswerStream &&
+                  message.content.trim().length > 0
+                }
+                onRegenerate={
+                  onRegenerateAssistantMessage
+                    ? () => onRegenerateAssistantMessage(message.id)
+                    : undefined
+                }
+                regenerateDisabled={agentBusy}
               />
             )}
           </article>

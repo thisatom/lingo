@@ -54,7 +54,7 @@ export const confirmActionDialogCloseClass = cn(
   'dark:focus-visible:ring-[#404040]'
 )
 
-export const confirmActionDialogHeaderClass = 'flex items-start gap-3 px-5 pt-3 pb-3'
+export const confirmActionDialogHeaderClass = 'flex items-start gap-2 px-4 pt-2.5 pb-2'
 
 export const confirmActionDialogCancelClass = cn(
   '!h-[21px] min-h-[21px] min-w-0 border-0 bg-transparent px-2.5 py-0 text-[13px] font-normal leading-none text-[#525252]',

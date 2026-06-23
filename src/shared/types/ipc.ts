@@ -51,6 +51,8 @@ export interface ChatStreamRequest {
   customLlm?: CustomLlmConfig
   /** Defaults to true — enables OpenRouter `openrouter:web_search` server tool. */
   webSearch?: boolean
+  /** When false, assistant uses general chat (not language practice). Defaults to true. */
+  languagePractice?: boolean
   /** Try other free models when the selected one errors (no repeat attempts). */
   modelAutoFallback?: boolean
   /** Max completion tokens for this request (from Settings → API). `0` = omit `max_tokens` (model default). */
@@ -229,6 +231,7 @@ export interface LingoApi {
   files?: {
     getPathForFile: (file: File) => string
     setComposerDropRect: (rect: ComposerDropRect) => void
+    onComposerDragOver: (handler: (over: boolean) => void) => () => void
     onDesktopFileDrop: (handler: (payload: DesktopFileDropPayload) => void) => () => void
     readDroppedPaths: (paths: string[]) => Promise<DesktopFileDropPayload>
   }

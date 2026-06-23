@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Globe, Mic } from '@/shared/ui/icons'
-import { ArrowUp, Square } from 'lucide-react'
+import { ArrowUp, Languages, Square, Upload } from 'lucide-react'
 import {
   EMPTY_COMPOSER_ATTACHMENTS,
   type MessageAttachment
 } from '@/entities/message/model/attachment'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
-import { ComposerAttachments } from '@/features/chat-attachments/ui/ComposerAttachments'
-import { ComposerTextareaContextMenu } from '@/features/chat-composer/ui/ComposerTextareaContextMenu'
+import type { QueuedMessage } from '@/entities/message-queue/model/store'
 import { ComposerFileInput } from '@/features/chat-attachments/ui/ComposerFileInput'
 import { useComposerPaste } from '@/features/chat-attachments/model/useComposerPaste'
 import { useNativeComposerDrop } from '@/features/chat-attachments/model/useNativeComposerDrop'
@@ -16,6 +15,9 @@ import { VoiceRecordButton, type VoiceInteractionMode } from '@/features/voice-c
 import { composerInputHoverClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { CHAT_MODE_LABELS, composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
 import { ComposerAgentMenuSelect } from '@/widgets/chat-composer/ui/ComposerAgentMenuSelect'
+import { ComposerAttachmentsPanel } from '@/widgets/chat-composer/ui/ComposerAttachmentsPanel'
+import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
+import { ComposerTextareaContextMenu } from '@/features/chat-composer/ui/ComposerTextareaContextMenu'
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import { isElectronApp } from '@/shared/lib/lingo'
 import { cn } from '@/shared/lib/utils'
@@ -39,6 +41,10 @@ interface ChatComposerProps {
   onAddAttachments?: (items: MessageAttachment[]) => void
   onRemoveAttachment?: (id: string) => void
   onAttachmentError?: (message: string) => void
+  queuedMessages?: readonly QueuedMessage[]
+  onUpdateQueuedMessage?: (id: string, content: string) => void
+  onRemoveQueuedMessage?: (id: string) => void
+  onSendQueuedMessageNow?: (id: string) => void
   onSend: () => void
   onStop?: () => void
   disabled?: boolean
@@ -100,6 +106,10 @@ export function ChatComposer({
   onAddAttachments,
   onRemoveAttachment,
   onAttachmentError,
+  queuedMessages,
+  onUpdateQueuedMessage,
+  onRemoveQueuedMessage,
+  onSendQueuedMessageNow,
   onSend,
   onStop,
   disabled,
@@ -127,6 +137,8 @@ export function ChatComposer({
   const setModelAutoFallback = useSettingsStore((s) => s.setModelAutoFallback)
   const webSearchEnabled = useSettingsStore((s) => s.webSearchEnabled)
   const setWebSearchEnabled = useSettingsStore((s) => s.setWebSearchEnabled)
+  const languagePracticeEnabled = useSettingsStore((s) => s.languagePracticeEnabled)
+  const setLanguagePracticeEnabled = useSettingsStore((s) => s.setLanguagePracticeEnabled)
 
   const activeModelId = llmBackend === 'custom' ? customModelId : modelId
 
@@ -148,13 +160,20 @@ export function ChatComposer({
   )
 
   const canSend = !disabled && (value.trim().length > 0 || attachments.length > 0)
+  const voiceAvailable = voiceSupported && onVoicePress && (onVoiceStop || onVoiceRelease)
+  const attachmentsEnabled = Boolean(onAddAttachments)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { zoneRef, dragOver } = useNativeComposerDrop({
-    enabled: Boolean(onAddAttachments),
+    enabled: attachmentsEnabled,
     existingCount: attachments.length,
     onAdd: onAddAttachments ?? noopAddAttachments,
     onError: onAttachmentError
   })
+  const showDropOverlay = attachmentsEnabled && dragOver && !disabled
+  const voiceDisabled =
+    disabled ||
+    voiceBusy ||
+    (agentBusy && !(liveConversationActive && chatComposerMode === 'conversation'))
   const showStop = Boolean(
     onStop &&
       !canSend &&
@@ -188,20 +207,54 @@ export function ChatComposer({
     return () => cancelAnimationFrame(frame)
   }, [focusChatId, disabled])
 
+  const showAttachmentPanel = attachments.length > 0 && Boolean(onRemoveAttachment)
+  const showQueuePanel =
+    (queuedMessages?.length ?? 0) > 0 &&
+    Boolean(onUpdateQueuedMessage && onRemoveQueuedMessage && onSendQueuedMessageNow)
+
   return (
     <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')} data-composer-root>
       <div
         ref={zoneRef}
         className={cn(
           composerShellClass,
+          'relative',
           '[app-region:no-drag]',
           disabled && 'opacity-60',
-          dragOver && 'border-ring/80 bg-accent/50'
+          dragOver && attachmentsEnabled && 'ring-2 ring-inset ring-ring/80'
         )}
       >
-        {attachments.length > 0 && onRemoveAttachment ? (
-          <ComposerAttachments items={attachments} onRemove={onRemoveAttachment} />
+        {showDropOverlay ? (
+          <div
+            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-accent/60 backdrop-blur-[1px]"
+            aria-hidden
+          >
+            <div className="flex flex-col items-center gap-1.5 px-4 text-center">
+              <Upload className="size-6 text-foreground/80" strokeWidth={1.75} />
+              <p className="text-sm font-medium text-foreground">Drop files to attach</p>
+              <p className="text-xs text-muted-foreground">Images and text files</p>
+            </div>
+          </div>
         ) : null}
+
+        {showQueuePanel ? (
+          <ChatMessageQueue
+            embedded
+            items={queuedMessages!}
+            onUpdate={onUpdateQueuedMessage!}
+            onRemove={onRemoveQueuedMessage!}
+            onSendNow={onSendQueuedMessageNow!}
+          />
+        ) : null}
+
+        {showAttachmentPanel ? (
+          <ComposerAttachmentsPanel
+            embedded
+            items={attachments}
+            onRemove={onRemoveAttachment!}
+          />
+        ) : null}
+
         <CustomScrollArea variant="menu" className="max-h-40 w-full">
           <ComposerTextareaContextMenu onValueChange={onChange} textareaRef={textareaRef}>
             <textarea
@@ -238,45 +291,7 @@ export function ChatComposer({
         </CustomScrollArea>
 
         <div className="flex shrink-0 items-center gap-0.5 px-2 pb-2 pt-0.5">
-          {voiceSupported && onVoicePress && (onVoiceStop || onVoiceRelease) ? (
-            isListening && onVoiceStop ? (
-              <TooltipIconButton
-                type="button"
-                variant="destructive"
-                size="iconSm"
-                className={cn(composerToolbarIconClass, 'animate-pulse')}
-                disabled={disabled}
-                tooltip="Stop recording"
-                aria-label="Stop recording"
-                onClick={onVoiceStop}
-              >
-                <Square className="size-3.5 fill-current" strokeWidth={0} />
-              </TooltipIconButton>
-            ) : (
-              <VoiceRecordButton
-                variant="ghost"
-                size="iconSm"
-                interactionMode={voiceInteractionMode}
-                isListening={!!isListening}
-                disabled={
-                  disabled ||
-                  voiceBusy ||
-                  (agentBusy && !(liveConversationActive && chatComposerMode === 'conversation'))
-                }
-                label={micLabel}
-                highlight={liveConversationActive && chatComposerMode === 'conversation'}
-                onPress={onVoicePress}
-                onRelease={onVoiceStop ?? onVoiceRelease ?? (() => undefined)}
-                className={cn(
-                  composerToolbarIconClass,
-                  liveConversationActive &&
-                    chatComposerMode === 'conversation' &&
-                    !isListening &&
-                    'ring-1 ring-emerald-500/50'
-                )}
-              />
-            )
-          ) : (
+          {!voiceAvailable ? (
             <Button
               type="button"
               variant="ghost"
@@ -287,7 +302,7 @@ export function ChatComposer({
             >
               <Mic />
             </Button>
-          )}
+          ) : null}
 
           {onAddAttachments ? (
             <ComposerFileInput
@@ -297,6 +312,29 @@ export function ChatComposer({
               onError={onAttachmentError}
             />
           ) : null}
+
+          <TooltipIconButton
+            type="button"
+            variant="ghost"
+            size="iconSm"
+            className={cn(
+              composerToolbarIconClass,
+              languagePracticeEnabled && cn(composerInputHoverClass, 'bg-accent text-foreground')
+            )}
+            disabled={disabled}
+            tooltip={
+              languagePracticeEnabled
+                ? 'Language practice on'
+                : 'General chat — language practice off'
+            }
+            aria-label={
+              languagePracticeEnabled ? 'Language practice on' : 'Language practice off'
+            }
+            aria-pressed={languagePracticeEnabled}
+            onClick={() => setLanguagePracticeEnabled(!languagePracticeEnabled)}
+          >
+            <Languages className="size-4" strokeWidth={1.75} />
+          </TooltipIconButton>
 
           <TooltipIconButton
             type="button"
@@ -343,18 +381,55 @@ export function ChatComposer({
             >
               <Square className="size-3.5 fill-current" strokeWidth={0} />
             </TooltipIconButton>
+          ) : canSend ? (
+            <TooltipIconButton
+              size="iconSm"
+              className="shrink-0 rounded-full bg-foreground text-background transition-colors hover:bg-foreground/90"
+              tooltip={sendTooltip}
+              onClick={onSend}
+            >
+              <ArrowUp className="size-3.5" strokeWidth={2} />
+            </TooltipIconButton>
+          ) : voiceAvailable ? (
+            isListening && onVoiceStop ? (
+              <TooltipIconButton
+                type="button"
+                variant="destructive"
+                size="iconSm"
+                className="shrink-0 rounded-full animate-pulse"
+                disabled={disabled}
+                tooltip="Stop recording"
+                aria-label="Stop recording"
+                onClick={onVoiceStop}
+              >
+                <Square className="size-3.5 fill-current" strokeWidth={0} />
+              </TooltipIconButton>
+            ) : (
+              <VoiceRecordButton
+                variant="secondary"
+                size="iconSm"
+                interactionMode={voiceInteractionMode}
+                isListening={!!isListening}
+                disabled={voiceDisabled}
+                label={micLabel}
+                highlight={liveConversationActive && chatComposerMode === 'conversation'}
+                onPress={onVoicePress}
+                onRelease={onVoiceStop ?? onVoiceRelease ?? (() => undefined)}
+                className={cn(
+                  'shrink-0 rounded-full',
+                  liveConversationActive &&
+                    chatComposerMode === 'conversation' &&
+                    !isListening &&
+                    'ring-1 ring-emerald-500/50'
+                )}
+              />
+            )
           ) : (
             <TooltipIconButton
               size="iconSm"
-              className={cn(
-                'shrink-0 rounded-full transition-colors',
-                canSend
-                  ? 'bg-foreground text-background hover:bg-foreground/90'
-                  : 'bg-muted text-muted-foreground'
-              )}
-              disabled={!canSend}
-              tooltip={sendTooltip}
-              onClick={onSend}
+              className="shrink-0 rounded-full bg-muted text-muted-foreground"
+              disabled
+              tooltip="Send"
             >
               <ArrowUp className="size-3.5" strokeWidth={2} />
             </TooltipIconButton>

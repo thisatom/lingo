@@ -1,0 +1,30 @@
+/* Mermaid diagrams in chat markdown */
+
+.markdown-prose .mermaid-diagram {
+  border-top: 1px solid var(--md-code-border, hsl(var(--border)));
+  background: var(--md-code-bg, hsl(var(--muted) / 0.35));
+}
+
+.markdown-prose .mermaid-diagram__canvas {
+  display: flex;
+  justify-content: center;
+  min-height: 2.5rem;
+}
+
+.markdown-prose .mermaid-diagram__canvas.flex {
+  min-height: 0;
+}
+
+.markdown-prose .mermaid-diagram__canvas svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-prose .mermaid-diagram__canvas .nodeLabel,
+.markdown-prose .mermaid-diagram__canvas .label {
+  font-family: inherit;
+}
+
+.markdown-prose .mermaid-diagram__canvas .edgeLabel {
+  font-size: 11px;
+}

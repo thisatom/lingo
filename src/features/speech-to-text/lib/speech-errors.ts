@@ -13,10 +13,15 @@ const ERROR_MESSAGES: Record<string, string> = {
   SPEECH_NOT_SUPPORTED: 'Voice input is not supported in this environment.',
   NO_OPENROUTER_KEY: 'Add your OpenRouter API key in Settings to use voice input.',
   LOCAL_STT_LOADING:
-    'Loading speech model… The first run downloads ~40 MB; keep the app open.',
+    'Loading speech model… First run downloads Whisper (~190 MB) and VAD; keep the app open.',
   LOCAL_STT_FAILED:
     'On-device transcription failed. Try again or type your message.',
-  STT_MODEL_LOADING: 'Loading speech model… First run may download ~40 MB (one time, free).'
+  STT_MODEL_LOADING: 'Loading speech model… First run may download ~190 MB (one time, free).',
+  STT_MODEL_LOAD_FAILED:
+    'Could not load the on-device speech model. Check your connection and disk space, then restart.',
+  STT_WORKER_CRASHED:
+    'Speech recognition crashed unexpectedly. Try again — the app will restart the speech engine.',
+  RECORDING_TOO_LONG: 'Recording is too long. Speak in shorter phrases (up to about 2 minutes).'
 }
 
 export function isDesktopApp(): boolean {
@@ -43,6 +48,15 @@ export function mapTranscriptionError(message: string): string | null {
   }
   if (message.includes('STT_TIMEOUT') || message.includes('Loading local Whisper')) {
     return ERROR_MESSAGES.LOCAL_STT_LOADING
+  }
+  if (message.includes('STT_MODEL_LOAD_FAILED')) {
+    return ERROR_MESSAGES.STT_MODEL_LOAD_FAILED
+  }
+  if (message.includes('STT_WORKER_CRASHED')) {
+    return ERROR_MESSAGES.STT_WORKER_CRASHED
+  }
+  if (message.includes('RECORDING_TOO_LONG')) {
+    return ERROR_MESSAGES.RECORDING_TOO_LONG
   }
   if (message.includes('LOCAL_STT') || message.includes('INVALID_WAV')) {
     return ERROR_MESSAGES.LOCAL_STT_FAILED

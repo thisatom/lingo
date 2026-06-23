@@ -33,7 +33,8 @@ export function formatCodeLanguageLabel(language: string): string {
     go: 'Go',
     java: 'Java',
     kotlin: 'Kotlin',
-    sql: 'SQL'
+    mermaid: 'Diagram',
+    diagram: 'Diagram'
   }
   return labels[normalized] ?? language
 }

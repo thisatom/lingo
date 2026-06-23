@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   IpcValidationError,
   parseChatStreamRequest,
+  parseDroppedFilePaths,
   parseLinkPreviewUrl,
   parseStreamChannel,
   parseSttTranscribeRequest
 } from './ipc-schemas'
+import { MAX_DROPPED_PATHS_IPC } from '@/shared/config/attachments'
 
 describe('ipc-schemas', () => {
   it('parses a minimal chat stream request', () => {
@@ -36,5 +38,13 @@ describe('ipc-schemas', () => {
       format: 'wav'
     })
     expect(req.format).toBe('wav')
+  })
+
+  it('accepts dropped file paths up to IPC batch guard', () => {
+    const paths = Array.from({ length: MAX_DROPPED_PATHS_IPC }, (_, i) => `/tmp/file-${i}.txt`)
+    expect(parseDroppedFilePaths(paths)).toHaveLength(MAX_DROPPED_PATHS_IPC)
+    expect(() =>
+      parseDroppedFilePaths([...paths, '/tmp/extra.txt'])
+    ).toThrow(IpcValidationError)
   })
 })

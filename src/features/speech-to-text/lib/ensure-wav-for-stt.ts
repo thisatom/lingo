@@ -3,29 +3,14 @@
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { enhanceSpeechAudio } from './enhance-speech-audio'
 import { WHISPER_SAMPLE_RATE } from './speech-audio-constants'
-import { decodeWavPcm16ToFloat32, encodeWav16Mono } from './wav-pcm'
+import { decodeWavPcm16ToFloat32, encodeWav16Mono, resampleMono } from './wav-pcm'
 
 function downsampleToMono(
   input: Float32Array,
   inputSampleRate: number,
   targetSampleRate: number
 ): Float32Array {
-  if (inputSampleRate === targetSampleRate) return input
-  const ratio = inputSampleRate / targetSampleRate
-  const length = Math.max(1, Math.round(input.length / ratio))
-  const output = new Float32Array(length)
-  for (let i = 0; i < length; i++) {
-    const start = Math.floor(i * ratio)
-    const end = Math.min(input.length, Math.floor((i + 1) * ratio))
-    let sum = 0
-    let count = 0
-    for (let j = start; j < end; j++) {
-      sum += input[j] ?? 0
-      count++
-    }
-    output[i] = count > 0 ? sum / count : 0
-  }
-  return output
+  return resampleMono(input, inputSampleRate, targetSampleRate)
 }
 
 function mixToMono(buffer: AudioBuffer): Float32Array {

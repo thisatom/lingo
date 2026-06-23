@@ -6,7 +6,6 @@ import {
   dedupeFiles,
   extractLocalPathsFromDataTransfer
 } from '@/features/chat-attachments/lib/collect-files'
-import { MAX_COMPOSER_ATTACHMENTS } from '@/features/chat-attachments/lib/constants'
 
 export function filesFromDroppedReadResults(results: DroppedFileReadResult[]): File[] {
   return results.map((result) => {
@@ -69,15 +68,11 @@ export async function resolveDroppedFilesForProcessing(
     }
 
     const allPaths = [...pathSet]
-    if (allPaths.length > MAX_COMPOSER_ATTACHMENTS) {
-      errors.push(`Only ${MAX_COMPOSER_ATTACHMENTS} file path(s) can be read from disk at once.`)
-    }
-    const pathsForIpc = allPaths.slice(0, MAX_COMPOSER_ATTACHMENTS)
 
-    if (pathsForIpc.length > 0) {
+    if (allPaths.length > 0) {
       try {
         const { results, errors: ipcErrors } =
-          await window.lingo.files.readDroppedPaths(pathsForIpc)
+          await window.lingo.files.readDroppedPaths(allPaths)
         errors.push(...ipcErrors)
 
         const combined = mergeIpcResultsWithBlobs(results, merged)

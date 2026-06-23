@@ -98,11 +98,11 @@
   --command-palette-overlay: rgb(0 0 0 / 0.32);
   --command-palette-item-hover: var(--menu-hover);
 
-  --sidebar: #f0f0f0;
+  --sidebar: #ebebeb;
   --sidebar-foreground: #171717;
   --sidebar-primary: #171717;
   --sidebar-primary-foreground: #fafafa;
-  --sidebar-accent: #e6e6e6;
+  --sidebar-accent: #e0e0e0;
   --sidebar-accent-foreground: #171717;
   --sidebar-border: #d6d6d6;
   --sidebar-ring: #a3a3a3;
@@ -162,19 +162,19 @@
   --surface-raised: #1a1a1a;
   --surface-overlay: #181818;
 
-  --sidebar: #121212;
+  --sidebar: #181818;
   --sidebar-foreground: #e0e0e0;
   --sidebar-primary: #e8e8e8;
   --sidebar-primary-foreground: #121212;
-  --sidebar-accent: #212121;
+  --sidebar-accent: #252525;
   --sidebar-accent-foreground: #eaeaea;
-  --sidebar-border: #303030;
+  --sidebar-border: #2a2a2a;
   --sidebar-ring: #5c5c5c;
 
   --scrollbar-thumb: #3a3a3a;
   --scrollbar-thumb-hover: #4a4a4a;
   --kbd-divider: #181818;
-  --titlebar-border: #242424;
+  --titlebar-border: #2a2a2a;
   --overlay: rgb(0 0 0 / 0.55);
   --command-palette-surface: rgb(30 30 30 / 0.8);
   --command-palette-border: #313131;
@@ -321,19 +321,19 @@
 }
 
 .cet-titlebar:not(.light) {
-  background-color: #121212;
+  background-color: var(--sidebar);
 }
 
 .cet-titlebar:not(.light) .cet-window-controls {
-  background-color: #121212;
+  background-color: var(--sidebar);
 }
 
 .cet-titlebar.light {
-  background-color: #f5f5f5;
+  background-color: var(--sidebar);
 }
 
 .cet-titlebar.light .cet-window-controls {
-  background-color: #f5f5f5;
+  background-color: var(--sidebar);
 }
 
 .cet-container {

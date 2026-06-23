@@ -4,7 +4,7 @@ import { ArrowUp, Mic, Square } from 'lucide-react'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 import { useComposerPaste } from '@/features/chat-attachments/model/useComposerPaste'
-import { ComposerAttachments } from '@/features/chat-attachments/ui/ComposerAttachments'
+import { QueuedMessageAttachments } from '@/features/chat-attachments/ui/QueuedMessageAttachments'
 import { ComposerFileInput } from '@/features/chat-attachments/ui/ComposerFileInput'
 import { UserQuestionContextMenu } from './chat-context-menu/UserQuestionContextMenu'
 import { MessageBodyClamp } from './MessageBodyClamp'
@@ -139,7 +139,6 @@ export function UserMessage({
     if (!canSend) return
     const text = draft.trim()
     const attachments = hasAttachments ? editAttachments : undefined
-    onExitEdit()
     void onSubmitEdit(text, attachments)
   }
 
@@ -161,10 +160,10 @@ export function UserMessage({
           )}
         >
           {hasAttachments ? (
-            <ComposerAttachments
-              items={editAttachments}
+            <QueuedMessageAttachments
+              attachments={editAttachments}
               onRemove={(id) => setEditAttachments((prev) => prev.filter((a) => a.id !== id))}
-              className="px-0 pt-0 pb-0"
+              className="px-0.5"
             />
           ) : null}
 
@@ -280,8 +279,14 @@ export function UserMessage({
   }
 
   return (
-    <div className="w-full min-w-0 max-w-full">
-      <UserQuestionContextMenu prompt={content} chatId={chatId} className={userMessageBubbleClass}>
+    <div className={cn('relative w-full min-w-0 max-w-full', userMessageBubbleClass)}>
+      <UserQuestionContextMenu
+        prompt={content}
+        chatId={chatId}
+        className="block min-w-0 w-full"
+        activateDisabled={disabled && !showStop}
+        onActivate={showStop ? undefined : onEnterEdit}
+      >
         <MessageBodyClamp bodyClassName="pr-8">
           {attachments && attachments.length > 0 ? (
             <UserMessageAttachments attachments={attachments} />
@@ -294,12 +299,12 @@ export function UserMessage({
             </p>
           ) : null}
         </MessageBodyClamp>
-        <UserMessageActionButton
-          mode={showStop ? 'stop' : 'edit'}
-          disabled={disabled && !showStop}
-          onClick={showStop ? () => onStopAgent?.() : onEnterEdit}
-        />
       </UserQuestionContextMenu>
+      <UserMessageActionButton
+        mode={showStop ? 'stop' : 'edit'}
+        disabled={disabled && !showStop}
+        onClick={showStop ? () => onStopAgent?.() : onEnterEdit}
+      />
     </div>
   )
 }

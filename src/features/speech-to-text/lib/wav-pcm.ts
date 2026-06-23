@@ -1,5 +1,34 @@
 import { WHISPER_SAMPLE_RATE } from './speech-audio-constants'
 
+export interface DecodeWavOptions {
+  /** When false, throw UNSUPPORTED_SAMPLE_RATE instead of resampling. */
+  resample?: boolean
+}
+
+/** Downsample/mono mix helper shared by capture and STT decode paths. */
+export function resampleMono(
+  input: Float32Array,
+  inputSampleRate: number,
+  targetSampleRate: number
+): Float32Array {
+  if (inputSampleRate === targetSampleRate) return input
+  const ratio = inputSampleRate / targetSampleRate
+  const length = Math.max(1, Math.round(input.length / ratio))
+  const output = new Float32Array(length)
+  for (let i = 0; i < length; i++) {
+    const start = Math.floor(i * ratio)
+    const end = Math.min(input.length, Math.floor((i + 1) * ratio))
+    let sum = 0
+    let count = 0
+    for (let j = start; j < end; j++) {
+      sum += input[j] ?? 0
+      count++
+    }
+    output[i] = count > 0 ? sum / count : 0
+  }
+  return output
+}
+
 function viewFor(bytes: ArrayBuffer | Uint8Array): DataView {
   if (bytes instanceof ArrayBuffer) {
     return new DataView(bytes)
@@ -15,11 +44,13 @@ function ascii(view: DataView, start: number, len: number): string {
   return s
 }
 
-/** Decode 16-bit PCM WAV to mono Float32 in [-1, 1]. */
+/** Decode 16-bit PCM WAV to mono Float32 in [-1, 1]. Resamples to expectedSampleRate by default. */
 export function decodeWavPcm16ToFloat32(
   bytes: ArrayBuffer | Uint8Array,
-  expectedSampleRate = WHISPER_SAMPLE_RATE
+  expectedSampleRate = WHISPER_SAMPLE_RATE,
+  options: DecodeWavOptions = {}
 ): Float32Array {
+  const resample = options.resample !== false
   const view = viewFor(bytes)
   if (view.byteLength < 44) throw new Error('INVALID_WAV')
   if (ascii(view, 0, 4) !== 'RIFF' || ascii(view, 8, 4) !== 'WAVE') {
@@ -53,7 +84,6 @@ export function decodeWavPcm16ToFloat32(
   }
 
   if (dataOffset < 0 || bitsPerSample !== 16) throw new Error('INVALID_WAV')
-  if (sampleRate !== expectedSampleRate) throw new Error('UNSUPPORTED_SAMPLE_RATE')
 
   const frameSize = (bitsPerSample / 8) * numChannels
   const numSamples = Math.floor(dataSize / frameSize)
@@ -74,6 +104,11 @@ export function decodeWavPcm16ToFloat32(
       }
       samples[i] = sum / numChannels
     }
+  }
+
+  if (sampleRate !== expectedSampleRate) {
+    if (!resample) throw new Error('UNSUPPORTED_SAMPLE_RATE')
+    return resampleMono(samples, sampleRate, expectedSampleRate)
   }
 
   return samples

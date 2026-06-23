@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useAiChat } from '@/features/ai-chat/model/useAiChat'
 import { useLlmChatReady } from '@/features/ai-chat/model/useLlmChatReady'
 import { useChatContextUsage } from '@/features/chat-context/model/useChatContextUsage'
+import { mergeComposerAttachments } from '@/features/chat-attachments/lib/merge-composer-attachments'
 import { useChatComposerModeHotkey } from '@/features/chat-composer/model/useChatComposerModeHotkey'
 import { useVoiceInput } from '@/features/voice-input/model/useVoiceInput'
 import { useLiveConversationLoop } from '@/features/voice-input/model/useLiveConversationLoop'
@@ -21,7 +22,6 @@ import {
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { ChatComposer } from '@/widgets/chat-composer/ui/ChatComposer'
-import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
 import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
 import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
 import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
@@ -76,6 +76,7 @@ export function MainPage() {
     submitEditedUserMessage,
     stopAgent,
     retryLastRequest,
+    regenerateAssistantMessage,
     clearError
   } = useAiChat({
     onLiveConversationTurnComplete: () => scheduleAutoListenRef.current?.()
@@ -88,7 +89,7 @@ export function MainPage() {
     (s) => s.composerDraftByChatId?.[composerChatId] ?? ''
   )
   const composerAttachments = useChatsStore(
-    (s) => s.composerAttachmentsByChatId[composerChatId] ?? EMPTY_COMPOSER_ATTACHMENTS
+    (s) => s.composerAttachmentsByChatId?.[composerChatId] ?? EMPTY_COMPOSER_ATTACHMENTS
   )
   const setComposerDraft = useChatsStore((s) => s.setComposerDraft)
   const addComposerAttachments = useChatsStore((s) => s.addComposerAttachments)
@@ -120,7 +121,11 @@ export function MainPage() {
 
   const handleAddAttachments = useCallback(
     (items: MessageAttachment[]) => {
-      addComposerAttachments(composerChatId, items)
+      const existing = useChatsStore.getState().getComposerAttachments(composerChatId)
+      const merged = mergeComposerAttachments(existing, items)
+      if (merged.length > 0) {
+        addComposerAttachments(composerChatId, merged)
+      }
     },
     [composerChatId, addComposerAttachments]
   )
@@ -443,7 +448,7 @@ export function MainPage() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      <header className="relative z-10 flex shrink-0 items-center gap-2 bg-background p-2">
+      <header className="relative z-10 flex shrink-0 items-center gap-2 bg-transparent p-2">
         <SidebarExpandButton />
         <ChatHeaderTitle
           title={activeChat?.title ?? 'New chat'}
@@ -479,6 +484,9 @@ export function MainPage() {
           onShowScrollToLatestChange={setShowScrollToLatest}
           onScrollToLatestReady={(api) => {
             chatScrollRef.current = api
+          }}
+          onRegenerateAssistantMessage={(messageId) => {
+            void regenerateAssistantMessage(messageId)
           }}
         />
 
@@ -538,15 +546,6 @@ export function MainPage() {
               />
             )}
 
-            {queuedMessages.length > 0 ? (
-              <ChatMessageQueue
-                items={queuedMessages}
-                onUpdate={updateQueuedMessage}
-                onRemove={removeQueuedMessage}
-                onSendNow={(id) => void sendQueuedMessageNow(id)}
-              />
-            ) : null}
-
               <ChatComposer
                 focusChatId={activeChatId}
                 value={draft}
@@ -555,6 +554,10 @@ export function MainPage() {
                 onAddAttachments={handleAddAttachments}
                 onRemoveAttachment={handleRemoveAttachment}
                 onAttachmentError={handleAttachmentError}
+                queuedMessages={queuedMessages}
+                onUpdateQueuedMessage={updateQueuedMessage}
+                onRemoveQueuedMessage={removeQueuedMessage}
+                onSendQueuedMessageNow={(id) => void sendQueuedMessageNow(id)}
                 onSend={() => void onSend()}
                 onStop={handleStopAgent}
                 disabled={!llmChatReady}

@@ -37,16 +37,18 @@ export function isThinkingMessageLive(
   pipelineStage: PipelineStage = 'idle',
   pipelineStreamingAnswer = false
 ): boolean {
-  const reasoningStage = pipelineStage === 'thinking'
-
-  if (!agentBusy || !isLatestTurn || !reasoningStage) return false
+  if (!agentBusy || !isLatestTurn || pipelineStreamingAnswer) return false
 
   const index = turn.assistantMessages.findIndex((m) => m.id === messageId)
   if (index === -1 || turn.assistantMessages[index]?.role !== 'thinking') return false
 
-  return !turn.assistantMessages
+  const hasAnswerAfter = turn.assistantMessages
     .slice(index + 1)
     .some((message) => message.role === 'assistant')
+
+  if (hasAnswerAfter) return false
+
+  return pipelineStage === 'thinking' || pipelineStage === 'searching'
 }
 
 /** Hide thinking left over from a stopped turn so it does not sit above the next question. */

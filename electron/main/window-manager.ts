@@ -7,6 +7,7 @@ import {
 } from '@incanta/custom-electron-titlebar/main'
 import { getTitlebarTheme } from '../../src/shared/config/titlebar'
 import { backgroundUpdateCheck } from './app-update'
+import { openDevToolsIfDev } from './devtools'
 import { resolveAppIconPath } from './icon'
 import { resolvePreloadScript } from './paths'
 import { registerWindowShortcuts } from './window-shortcuts'

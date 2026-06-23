@@ -1,6 +1,6 @@
-/** Neutral label in the main chat header (sidebar keeps the full chat title). */
-export const CHAT_HEADER_LABEL = 'Chat'
-
-export function getChatHeaderDisplayTitle(_title?: string | null): string {
-  return CHAT_HEADER_LABEL
+/** Title shown in the main chat header (sidebar keeps the same string). */
+export function getChatHeaderDisplayTitle(title?: string | null): string {
+  const trimmed = title?.trim()
+  if (!trimmed) return 'New chat'
+  return trimmed
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_DROPPED_PATHS_IPC } from '@/shared/config/attachments'
 import type {
   ChatCompleteRequest,
   ChatStreamRequest,
@@ -58,6 +59,7 @@ export const chatStreamRequestSchema = z.object({
   llmBackend: llmBackendSchema.optional(),
   customLlm: customLlmConfigSchema.optional(),
   webSearch: z.boolean().optional(),
+  languagePractice: z.boolean().optional(),
   modelAutoFallback: z.boolean().optional(),
   maxTokens: z.number().int().min(0).max(128_000).optional(),
   maxTokensRetry: z.number().int().min(0).max(128_000).optional()
@@ -121,7 +123,7 @@ export function parseStreamChannel(input: unknown): string {
 
 const droppedFilePathSchema = z.string().trim().min(1).max(4096)
 
-export const droppedFilePathsSchema = z.array(droppedFilePathSchema).max(5)
+export const droppedFilePathsSchema = z.array(droppedFilePathSchema).max(MAX_DROPPED_PATHS_IPC)
 
 export function parseDroppedFilePaths(input: unknown): string[] {
   return parseOrThrow(droppedFilePathsSchema, input, 'dropped file paths')

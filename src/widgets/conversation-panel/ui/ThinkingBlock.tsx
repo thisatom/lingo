@@ -82,13 +82,19 @@ function ThinkingReasoningScroll({
   )
 }
 
-function ThinkingReasoningBody({ content, pinToBottom }: { content: string; pinToBottom?: boolean }) {
+function ThinkingReasoningBody({
+  content,
+  pinToBottom
+}: {
+  content: string
+  pinToBottom?: boolean
+}) {
   return (
     <ThinkingReasoningScroll content={content} pinToBottom={pinToBottom}>
       <MarkdownContent
         content={content}
         variant="thinking"
-        parseThrottleMs={pinToBottom ? 120 : undefined}
+        parseThrottleMs={pinToBottom ? 50 : undefined}
         className={cn(thinkingReasoningClass, chatSelectableClass)}
       />
     </ThinkingReasoningScroll>

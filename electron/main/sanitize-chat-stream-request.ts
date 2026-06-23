@@ -14,13 +14,14 @@ export async function sanitizeChatStreamRequest(
   webContents: WebContents
 ): Promise<ChatStreamRequest> {
   const snapshot = await readPersistedLlmSnapshot(webContents)
-  const { messages, practiceLanguage, webSearch: perTurnWebSearch } = request
+  const { messages, practiceLanguage, webSearch: perTurnWebSearch, languagePractice } = request
 
   if (!snapshot) {
     return {
       messages,
       practiceLanguage,
       webSearch: perTurnWebSearch === true,
+      languagePractice: languagePractice ?? true,
       llmBackend: 'openrouter'
     }
   }
@@ -46,6 +47,7 @@ export async function sanitizeChatStreamRequest(
     messages,
     practiceLanguage,
     ...llmFields,
-    webSearch: resolveChatStreamWebSearch(llmSettings, perTurnWebSearch)
+    webSearch: resolveChatStreamWebSearch(llmSettings, perTurnWebSearch),
+    languagePractice: languagePractice ?? true
   }
 }

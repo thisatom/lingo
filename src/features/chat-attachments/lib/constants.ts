@@ -1,4 +1,3 @@
-export const MAX_COMPOSER_ATTACHMENTS = 5
 export const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 export const MAX_TEXT_FILE_BYTES = 256 * 1024
 export const MAX_TEXT_CHARS_IN_API = 12_000

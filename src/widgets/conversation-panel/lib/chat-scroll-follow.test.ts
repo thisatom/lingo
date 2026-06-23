@@ -25,18 +25,19 @@ describe('shouldStickToBottom', () => {
     )
   })
 
-  it('uses a tighter near-bottom threshold while agent is busy', () => {
+  it('uses a wider near-bottom threshold while agent is busy', () => {
     const viewport = {
       scrollHeight: 1000,
       clientHeight: 400,
-      scrollTop: 570
+      scrollTop: 500
     } as HTMLElement
     expect(
       shouldStickToBottom({ pinToBottom: false, isRestoring: false, agentBusy: true }, viewport)
-    ).toBe(false)
-    expect(
-      shouldStickToBottom({ pinToBottom: false, isRestoring: false, agentBusy: false }, viewport)
     ).toBe(true)
+    viewport.scrollTop = 350
+    expect(
+      shouldStickToBottom({ pinToBottom: false, isRestoring: false, agentBusy: true }, viewport)
+    ).toBe(false)
   })
 
   it('follows near bottom only with a viewport', () => {

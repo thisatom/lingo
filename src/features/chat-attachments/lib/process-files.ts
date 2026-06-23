@@ -2,7 +2,6 @@ import type { MessageAttachment } from '@/entities/message/model/attachment'
 import { persistAttachment } from '@/entities/message/lib/prepare-attachment'
 import {
   IMAGE_MIME_TYPES,
-  MAX_COMPOSER_ATTACHMENTS,
   MAX_IMAGE_BYTES,
   MAX_TEXT_CHARS_IN_API,
   MAX_TEXT_FILE_BYTES,
@@ -81,22 +80,12 @@ async function fileToAttachment(file: File): Promise<MessageAttachment | null> {
 
 export async function processDroppedFiles(
   files: File[],
-  existingCount: number
+  _existingCount = 0
 ): Promise<{ attachments: MessageAttachment[]; errors: string[] }> {
   const attachments: MessageAttachment[] = []
   const errors: string[] = []
-  const slotsLeft = Math.max(0, MAX_COMPOSER_ATTACHMENTS - existingCount)
 
-  if (slotsLeft === 0) {
-    return { attachments: [], errors: ['Maximum 5 attachments per message.'] }
-  }
-
-  const batch = files.slice(0, slotsLeft)
-  if (files.length > slotsLeft) {
-    errors.push(`Only ${slotsLeft} more file(s) can be added.`)
-  }
-
-  for (const file of batch) {
+  for (const file of files) {
     try {
       const att = await fileToAttachment(file)
       if (att) attachments.push(await persistAttachment(att))

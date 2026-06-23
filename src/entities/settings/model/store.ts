@@ -94,6 +94,8 @@ interface SettingsState {
   ttsVolume: number
   chatComposerMode: ChatComposerMode
   webSearchEnabled: boolean
+  /** When true, assistant focuses on language practice; when false, general AI chat. */
+  languagePracticeEnabled: boolean
   /** On API error, try other free OpenRouter models (each at most once). */
   modelAutoFallback: boolean
   /** Max completion tokens (`max_tokens`); `0` = no limit (omit on API). */
@@ -132,6 +134,7 @@ interface SettingsState {
   setTtsVolume: (volume: number) => void
   setChatComposerMode: (mode: ChatComposerMode) => void
   setWebSearchEnabled: (enabled: boolean) => void
+  setLanguagePracticeEnabled: (enabled: boolean) => void
   setModelAutoFallback: (enabled: boolean) => void
   setLlmMaxTokens: (maxTokens: number) => void
   setSidebarShowDateGroups: (show: boolean) => void
@@ -171,6 +174,7 @@ type PersistedSettings = Pick<
   | 'ttsVolume'
   | 'chatComposerMode'
   | 'webSearchEnabled'
+  | 'languagePracticeEnabled'
   | 'modelAutoFallback'
   | 'llmMaxTokens'
   | 'sidebarShowDateGroups'
@@ -209,6 +213,7 @@ const DEFAULT_SETTINGS: Omit<
   | 'setTtsVolume'
   | 'setChatComposerMode'
   | 'setWebSearchEnabled'
+  | 'setLanguagePracticeEnabled'
   | 'setModelAutoFallback'
   | 'setLlmMaxTokens'
   | 'setSidebarShowDateGroups'
@@ -245,6 +250,7 @@ const DEFAULT_SETTINGS: Omit<
   ttsVolume: TTS_VOLUME_DEFAULT,
   chatComposerMode: 'text',
   webSearchEnabled: false,
+  languagePracticeEnabled: true,
   modelAutoFallback: true,
   llmMaxTokens: LLM_MAX_TOKENS_DEFAULT,
   sidebarShowDateGroups: true,
@@ -351,6 +357,7 @@ export const useSettingsStore = create<SettingsState>()(
       setTtsVolume: (ttsVolume) => set({ ttsVolume: normalizeTtsVolume(ttsVolume) }),
       setChatComposerMode: (chatComposerMode) => set({ chatComposerMode }),
       setWebSearchEnabled: (webSearchEnabled) => set({ webSearchEnabled }),
+      setLanguagePracticeEnabled: (languagePracticeEnabled) => set({ languagePracticeEnabled }),
       setModelAutoFallback: (modelAutoFallback) => set({ modelAutoFallback }),
       setLlmMaxTokens: (llmMaxTokens) => set({ llmMaxTokens: normalizeLlmMaxTokens(llmMaxTokens) }),
       setSidebarShowDateGroups: (sidebarShowDateGroups) => set({ sidebarShowDateGroups }),
@@ -362,7 +369,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'lingo-settings',
-      version: 23,
+      version: 24,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
         llmBackend: state.llmBackend,
@@ -392,6 +399,7 @@ export const useSettingsStore = create<SettingsState>()(
         ttsVolume: state.ttsVolume,
         chatComposerMode: state.chatComposerMode,
         webSearchEnabled: state.webSearchEnabled,
+        languagePracticeEnabled: state.languagePracticeEnabled,
         modelAutoFallback: state.modelAutoFallback,
         llmMaxTokens: state.llmMaxTokens,
         sidebarShowDateGroups: state.sidebarShowDateGroups,
@@ -554,6 +562,15 @@ export const useSettingsStore = create<SettingsState>()(
               : DEFAULT_APPEARANCE.codeTextScale
           }
         }
+        if (version < 24) {
+          state = {
+            ...state,
+            languagePracticeEnabled:
+              typeof state.languagePracticeEnabled === 'boolean'
+                ? state.languagePracticeEnabled
+                : true
+          }
+        }
         if (version < 23) {
           state = {
             ...state,
@@ -640,6 +657,10 @@ export const useSettingsStore = create<SettingsState>()(
             typeof saved.webSearchEnabled === 'boolean'
               ? saved.webSearchEnabled
               : current.webSearchEnabled,
+          languagePracticeEnabled:
+            typeof saved.languagePracticeEnabled === 'boolean'
+              ? saved.languagePracticeEnabled
+              : current.languagePracticeEnabled,
           llmMaxTokens: normalizeLlmMaxTokens(saved.llmMaxTokens ?? current.llmMaxTokens),
           checkpointReturnConfirmEnabled:
             typeof saved.checkpointReturnConfirmEnabled === 'boolean'

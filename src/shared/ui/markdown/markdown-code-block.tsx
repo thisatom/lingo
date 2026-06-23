@@ -3,6 +3,8 @@ import { Check, Copy } from '@/shared/ui/icons'
 import { copyToClipboard } from '@/shared/lib/copy-to-clipboard'
 import { cn } from '@/shared/lib/utils'
 import { typography } from '@/shared/ui/typography'
+import { MermaidDiagram } from '@/shared/ui/markdown/mermaid-diagram'
+import { looksLikeMermaidSource, unwrapMermaidFence } from '@/shared/lib/mermaid-detect'
 import { extractCodeLanguage, formatCodeLanguageLabel } from '@/shared/ui/markdown/markdown-utils'
 
 function extractTextFromChildren(children: ReactNode): string {
@@ -34,38 +36,55 @@ export function MarkdownCodeBlock({ children, className }: MarkdownCodeBlockProp
   const preRef = useRef<HTMLPreElement>(null)
   const [copied, setCopied] = useState(false)
   const language = extractCodeLanguage(className) ?? languageFromPreChildren(children)
-  const label = language ? formatCodeLanguageLabel(language) : 'Code'
+  const source = extractTextFromChildren(children).trim()
+  const mermaidSource = unwrapMermaidFence(source)
+  const isMermaid =
+    mermaidSource.length > 0 &&
+    (language?.toLowerCase() === 'mermaid' || looksLikeMermaidSource(mermaidSource))
+  const label = isMermaid ? 'Diagram' : language ? formatCodeLanguageLabel(language) : 'Code'
 
   const handleCopy = useCallback(async () => {
     const fromDom =
       preRef.current?.querySelector('code')?.textContent ??
       preRef.current?.textContent ??
       ''
-    const text = fromDom.trim() || extractTextFromChildren(children).trim()
+    const text = fromDom.trim() || mermaidSource
     if (!text) return
     const ok = await copyToClipboard(text)
     if (!ok) return
     setCopied(true)
     window.setTimeout(() => setCopied(false), 2000)
-  }, [children])
+  }, [mermaidSource])
+
+  if (isMermaid) {
+    return <MermaidDiagram source={mermaidSource} />
+  }
+
+  const copyButton = (
+    <button
+      type="button"
+      className={typography.codeBlockCopyButton}
+      aria-label={copied ? 'Copied' : 'Copy code'}
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        void handleCopy()
+      }}
+    >
+      {copied ? (
+        <Check className="size-3 shrink-0" aria-hidden />
+      ) : (
+        <Copy className="size-3 shrink-0" aria-hidden />
+      )}
+      <span>{copied ? 'Copied' : 'Copy'}</span>
+    </button>
+  )
 
   return (
     <div className={typography.codeBlock}>
       <div className={typography.codeBlockHeader}>
         <span className="truncate">{label}</span>
-        <button
-          type="button"
-          className={typography.codeBlockCopyButton}
-          aria-label={copied ? 'Copied' : 'Copy code'}
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            void handleCopy()
-          }}
-        >
-          {copied ? <Check className="size-3 shrink-0" aria-hidden /> : <Copy className="size-3 shrink-0" aria-hidden />}
-          <span>{copied ? 'Copied' : 'Copy'}</span>
-        </button>
+        {copyButton}
       </div>
       <pre ref={preRef} className={cn(typography.pre, 'p-3', className)}>
         {children}

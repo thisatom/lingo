@@ -126,11 +126,15 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('lingo:stt:transcribe', (_e, request: unknown) => {
+  ipcMain.handle('lingo:stt:transcribe', async (_e, request: unknown) => {
     try {
-      return transcribeAudio(parseSttTranscribeRequest(request))
+      return await transcribeAudio(parseSttTranscribeRequest(request))
     } catch (error) {
-      rejectInvalidPayload(error)
+      if (error instanceof IpcValidationError) {
+        rejectInvalidPayload(error)
+      }
+      console.warn('[lingo] STT transcribe failed:', error)
+      throw error
     }
   })
 

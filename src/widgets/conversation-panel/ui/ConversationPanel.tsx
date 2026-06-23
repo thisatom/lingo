@@ -20,9 +20,7 @@ import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
 import { CHAT_BOTTOM_INSET } from '@/widgets/conversation-panel/lib/chat-layout'
 import {
   applyScrollTop,
-  captureVirtualizationScrollAnchor,
   scrollViewportToBottom,
-  type VirtualizationScrollAnchor
 } from '@/widgets/conversation-panel/lib/chat-scroll-anchor'
 import {
   buildChatTailScrollSignature,
@@ -48,21 +46,19 @@ import {
   voiceCaptureLabelForUserMessage
 } from '@/widgets/conversation-panel/lib/group-turns'
 import { cn } from '@/shared/lib/utils'
+import {
+  initialHiddenTurnCount,
+  nextHiddenTurnCount,
+  hiddenTurnsRemaining
+} from '@/widgets/conversation-panel/lib/conversation-turn-window'
 import { ConfirmActionDialog } from '@/shared/ui/confirm-action-dialog'
 import { AgentStatus } from './AgentStatus'
 import { ChatEmptyPrompt } from './ChatEmptyPrompt'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { ConversationTurn } from './ConversationTurn'
+import { LoadEarlierTurnsButton } from './LoadEarlierTurnsButton'
 import { QueueAheadHint } from './QueueAheadHint'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
-import {
-  resolveVirtualizedTurnsActive,
-  VIRTUALIZE_MESSAGE_THRESHOLD
-} from '@/widgets/conversation-panel/lib/virtualization-threshold'
-import {
-  VirtualizedConversationTurns,
-  type VirtualizedConversationScrollApi
-} from './VirtualizedConversationTurns'
 
 const ACTIVE_STAGES: PipelineStage[] = [
   'listening',
@@ -101,6 +97,7 @@ interface ConversationPanelProps {
   onAttachmentError?: (message: string) => void
   /** User message id while Agent Speech capture is in progress (may be empty). */
   liveVoiceUserMessageId?: string | null
+  onRegenerateAssistantMessage?: (messageId: string) => void
 }
 
 export function ConversationPanel({
@@ -121,7 +118,8 @@ export function ConversationPanel({
   onShowScrollToLatestChange,
   onScrollToLatestReady,
   onAttachmentError,
-  liveVoiceUserMessageId = null
+  liveVoiceUserMessageId = null,
+  onRegenerateAssistantMessage
 }: ConversationPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -154,12 +152,18 @@ export function ConversationPanel({
   })
 
   const [editingUserMessageId, setEditingUserMessageId] = useState<string | null>(null)
-  const [pendingCheckpointMessageId, setPendingCheckpointMessageId] = useState<string | null>(null)
+  const [pendingCheckpointSubmit, setPendingCheckpointSubmit] = useState<{
+    messageId: string
+    text: string
+    attachments?: MessageAttachment[]
+  } | null>(null)
   const [checkpointConfirmOpen, setCheckpointConfirmOpen] = useState(false)
   const [checkpointDontShowAgain, setCheckpointDontShowAgain] = useState(false)
   const atBottomRef = useRef(true)
   /** Follow the latest messages until the user scrolls up. */
   const pinToBottomRef = useRef(false)
+  /** Follow agent stream until the user scrolls up during the reply. */
+  const agentAutoFollowRef = useRef(false)
   const stickCoalescerRef = useRef(createRafCoalescer(() => {}))
   const assistantStreaming =
     agentBusy &&
@@ -389,44 +393,68 @@ export function ConversationPanel({
 
   const handleSubmitEditedUserMessage = useCallback(
     async (messageId: string, text: string, attachments?: MessageAttachment[]) => {
+      const messageIndex = messages.findIndex((m) => m.id === messageId)
+      const hasTrailingMessages =
+        messageIndex >= 0 && messages.slice(messageIndex + 1).some((m) => m.role !== 'system')
+
+      if (checkpointReturnConfirmEnabled && hasTrailingMessages) {
+        setPendingCheckpointSubmit({ messageId, text, attachments })
+        setCheckpointDontShowAgain(false)
+        setCheckpointConfirmOpen(true)
+        return
+      }
+
       followBottom()
       const result = await onSubmitEditedUserMessage(messageId, text, attachments)
       if (result?.rollbackToEdit) {
         setEditingUserMessageId(result.rollbackToEdit)
+      } else {
+        setEditingUserMessageId(null)
       }
     },
-    [followBottom, onSubmitEditedUserMessage]
+    [
+      checkpointReturnConfirmEnabled,
+      followBottom,
+      messages,
+      onSubmitEditedUserMessage
+    ]
   )
 
-  const handleEnterEdit = useCallback(
-    (messageId: string) => {
-      if (!checkpointReturnConfirmEnabled) {
-        setEditingUserMessageId(messageId)
-        return
-      }
-      setPendingCheckpointMessageId(messageId)
-      setCheckpointDontShowAgain(false)
-      setCheckpointConfirmOpen(true)
-    },
-    [checkpointReturnConfirmEnabled]
-  )
+  const handleEnterEdit = useCallback((messageId: string) => {
+    setEditingUserMessageId(messageId)
+  }, [])
 
-  const handleConfirmCheckpointReturn = useCallback(() => {
-    if (!pendingCheckpointMessageId) return
+  const handleConfirmCheckpointReturn = useCallback(async () => {
+    if (!pendingCheckpointSubmit) return
     if (checkpointDontShowAgain) {
       setCheckpointReturnConfirmEnabled(false)
     }
-    setEditingUserMessageId(pendingCheckpointMessageId)
-    setPendingCheckpointMessageId(null)
+
+    const { messageId, text, attachments } = pendingCheckpointSubmit
+    setPendingCheckpointSubmit(null)
     setCheckpointConfirmOpen(false)
     setCheckpointDontShowAgain(false)
+
+    followBottom()
+    const result = await onSubmitEditedUserMessage(messageId, text, attachments)
+    if (result?.rollbackToEdit) {
+      setEditingUserMessageId(result.rollbackToEdit)
+    } else {
+      setEditingUserMessageId(null)
+    }
   }, [
     checkpointDontShowAgain,
-    pendingCheckpointMessageId,
+    followBottom,
+    onSubmitEditedUserMessage,
+    pendingCheckpointSubmit,
     setCheckpointReturnConfirmEnabled
   ])
 
   const stickToBottomIfFollowing = useCallback(() => {
+    if (agentAutoFollowRef.current) {
+      stickToBottomNow()
+      return
+    }
     const viewport = viewportRef.current
     if (
       !shouldStickToBottom(
@@ -444,7 +472,7 @@ export function ConversationPanel({
     else scrollToLatest('instant')
     pinToBottomRef.current = true
     atBottomRef.current = true
-  }, [agentBusy, onAtBottomChange, scrollToLatest])
+  }, [agentBusy, onAtBottomChange, scrollToLatest, stickToBottomNow])
 
   useEffect(() => {
     stickCoalescerRef.current.cancel()
@@ -477,7 +505,7 @@ export function ConversationPanel({
     prevRestoreChatIdRef.current = activeChatId
 
     setEditingUserMessageId(null)
-    setPendingCheckpointMessageId(null)
+    setPendingCheckpointSubmit(null)
     setCheckpointConfirmOpen(false)
     setCheckpointDontShowAgain(false)
     scrollSaveEnabledRef.current = false
@@ -568,107 +596,36 @@ export function ConversationPanel({
     () => groupMessagesIntoTurns(messages, { preserveEmptyUserMessageId: liveVoiceUserMessageId }),
     [liveVoiceUserMessageId, messages]
   )
-  const [useVirtualizedTurns, setUseVirtualizedTurns] = useState(
-    () => messages.length >= VIRTUALIZE_MESSAGE_THRESHOLD
-  )
-  const virtualizationAnchorRef = useRef<VirtualizationScrollAnchor | null>(null)
-  const virtualizedScrollApiRef = useRef<VirtualizedConversationScrollApi | null>(null)
+  const lastReplyMessageId = useMemo(() => {
+    for (let i = turns.length - 1; i >= 0; i -= 1) {
+      const id = lastAssistantMessageId(turns[i]!.assistantMessages)
+      if (id) return id
+    }
+    return null
+  }, [turns])
+  const [hiddenTurnCount, setHiddenTurnCount] = useState(0)
 
   useEffect(() => {
-    setUseVirtualizedTurns((active) => {
-      const next = resolveVirtualizedTurnsActive(messages.length, active)
-      if (next !== active) {
-        const viewport = viewportRef.current
-        if (viewport && !pinToBottomRef.current) {
-          virtualizationAnchorRef.current = captureVirtualizationScrollAnchor(viewport)
-        } else {
-          virtualizationAnchorRef.current = null
-        }
-      }
-      return next
-    })
-  }, [messages.length])
+    setHiddenTurnCount(initialHiddenTurnCount(turns.length))
+    agentAutoFollowRef.current = false
+  }, [activeChatId])
 
-  useLayoutEffect(() => {
-    const anchor = virtualizationAnchorRef.current
-    if (!anchor) return
+  useEffect(() => {
+    setHiddenTurnCount((current) => Math.min(current, initialHiddenTurnCount(turns.length)))
+  }, [turns.length])
 
-    const viewport = viewportRef.current
-    if (!viewport) {
-      virtualizationAnchorRef.current = null
-      return
-    }
-
-    if (pinToBottomRef.current) {
-      scrollToLatest('instant')
-      virtualizationAnchorRef.current = null
-      return
-    }
-
-    let cancelled = false
-    const finish = () => {
-      virtualizationAnchorRef.current = null
-    }
-
-    if (useVirtualizedTurns) {
-      const api = virtualizedScrollApiRef.current
-      if (anchor.turnId && api) {
-        api.scrollToTurn(anchor.turnId, { align: 'start' })
-      }
-      requestAnimationFrame(() => {
-        if (cancelled) return
-        applyScrollTop(viewport, anchor.scrollTop)
-        finish()
-      })
-      return () => {
-        cancelled = true
-      }
-    }
-
-    const attemptRestore = (): boolean => {
-      if (cancelled) return true
-      if (anchor.turnId) {
-        const turnEl = viewport.querySelector(`[data-turn-id="${anchor.turnId}"]`)
-        turnEl?.scrollIntoView({ block: 'start' })
-      }
-      const { contentReady } = applyScrollTop(viewport, anchor.scrollTop)
-      if (contentReady) {
-        finish()
-        return true
-      }
-      return false
-    }
-
-    if (attemptRestore()) {
-      return () => {
-        cancelled = true
-      }
-    }
-
-    const content =
-      viewport.querySelector('[data-chat-scroll-content]') ?? viewport.firstElementChild
-    const observer = new ResizeObserver(() => {
-      attemptRestore()
-    })
-    if (content) observer.observe(content)
-    const raf = requestAnimationFrame(() => attemptRestore())
-
-    return () => {
-      cancelled = true
-      observer.disconnect()
-      cancelAnimationFrame(raf)
-    }
-  }, [useVirtualizedTurns, scrollToLatest])
+  const visibleTurns = useMemo(
+    () => (hiddenTurnCount > 0 ? turns.slice(hiddenTurnCount) : turns),
+    [hiddenTurnCount, turns]
+  )
+  const earlierTurnsRemaining = hiddenTurnsRemaining(hiddenTurnCount)
 
   useLayoutEffect(() => {
     if (!editingUserMessageId) return
-    if (useVirtualizedTurns) {
-      virtualizedScrollApiRef.current?.scrollToTurn(editingUserMessageId, { align: 'center' })
-      return
-    }
     const turnEl = document.querySelector(`[data-turn-id="${editingUserMessageId}"]`)
     turnEl?.scrollIntoView({ block: 'nearest' })
-  }, [editingUserMessageId, useVirtualizedTurns])
+  }, [editingUserMessageId])
+
   const hasVisibleMessages = useMemo(
     () => messages.some(messageHasVisibleContent),
     [messages]
@@ -782,12 +739,14 @@ export function ConversationPanel({
     const onWheel = (event: WheelEvent) => {
       if (event.deltaY < 0) {
         pinToBottomRef.current = false
+        if (agentBusy) agentAutoFollowRef.current = false
       }
     }
 
     const onScroll = () => {
       if (viewport.scrollTop < lastScrollTop - 1) {
         pinToBottomRef.current = false
+        if (agentBusy) agentAutoFollowRef.current = false
       }
       lastScrollTop = viewport.scrollTop
     }
@@ -822,10 +781,21 @@ export function ConversationPanel({
     const stageChanged = stage !== prevStageRef.current
     prevStageRef.current = stage
     if (!stageChanged || !agentBusy) return
-    if (pinToBottomRef.current) {
+    if (agentAutoFollowRef.current || pinToBottomRef.current) {
       followBottom()
     }
   }, [agentBusy, followBottom, stage])
+
+  useLayoutEffect(() => {
+    if (agentBusy && !prevAgentBusyRef.current) {
+      agentAutoFollowRef.current = true
+      pinToBottomRef.current = true
+      followBottom()
+    }
+    if (!agentBusy) {
+      agentAutoFollowRef.current = false
+    }
+  }, [agentBusy, followBottom])
 
   useLayoutEffect(() => {
     const messagesGrew = messages.length > prevMessagesLengthRef.current
@@ -857,6 +827,8 @@ export function ConversationPanel({
     if (!contentChanged) return
 
     if (userJustSent || agentJustStarted || statusAppeared) {
+      agentAutoFollowRef.current = true
+      pinToBottomRef.current = true
       followBottom()
       return
     }
@@ -897,86 +869,65 @@ export function ConversationPanel({
             className={cn('relative select-none', turns.length > 0 && conversationGapClass)}
             style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
           >
-            {useVirtualizedTurns ? (
-              <VirtualizedConversationTurns
-                turns={turns}
-                scrollElement={scrollElement}
-                activeChatId={activeChatId}
-                editingUserMessageId={editingUserMessageId}
-                actionsDisabled={actionsDisabled}
-                agentBusy={agentBusy}
-                pipelineStreamingAnswer={pipelineStreamingAnswer}
-                stage={stage}
-                onStopAgent={onStopAgent}
-                voiceSupported={voiceSupported}
-                voiceBusy={voiceBusy}
-                isVoiceListening={isVoiceListening}
-                onVoicePress={onVoicePress}
-                onVoiceStop={onVoiceStop}
-                onRegisterEditSpeech={onRegisterEditSpeech}
-                onEnterEdit={handleEnterEdit}
-                onExitEdit={() => setEditingUserMessageId(null)}
-                onSubmitEdit={(messageId, text, attachments) =>
-                  handleSubmitEditedUserMessage(messageId, text, attachments)
-                }
-                onAttachmentError={onAttachmentError}
-                liveVoiceUserMessageId={liveVoiceUserMessageId}
-                onTailContentChange={scheduleStickToBottomIfFollowing}
-                pipelineSearchActiveUrl={pipelineSearchActiveUrl}
-                scrollApiRef={virtualizedScrollApiRef}
-              />
-            ) : (
-              turns.map((turn, turnIndex) => {
-                const isLatestTurn = turnIndex === turns.length - 1
-                const showStopOnUserMessage = agentBusy && isLatestTurn
+            <LoadEarlierTurnsButton
+              remaining={earlierTurnsRemaining}
+              onLoad={() => setHiddenTurnCount((count) => nextHiddenTurnCount(count))}
+            />
 
-                return (
-                  <ConversationTurn
-                    key={turn.id}
-                    turn={turn}
-                    turnIndex={turnIndex + 1}
-                    activeChatId={activeChatId}
-                    editingUserMessageId={editingUserMessageId}
-                    actionsDisabled={actionsDisabled}
-                    showStopOnUserMessage={showStopOnUserMessage}
-                    onStopAgent={onStopAgent}
-                    voiceSupported={voiceSupported}
-                    voiceBusy={voiceBusy}
-                    isVoiceListening={isVoiceListening}
-                    onVoicePress={onVoicePress}
-                    onVoiceStop={onVoiceStop}
-                    onRegisterEditSpeech={onRegisterEditSpeech}
-                    onEnterEdit={handleEnterEdit}
-                    onExitEdit={() => setEditingUserMessageId(null)}
-                    onSubmitEdit={(messageId, text, attachments) =>
-                      handleSubmitEditedUserMessage(messageId, text, attachments)
-                    }
-                    onAttachmentError={onAttachmentError}
-                    agentBusy={agentBusy}
-                    isLatestTurn={isLatestTurn}
-                    pipelineStage={isLatestTurn ? stage : 'idle'}
-                    pipelineStreamingAnswer={
-                      agentBusy && isLatestTurn ? pipelineStreamingAnswer : false
-                    }
-                    pipelineSearchActiveUrl={
-                      isLatestTurn ? pipelineSearchActiveUrl : null
-                    }
-                    liveVoiceUserMessageId={liveVoiceUserMessageId}
-                    voiceCaptureLabel={voiceCaptureLabelForUserMessage(
-                      turn.user.id,
-                      turn.user.content,
-                      liveVoiceUserMessageId,
-                      stage
-                    )}
-                    streamingAssistantMessageId={
-                      agentBusy && isLatestTurn && pipelineStreamingAnswer
-                        ? lastAssistantMessageId(turn.assistantMessages)
-                        : undefined
-                    }
-                  />
-                )
-              })
-            )}
+            {visibleTurns.map((turn, visibleIndex) => {
+              const turnIndex = hiddenTurnCount + visibleIndex
+              const isLatestTurn = turnIndex === turns.length - 1
+              const showStopOnUserMessage = agentBusy && isLatestTurn
+
+              return (
+                <ConversationTurn
+                  key={turn.id}
+                  turn={turn}
+                  turnIndex={turnIndex + 1}
+                  userHeaderSticky
+                  activeChatId={activeChatId}
+                  editingUserMessageId={editingUserMessageId}
+                  actionsDisabled={actionsDisabled}
+                  showStopOnUserMessage={showStopOnUserMessage}
+                  onStopAgent={onStopAgent}
+                  voiceSupported={voiceSupported}
+                  voiceBusy={voiceBusy}
+                  isVoiceListening={isVoiceListening}
+                  onVoicePress={onVoicePress}
+                  onVoiceStop={onVoiceStop}
+                  onRegisterEditSpeech={onRegisterEditSpeech}
+                  onEnterEdit={handleEnterEdit}
+                  onExitEdit={() => setEditingUserMessageId(null)}
+                  onSubmitEdit={(messageId, text, attachments) =>
+                    handleSubmitEditedUserMessage(messageId, text, attachments)
+                  }
+                  onAttachmentError={onAttachmentError}
+                  agentBusy={agentBusy}
+                  isLatestTurn={isLatestTurn}
+                  pipelineStage={isLatestTurn ? stage : 'idle'}
+                  pipelineStreamingAnswer={
+                    agentBusy && isLatestTurn ? pipelineStreamingAnswer : false
+                  }
+                  pipelineSearchActiveUrl={
+                    isLatestTurn ? pipelineSearchActiveUrl : null
+                  }
+                  liveVoiceUserMessageId={liveVoiceUserMessageId}
+                  voiceCaptureLabel={voiceCaptureLabelForUserMessage(
+                    turn.user.id,
+                    turn.user.content,
+                    liveVoiceUserMessageId,
+                    stage
+                  )}
+                  streamingAssistantMessageId={
+                    agentBusy && isLatestTurn && pipelineStreamingAnswer
+                      ? lastAssistantMessageId(turn.assistantMessages)
+                      : undefined
+                  }
+                  lastReplyMessageId={lastReplyMessageId}
+                  onRegenerateAssistantMessage={onRegenerateAssistantMessage}
+                />
+              )
+            })}
 
             {queueAheadPreview ? <QueueAheadHint preview={queueAheadPreview} /> : null}
 
@@ -992,7 +943,7 @@ export function ConversationPanel({
         onOpenChange={(open) => {
           setCheckpointConfirmOpen(open)
           if (!open) {
-            setPendingCheckpointMessageId(null)
+            setPendingCheckpointSubmit(null)
             setCheckpointDontShowAgain(false)
           }
         }}

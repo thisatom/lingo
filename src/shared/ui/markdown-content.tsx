@@ -13,7 +13,6 @@ import {
 } from '@/shared/lib/strip-assistant-role-markup'
 import { cn } from '@/shared/lib/utils'
 import { KaTeXBlock } from '@/shared/ui/katex-block'
-import { StreamCursor } from '@/shared/ui/stream-cursor'
 import {
   agentMarkdownComponents,
   compactMarkdownComponents
@@ -45,8 +44,6 @@ interface MarkdownContentProps {
   variant?: 'agent' | 'user' | 'compact' | 'thinking' | 'typography' | 'default'
   /** Throttle KaTeX/markdown re-parses while content grows (streaming). */
   parseThrottleMs?: number
-  /** Blinking caret after content while the answer is still streaming. */
-  showStreamingCursor?: boolean
 }
 
 function segmentReactKey(segment: MarkdownSegment, index: number, stableKeys: boolean): string {
@@ -97,8 +94,7 @@ function MarkdownContentInner({
   content,
   className,
   variant = 'agent',
-  parseThrottleMs,
-  showStreamingCursor = false
+  parseThrottleMs
 }: MarkdownContentProps) {
   const throttleMs = parseThrottleMs ?? 0
   const streamingParse = throttleMs > 0
@@ -134,7 +130,6 @@ function MarkdownContentInner({
           {renderSegment(segment, index, components)}
         </Fragment>
       ))}
-      {showStreamingCursor ? <StreamCursor /> : null}
     </div>
   )
 }
