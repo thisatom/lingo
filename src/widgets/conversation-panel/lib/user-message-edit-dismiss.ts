@@ -2,7 +2,7 @@ type ClosestTarget = { closest(selector: string): Element | null }
 
 function asClosestTarget(target: EventTarget | null): ClosestTarget | null {
   if (!target || typeof target !== 'object') return null
-  const candidate = target as ClosestTarget
+  const candidate = target as unknown as ClosestTarget
   if (typeof candidate.closest !== 'function') return null
   return candidate
 }

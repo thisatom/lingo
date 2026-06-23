@@ -63,10 +63,13 @@ linux:
   category: Education
   maintainer: Lingo
   target:
-    - target: tar.gz
+    - target: AppImage
       arch:
         - x64
-    - target: dir
+    - target: deb
+      arch:
+        - x64
+    - target: tar.gz
       arch:
         - x64
   artifactName: Lingo-${version}-linux-${arch}.${ext}

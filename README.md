@@ -10,9 +10,9 @@ Installers are published on [GitHub Releases](https://github.com/thisatom/lingo/
 
 | Platform | File |
 |----------|------|
-| Windows (64-bit) | `Lingo-0.1.0-win-setup.exe` — installer with folder picker |
-| Linux (64-bit) | `Lingo-0.1.0-linux-x64.tar.gz` — extract and run `./lingo` |
-| macOS (Intel / Apple Silicon) | `Lingo-0.1.0-mac-*.dmg` or `.zip` |
+| Windows (64-bit) | `Lingo-*-win-setup.exe` — NSIS installer |
+| Linux (64-bit) | `Lingo-*-linux-x64.AppImage`, `.deb`, or `.tar.gz` |
+| macOS (Intel / Apple Silicon) | `Lingo-*-mac-*.dmg` or `.zip` |
 
 In the app: **Settings → About** — check for updates and open the download page.
 
@@ -105,16 +105,17 @@ UI-only in the browser (no Electron): `npm run dev:web` — keys are not stored 
 | `npm run build` | Production build |
 | `npm run dist` | Installer for the current OS → `release/` |
 | `npm run dist:win` | Windows NSIS installer |
-| `npm run dist:linux` | Linux tar.gz and unpacked folder |
+| `npm run dist:linux` | Linux AppImage, deb, and tar.gz |
 | `npm run dist:mac` | macOS DMG and ZIP (**macOS only**) |
 | `npm run typecheck` | TypeScript check |
-| `npm run test` | Unit tests (Vitest) |
+| `npm run test` | Unit tests (Vitest) — also run in [CI](.github/workflows/ci.yml) on push/PR |
 | `npm run icons:png` | Convert `resources/icon.ico` to PNG |
 
 **Build notes**
 
+- Push a tag `v*` (e.g. `v0.1.0`) to run [Release builds](.github/workflows/release.yml): Windows, Linux, and macOS artifacts are attached to a GitHub Release.
 - Windows: `npm run dist:win` → `release/Lingo-<version>-win-setup.exe`
-- Linux on Windows: produces tar.gz; AppImage/deb are easier via [CI Release](.github/workflows/release.yml) on Ubuntu
+- Linux on Windows: use CI Release on Ubuntu for AppImage/deb; locally you get tar.gz via `dist:linux`
 - macOS: run `npm run dist:mac` on a Mac, or push tag `v*` for GitHub Actions
 
 ### Dev-only API key (optional)
