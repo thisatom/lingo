@@ -1,91 +1,61 @@
-import { useEffect, useState } from 'react'
-import { AppUpdateAvailableDialog } from '@/features/app-update/ui/AppUpdateAvailableDialog'
-import { AppUpdateReleaseNotesDialog } from '@/features/app-update/ui/AppUpdateReleaseNotesDialog'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AppUpdateOverlay } from '@/features/app-update/ui/AppUpdateOverlay'
 import {
-  dismissAppUpdateToast,
-  showAppUpdateToast
-} from '@/features/app-update/lib/app-update-toast'
-import {
-  consumePostUpdateNotice,
+  installAppUpdate,
   isUpdaterAvailable,
-  subscribeToAppUpdateAvailable
+  subscribeToAppUpdateAvailable,
+  subscribeToAppUpdateProgress
 } from '@/shared/lib/updater'
-import type { AppUpdateInfo, PendingUpdateNotice } from '@/shared/types/ipc'
+import type { AppUpdateInfo, AppUpdateProgress } from '@/shared/types/ipc'
 
-const AVAILABLE_DISMISSED_KEY = 'lingo-update-available-dismissed'
+const AUTO_INSTALL_SESSION_KEY = 'lingo-update-auto-install'
 
-function wasUpdateDismissed(version: string): boolean {
+function wasAutoInstallStarted(version: string): boolean {
   try {
-    return sessionStorage.getItem(AVAILABLE_DISMISSED_KEY) === version
+    return sessionStorage.getItem(AUTO_INSTALL_SESSION_KEY) === version
   } catch {
     return false
   }
 }
 
-function markUpdateDismissed(version: string): void {
+function markAutoInstallStarted(version: string): void {
   try {
-    sessionStorage.setItem(AVAILABLE_DISMISSED_KEY, version)
+    sessionStorage.setItem(AUTO_INSTALL_SESSION_KEY, version)
   } catch {
     // ignore
   }
 }
 
-/** Post-update release notes and optional background update prompt. */
+/** Silent background updates with a minimal progress overlay. */
 export function AppUpdateGate() {
-  const [postUpdateNotice, setPostUpdateNotice] = useState<PendingUpdateNotice | null>(null)
-  const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null)
-  const [availableOpen, setAvailableOpen] = useState(false)
+  const [progress, setProgress] = useState<AppUpdateProgress | null>(null)
+  const installStartedRef = useRef(false)
+
+  const startSilentInstall = useCallback((update: AppUpdateInfo) => {
+    if (installStartedRef.current || wasAutoInstallStarted(update.version)) return
+    installStartedRef.current = true
+    markAutoInstallStarted(update.version)
+    void installAppUpdate()
+  }, [])
 
   useEffect(() => {
     if (!isUpdaterAvailable()) return
 
-    void consumePostUpdateNotice().then((notice) => {
-      if (notice) setPostUpdateNotice(notice)
+    const unsubProgress = subscribeToAppUpdateProgress((next) => {
+      setProgress(next.phase === 'idle' ? null : next)
     })
 
-    return subscribeToAppUpdateAvailable((info) => {
-      if (wasUpdateDismissed(info.version)) return
-
-      setAvailableUpdate(info)
-      showAppUpdateToast(info, {
-        onView: () => setAvailableOpen(true),
-        onDismiss: () => {
-          markUpdateDismissed(info.version)
-          dismissAppUpdateToast()
-          setAvailableUpdate(null)
-        }
-      })
+    const unsubAvailable = subscribeToAppUpdateAvailable((info) => {
+      startSilentInstall(info)
     })
-  }, [])
+
+    return () => {
+      unsubProgress()
+      unsubAvailable()
+    }
+  }, [startSilentInstall])
 
   if (!isUpdaterAvailable()) return null
 
-  return (
-    <>
-      {postUpdateNotice ? (
-        <AppUpdateReleaseNotesDialog
-          notice={postUpdateNotice}
-          open
-          onOpenChange={(open) => {
-            if (!open) setPostUpdateNotice(null)
-          }}
-        />
-      ) : null}
-
-      {availableUpdate ? (
-        <AppUpdateAvailableDialog
-          update={availableUpdate}
-          open={availableOpen}
-          onOpenChange={(open) => {
-            setAvailableOpen(open)
-            if (!open) {
-              markUpdateDismissed(availableUpdate.version)
-              dismissAppUpdateToast()
-              setAvailableUpdate(null)
-            }
-          }}
-        />
-      ) : null}
-    </>
-  )
+  return <AppUpdateOverlay progress={progress} />
 }

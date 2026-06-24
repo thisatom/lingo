@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { formatBytes } from '@/features/app-update/lib/format-bytes'
 import { isElectronApp } from '@/shared/lib/lingo'
 import {
   checkAppUpdate,
   getAppVersion,
   installAppUpdate,
-  isUpdaterAvailable
+  isUpdaterAvailable,
+  subscribeToAppUpdateProgress
 } from '@/shared/lib/updater'
 import {
   settingsCardClass,
@@ -15,107 +15,142 @@ import {
   settingsRowTitleClass,
   settingsSubsectionTitleClass
 } from '@/shared/lib/settings-surface'
+import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
-import type { AppUpdateInfo } from '@/shared/types/ipc'
+import type { AppUpdateProgress } from '@/shared/types/ipc'
+
+type UpdateStatus = 'loading' | 'current' | 'available' | 'updating' | 'error'
+
+function statusLabel(status: UpdateStatus, version: string | null, progress: AppUpdateProgress | null): string {
+  switch (status) {
+    case 'loading':
+      return 'Checking for updates…'
+    case 'current':
+      return version ? `Version ${version} · Up to date` : 'Up to date'
+    case 'available':
+      return version ? `Version ${version} · Update ready` : 'Update ready'
+    case 'updating':
+      if (progress?.phase === 'downloading' && progress.percent != null) {
+        return `Downloading… ${progress.percent}%`
+      }
+      if (progress?.phase === 'installing') return 'Installing update…'
+      if (progress?.phase === 'restarting') return 'Restarting…'
+      return 'Installing update…'
+    case 'error':
+      return 'Could not check for updates'
+    default:
+      return ''
+  }
+}
 
 export function AppUpdateSettingsSection() {
   const desktop = isElectronApp() && isUpdaterAvailable()
   const [currentVersion, setCurrentVersion] = useState<string | null>(null)
-  const [checking, setChecking] = useState(false)
-  const [installing, setInstalling] = useState(false)
-  const [status, setStatus] = useState<string | null>(null)
+  const [remoteVersion, setRemoteVersion] = useState<string | null>(null)
+  const [status, setStatus] = useState<UpdateStatus>('loading')
   const [error, setError] = useState<string | null>(null)
-  const [available, setAvailable] = useState<AppUpdateInfo | null>(null)
+  const [progress, setProgress] = useState<AppUpdateProgress | null>(null)
 
-  useEffect(() => {
+  const runCheck = useCallback(async () => {
     if (!desktop) return
-    void getAppVersion().then(setCurrentVersion)
-  }, [desktop])
-
-  const handleCheck = useCallback(async () => {
-    if (!desktop) return
-    setChecking(true)
+    setStatus('loading')
     setError(null)
-    setStatus(null)
-    setAvailable(null)
+    setRemoteVersion(null)
     try {
       const result = await checkAppUpdate()
       if (!result) return
       setCurrentVersion(result.currentVersion)
       if (result.error) {
+        setStatus('error')
         setError(result.error)
         return
       }
       if (result.update) {
-        setAvailable(result.update)
-        setStatus(`Version ${result.update.version} is available.`)
+        setRemoteVersion(result.update.version)
+        setStatus('available')
+        void installAppUpdate()
       } else {
-        setStatus('You are on the latest version.')
+        setStatus('current')
       }
     } catch (err) {
+      setStatus('error')
       setError(err instanceof Error ? err.message : 'Update check failed')
-    } finally {
-      setChecking(false)
     }
   }, [desktop])
 
-  const handleInstall = useCallback(async () => {
+  useEffect(() => {
     if (!desktop) return
-    setInstalling(true)
-    setError(null)
-    try {
-      const result = await installAppUpdate()
-      if (!result?.ok) {
-        setError(result?.error ?? 'Could not start the update')
-        setInstalling(false)
+    void getAppVersion().then(setCurrentVersion)
+    void runCheck()
+  }, [desktop, runCheck])
+
+  useEffect(() => {
+    if (!desktop) return
+    return subscribeToAppUpdateProgress((next) => {
+      setProgress(next.phase === 'idle' ? null : next)
+      if (
+        next.phase === 'checking' ||
+        next.phase === 'downloading' ||
+        next.phase === 'installing' ||
+        next.phase === 'restarting'
+      ) {
+        setStatus('updating')
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Update failed')
-      setInstalling(false)
-    }
+      if (next.phase === 'failed') {
+        setStatus('error')
+        setError(next.message ?? 'Update failed')
+      }
+    })
   }, [desktop])
 
   if (!desktop) return null
 
-  const sizeLabel = formatBytes(available?.downloadSize)
+  const pillClass =
+    status === 'current'
+      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+      : status === 'available' || status === 'updating'
+        ? 'bg-primary/10 text-primary'
+        : status === 'error'
+          ? 'bg-destructive/10 text-destructive'
+          : 'bg-muted text-muted-foreground'
 
   return (
     <>
-      <p className={settingsSubsectionTitleClass}>Updates</p>
+      <p className={settingsSubsectionTitleClass}>Software update</p>
       <div className={settingsCardClass}>
         <div className={settingsRowClass}>
           <div className={settingsRowTextWrapClass}>
-            <p className={settingsRowTitleClass}>App version</p>
+            <p className={settingsRowTitleClass}>Lingo desktop</p>
             <p className={settingsRowDescriptionClass}>
-              {currentVersion ? `Installed: ${currentVersion}` : 'Loading version…'}
-              {status ? ` ${status}` : null}
-              {available && sizeLabel ? ` Download size: ${sizeLabel}.` : null}
+              Updates download and install automatically in the background.
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                  pillClass
+                )}
+              >
+                {statusLabel(status, remoteVersion ?? currentVersion, progress)}
+              </span>
+              {currentVersion && status !== 'updating' ? (
+                <span className="text-[11px] text-muted-foreground">
+                  Installed v{currentVersion}
+                </span>
+              ) : null}
+            </div>
             {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              className="h-6 px-2 text-[11px]"
-              disabled={checking || installing}
-              onClick={() => void handleCheck()}
-            >
-              {checking ? 'Checking…' : 'Check for updates'}
-            </Button>
-            {available ? (
-              <Button
-                type="button"
-                size="xs"
-                className="h-6 px-2 text-[11px]"
-                disabled={installing}
-                onClick={() => void handleInstall()}
-              >
-                {installing ? 'Updating…' : `Update to ${available.version}`}
-              </Button>
-            ) : null}
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            className="h-6 shrink-0 px-2 text-[11px]"
+            disabled={status === 'loading' || status === 'updating'}
+            onClick={() => void runCheck()}
+          >
+            Check now
+          </Button>
         </div>
       </div>
     </>

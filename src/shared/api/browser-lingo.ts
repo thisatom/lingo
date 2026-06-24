@@ -156,7 +156,8 @@ export function createBrowserLingoApi(): LingoApi {
         window.open('https://github.com/thisatom/lingo/releases', '_blank', 'noopener')
       },
       consumePendingNotice: async (): Promise<PendingUpdateNotice | null> => null,
-      onUpdateAvailable: () => () => {}
+      onUpdateAvailable: () => () => {},
+      onUpdateProgress: () => () => {}
     }
   }
 }

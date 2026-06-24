@@ -1,4 +1,4 @@
-import type { AppUpdateCheckResult, AppUpdateInfo, PendingUpdateNotice } from '@/shared/types/ipc'
+import type { AppUpdateCheckResult, AppUpdateInfo, AppUpdateProgress } from '@/shared/types/ipc'
 
 export function isUpdaterAvailable(): boolean {
   return Boolean(window.lingo?.updater)
@@ -27,12 +27,14 @@ export async function installAppUpdate(): Promise<{ ok: boolean; error?: string 
   return getUpdater().downloadAndInstall()
 }
 
-export async function consumePostUpdateNotice(): Promise<PendingUpdateNotice | null> {
-  if (!isUpdaterAvailable()) return null
-  return getUpdater().consumePendingNotice()
-}
-
 export function subscribeToAppUpdateAvailable(handler: (info: AppUpdateInfo) => void): () => void {
   if (!isUpdaterAvailable()) return () => {}
   return getUpdater().onUpdateAvailable(handler)
+}
+
+export function subscribeToAppUpdateProgress(
+  handler: (progress: AppUpdateProgress) => void
+): () => void {
+  if (!isUpdaterAvailable()) return () => {}
+  return getUpdater().onUpdateProgress(handler)
 }

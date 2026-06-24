@@ -165,6 +165,21 @@ export interface PendingUpdateNotice {
   name?: string
 }
 
+export type AppUpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'downloading'
+  | 'installing'
+  | 'restarting'
+  | 'failed'
+
+export interface AppUpdateProgress {
+  phase: AppUpdatePhase
+  version?: string
+  percent?: number
+  message?: string
+}
+
 export type LingoPlatform = 'electron' | 'web'
 
 /** Payload from main after reading OS paths for drag-and-drop (Electron). */
@@ -238,6 +253,7 @@ export interface LingoApi {
     openReleasesPage: () => Promise<void>
     consumePendingNotice: () => Promise<PendingUpdateNotice | null>
     onUpdateAvailable: (handler: (info: AppUpdateInfo) => void) => () => void
+    onUpdateProgress: (handler: (progress: AppUpdateProgress) => void) => () => void
   }
   app?: {
     onPrepareShutdown: (handler: () => void | Promise<void>) => () => void

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AppUpdateInfo,
+  AppUpdateProgress,
   ChatCompleteRequest,
   ChatStreamEvent,
   ChatStreamHandlers,
@@ -146,6 +147,13 @@ const lingo: LingoApi = {
       ipcRenderer.on('lingo:updater:available', listener)
       return () => {
         ipcRenderer.removeListener('lingo:updater:available', listener)
+      }
+    },
+    onUpdateProgress: (handler: (progress: AppUpdateProgress) => void) => {
+      const listener = (_event: unknown, progress: AppUpdateProgress) => handler(progress)
+      ipcRenderer.on('lingo:updater:progress', listener)
+      return () => {
+        ipcRenderer.removeListener('lingo:updater:progress', listener)
       }
     }
   },
