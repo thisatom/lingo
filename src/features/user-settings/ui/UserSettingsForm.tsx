@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { AppUpdateSettingsSection } from '@/features/app-update/ui/AppUpdateSettingsSection'
-import { clearAppDataAndPersist } from '@/features/user-settings/lib/clear-app-data'
+import { clearAppDataAndPersist, deleteAllChatsAndPersist } from '@/features/user-settings/lib/clear-app-data'
 import { SIDEBAR_CHAT_SORT_OPTIONS, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
 import { settingsInputClass } from '@/shared/lib/settings-control'
 import {
@@ -59,12 +59,18 @@ export function UserSettingsForm() {
 
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const [clearConfirmInput, setClearConfirmInput] = useState('')
+  const [deleteChatsDialogOpen, setDeleteChatsDialogOpen] = useState(false)
   const canClearAppData = clearConfirmInput.trim() === CLEAR_APP_DATA_CONFIRM_TEXT
 
   const handleClearAppData = async () => {
     await clearAppDataAndPersist()
     setClearConfirmInput('')
     setClearDialogOpen(false)
+  }
+
+  const handleDeleteAllChats = async () => {
+    await deleteAllChatsAndPersist()
+    setDeleteChatsDialogOpen(false)
   }
 
   const applyChatSort = (sort: SidebarChatSort) => {
@@ -163,6 +169,23 @@ export function UserSettingsForm() {
       <div className={settingsCardClass}>
         <div className={settingsRowClass}>
           <div className={settingsRowTextWrapClass}>
+            <p className={settingsRowTitleClass}>Delete all chats</p>
+            <p className={settingsRowDescriptionClass}>
+              Permanently removes every conversation. Settings and API keys are kept.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="destructive"
+            size="xs"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setDeleteChatsDialogOpen(true)}
+          >
+            Delete
+          </Button>
+        </div>
+        <div className={settingsRowClass}>
+          <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Clear app data</p>
             <p className={settingsRowDescriptionClass}>
               Removes all chats and resets settings to defaults. API keys in the system keychain
@@ -180,6 +203,33 @@ export function UserSettingsForm() {
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={deleteChatsDialogOpen} onOpenChange={setDeleteChatsDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader className="sm:text-left">
+            <AlertDialogTitle>Delete all chats?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes every conversation. Settings and API keys are not affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-row justify-end gap-2 sm:justify-end">
+            <AlertDialogCancel size="sm" className="min-w-[5.5rem]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              size="sm"
+              variant="destructive"
+              className="min-w-[5.5rem]"
+              onClick={(e) => {
+                e.preventDefault()
+                void handleDeleteAllChats()
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={clearDialogOpen}

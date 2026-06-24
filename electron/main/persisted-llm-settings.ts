@@ -9,6 +9,7 @@ export type PersistedLlmSnapshot = {
   customModelId: string
   customLlmProfileJson: string
   webSearchEnabled: boolean
+  languagePracticeEnabled: boolean
   modelAutoFallback: boolean
   llmMaxTokens: number
 }
@@ -28,6 +29,10 @@ const READ_LLM_SETTINGS_SCRIPT = `
       customLlmProfileJson: typeof s.customLlmProfileJson === 'string' ? s.customLlmProfileJson : '',
       webSearchEnabled:
         typeof s.webSearchEnabled === 'boolean' ? s.webSearchEnabled : false,
+      languagePracticeEnabled:
+        typeof s.languagePracticeEnabled === 'boolean'
+          ? s.languagePracticeEnabled
+          : true,
       modelAutoFallback: Boolean(s.modelAutoFallback),
       llmMaxTokens: typeof s.llmMaxTokens === 'number' ? s.llmMaxTokens : 2048
     };

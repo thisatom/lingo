@@ -28,6 +28,7 @@
 
 ## Ссылки
 
+- [Chat agent rework — **closed**](./archive/2026-06-24-chat-agent-rework-closure/SUMMARY.md) (2026-06-24) — sprints A–D
 - [UI/UX audit — **closed**](./archive/2026-06-23-ui-ux-closure/SUMMARY.md) (2026-06-23)
 - [UI/UX audit status](./active/ui-ux/SUMMARY.md)
 - [Закрытый аудит (2026-06-23)](./archive/2026-06-23-global-audit-closure/SUMMARY.md) — sprints A–F

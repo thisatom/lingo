@@ -123,7 +123,51 @@ stateDiagram-v2
 | Run generation | `src/features/ai-chat/model/agent-run.ts` |
 | Stream session | `src/features/ai-chat/lib/agent-stream-session.ts` |
 | Pipeline | `src/features/ai-chat/lib/chat-pipeline-registry.ts` |
-| SSE (main) | `src/shared/lib/openrouter-chat-stream.ts` |
+| Stream orchestration | `src/shared/lib/openrouter-chat-stream.ts` |
+| **Turn policy** | `src/shared/lib/lingo-agent/turn-policy.ts` |
+| **Prompts** | `src/shared/lib/lingo-agent/prompts.ts` |
+| **AI SDK stream** | `src/shared/lib/lingo-agent/openrouter-ai-sdk.ts` |
+| **Legacy SSE** (custom LLM / Vitest) | `src/shared/lib/lingo-agent/legacy-sse-stream.ts` |
+| **Web search tool** | `src/shared/lib/lingo-agent/web-search-tool.ts` |
+| Stream config flag | `src/shared/lib/lingo-agent/stream-config.ts` |
+
+---
+
+## Стек LLM (OpenRouter / custom)
+
+```mermaid
+flowchart LR
+  A[User message] --> B[resolveAgentTurnPolicy]
+  B --> C{shouldSearch?}
+  C -->|yes| D[web_search tool or local prefetch]
+  C -->|no| E[stream completion]
+  D --> E
+  E --> F{isAiSdkStreamEnabled?}
+  F -->|yes, not custom| G[AI SDK streamText]
+  F -->|no or custom LLM| H[legacy SSE parser]
+  G --> I[ChatStreamEvent]
+  H --> I
+  I --> J[strip markup + store + UI]
+```
+
+| Путь | Когда | Модуль |
+|------|--------|--------|
+| **AI SDK** (default в app) | `llmBackend !== 'custom'`, не Vitest | `openrouter-ai-sdk.ts` |
+| **Legacy SSE** | Custom endpoint или `VITEST=true` | `legacy-sse-stream.ts` |
+| **Web search (AI SDK)** | Local search + AI SDK | `web_search` tool → `performLocalWebSearch` |
+| **Web search (legacy)** | Prefetch + inject в messages | `completeWithLocalWebSearch` |
+
+Переключатель env: `LINGO_AI_SDK_STREAM=0|1`, `VITE_LINGO_AI_SDK_STREAM=0|1`.
+
+### Language practice
+
+- Settings → **Language practice** (`languagePracticeEnabled`).
+- Когда **off**: system prompt = general assistant (`prompts.ts`), не language tutor.
+- Turn policy: `resolveAgentTurnPolicy()` — единый gate для renderer и stream.
+
+### Markup strip
+
+Стрим и финальный текст проходят `stripAssistantStreamSafeMarkup` (HTML-теги, частичные `</u…` на хвосте чанка). Слова не обрезаются.
 
 ---
 

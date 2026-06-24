@@ -35,6 +35,31 @@ export const EyeOff = icon('eye-closed')
 export const FileText = icon('file-text')
 export const Filter = icon('list-filter')
 export const Globe = icon('globe')
+
+/** Translate / language — stroke icon (no dedicated codicon). */
+export function Languages({ className, ...props }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cn('size-3.5 shrink-0', className)}
+      aria-hidden
+      {...props}
+    >
+      <path d="m5 8 6 6" />
+      <path d="m4 14 6-6 2-3" />
+      <path d="M2 5h12" />
+      <path d="M7 2h1" />
+      <path d="m22 22-5-10-5 10" />
+      <path d="M14 18h6" />
+    </svg>
+  )
+}
 export const List = icon('list-unordered')
 export const ListFilter = icon('list-filter')
 export const Loader2Icon = icon('loading')

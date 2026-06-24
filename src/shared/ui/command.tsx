@@ -52,11 +52,17 @@ function CommandDialog({
   description = 'Search for a command to run...',
   children,
   className,
+  commandValue,
+  onCommandValueChange,
+  shouldFilter,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   title?: string
   description?: string
   className?: string
+  commandValue?: string
+  onCommandValueChange?: (value: string) => void
+  shouldFilter?: boolean
 }) {
   return (
     <Dialog {...props}>
@@ -69,7 +75,14 @@ function CommandDialog({
         className={cn(commandPaletteDialogContentClass, className)}
         showCloseButton={false}
       >
-        <Command className={commandPaletteRootClass}>{children}</Command>
+        <Command
+          className={commandPaletteRootClass}
+          value={commandValue}
+          onValueChange={onCommandValueChange}
+          shouldFilter={shouldFilter}
+        >
+          {children}
+        </Command>
       </DialogContent>
     </Dialog>
   )
@@ -128,15 +141,22 @@ function CommandList({
 }: React.ComponentProps<typeof CommandPrimitive.List> & {
   variant?: 'menu' | 'palette'
 }) {
+  if (variant === 'palette') {
+    return (
+      <CommandPrimitive.List
+        data-slot="command-list"
+        className={cn(
+          commandPaletteListClass,
+          'overflow-x-hidden overflow-y-auto p-1',
+          className
+        )}
+        {...props}
+      />
+    )
+  }
+
   return (
-    <CustomScrollArea
-      variant="menu"
-      className={cn(
-        variant === 'palette' ? commandPaletteListClass : 'max-h-[300px]',
-        'min-h-0',
-        className
-      )}
-    >
+    <CustomScrollArea variant="menu" className={cn('max-h-[300px] min-h-0', className)}>
       <CommandPrimitive.List
         data-slot="command-list"
         className="scroll-py-1 overflow-x-hidden overflow-y-visible"

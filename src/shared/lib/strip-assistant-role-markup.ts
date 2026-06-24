@@ -11,6 +11,21 @@ const CHATML_TOKEN = /<\|im_(?:start|end)\|>\s*(?:assistant|user|system|tool)?\s
 
 const CHATML_END = /<\|im_end\|>/gi
 
+/** HTML/formatting tags some models leak into visible text. */
+const FORMATTING_TAG =
+  /<\/?(?:u|b|i|em|strong|underline|span|div|p|br|font)\b[^>]*>/gi
+
+/** Incomplete tag at end of a streaming buffer — hide until the closing `>` arrives. */
+const PARTIAL_TAG_SUFFIX = /<\/?[a-z][a-z0-9-]*(?:\s[^>]*)?$/i
+
+function stripKnownFormattingTags(text: string): string {
+  return text.replace(FORMATTING_TAG, '')
+}
+
+function stripPartialTagSuffix(text: string): string {
+  return text.replace(PARTIAL_TAG_SUFFIX, '')
+}
+
 function stripAssistantRoleTags(text: string): string {
   if (!text) return text
 
@@ -27,10 +42,13 @@ function stripAssistantRoleTags(text: string): string {
  * Do not run line-based citation cleanup on partial text (it eats split words).
  */
 export function stripAssistantStreamSafeMarkup(text: string): string {
-  return stripInvisibleFormatChars(stripAssistantRoleTags(text))
+  let s = stripAssistantRoleTags(text)
+  s = stripKnownFormattingTags(s)
+  s = stripPartialTagSuffix(s)
+  return stripInvisibleFormatChars(s)
 }
 
 /** Remove chat-template markup and tool/citation leaks from final assistant text. */
 export function stripAssistantRoleMarkup(text: string): string {
-  return stripAssistantDisplayLeaks(stripAssistantRoleTags(text))
+  return stripAssistantDisplayLeaks(stripKnownFormattingTags(stripAssistantRoleTags(text)))
 }

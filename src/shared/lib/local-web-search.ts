@@ -3,6 +3,8 @@ import { useSettingsStore } from '@/entities/settings/model/store'
 import { enrichSearchResultsWithPageContent } from '@/shared/lib/local-page-research'
 import { LocalWebSearchError } from '@/shared/lib/local-web-search-errors'
 import type { LocalWebSearchProgress } from '@/shared/lib/local-web-search-progress'
+import { normalizeWebSearchResults } from '@/shared/lib/web-search-pipeline'
+import { getWebsearchMaxResults } from '@/shared/lib/websearch-config'
 import { performWebsearchQuery } from '@/shared/lib/websearch-query'
 
 const PRACTICE_LOCALE: Record<string, string> = {
@@ -48,14 +50,19 @@ export type LocalWebSearchResult = {
   pageContent?: string
 }
 
-const MAX_RESULTS = 8
-const FETCH_TIMEOUT_MS = 12_000
+const FETCH_TIMEOUT_MS = 10_000
+const PRIMARY_SEARCH_TIMEOUT_MS = 10_000
+
+function maxResults(): number {
+  return getWebsearchMaxResults()
+}
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) {
     throw new LocalWebSearchError('Web search aborted', 'aborted')
   }
 }
+
 const SEARCH_USER_AGENT =
   'Mozilla/5.0 (compatible; Lingo/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
@@ -114,7 +121,7 @@ function flattenDdgTopics(
       url: topic.FirstURL?.trim() ?? '',
       snippet
     })
-    if (out.length >= MAX_RESULTS) return
+    if (out.length >= maxResults()) return
   }
 }
 
@@ -139,18 +146,19 @@ async function fetchDdgInstantAnswer(query: string): Promise<LocalWebSearchResul
   }
 
   flattenDdgTopics(data.RelatedTopics, out, seen)
-  return out.slice(0, MAX_RESULTS)
+  return out.slice(0, maxResults())
 }
 
 function parseDdgHtmlResults(html: string): LocalWebSearchResult[] {
   const out: LocalWebSearchResult[] = []
   const seen = new Set<string>()
+  const limit = maxResults()
 
   const blockRe =
     /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi
 
   let match: RegExpExecArray | null
-  while ((match = blockRe.exec(html)) !== null && out.length < MAX_RESULTS) {
+  while ((match = blockRe.exec(html)) !== null && out.length < limit) {
     const rawUrl = decodeHtmlEntities(match[1].trim())
     const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim())
     const snippet = decodeHtmlEntities(match[3].replace(/<[^>]+>/g, '').trim())
@@ -166,7 +174,7 @@ function parseDdgHtmlResults(html: string): LocalWebSearchResult[] {
     /<a[^>]+rel="nofollow"[^>]+class="result-link"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
   const liteSnippetRe = /<td[^>]+class="result-snippet"[^>]*>([\s\S]*?)<\/td>/gi
   const links: Array<{ url: string; title: string }> = []
-  while ((match = liteLinkRe.exec(html)) !== null && links.length < MAX_RESULTS) {
+  while ((match = liteLinkRe.exec(html)) !== null && links.length < limit) {
     let url = decodeHtmlEntities(match[1].trim())
     if (url.startsWith('//')) url = `https:${url}`
     const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim())
@@ -174,7 +182,7 @@ function parseDdgHtmlResults(html: string): LocalWebSearchResult[] {
   }
 
   const snippets: string[] = []
-  while ((match = liteSnippetRe.exec(html)) !== null && snippets.length < MAX_RESULTS) {
+  while ((match = liteSnippetRe.exec(html)) !== null && snippets.length < limit) {
     snippets.push(decodeHtmlEntities(match[1].replace(/<[^>]+>/g, '').trim()))
   }
 
@@ -218,56 +226,81 @@ async function fetchDdgLiteSearch(query: string): Promise<LocalWebSearchResult[]
 async function fetchDdgWebSearch(query: string): Promise<LocalWebSearchResult[]> {
   const seen = new Set<string>()
   const merged: LocalWebSearchResult[] = []
+  const limit = maxResults()
+
+  const mergeBatch = (items: LocalWebSearchResult[]) => {
+    for (const item of items) {
+      pushUnique(merged, seen, item)
+      if (merged.length >= limit) return
+    }
+  }
+
+  const [instantSettled, liteSettled] = await Promise.allSettled([
+    fetchDdgInstantAnswer(query),
+    fetchDdgLiteSearch(query)
+  ])
+
+  if (instantSettled.status === 'fulfilled') mergeBatch(instantSettled.value)
+  if (merged.length >= 4) return merged.slice(0, limit)
+  if (liteSettled.status === 'fulfilled') mergeBatch(liteSettled.value)
+  if (merged.length >= 3) return merged.slice(0, limit)
 
   try {
-    for (const item of await fetchDdgInstantAnswer(query)) {
-      pushUnique(merged, seen, item)
-      if (merged.length >= MAX_RESULTS) return merged
-    }
+    mergeBatch(await fetchDdgHtmlSearch(query))
   } catch {
-    // continue
+    // return partial
   }
 
-  if (merged.length < 3) {
-    try {
-      for (const item of await fetchDdgLiteSearch(query)) {
-        pushUnique(merged, seen, item)
-        if (merged.length >= MAX_RESULTS) return merged
-      }
-    } catch {
-      // continue
-    }
-  }
-
-  if (merged.length < 3) {
-    try {
-      for (const item of await fetchDdgHtmlSearch(query)) {
-        pushUnique(merged, seen, item)
-        if (merged.length >= MAX_RESULTS) return merged
-      }
-    } catch {
-      // return partial
-    }
-  }
-
-  return merged.slice(0, MAX_RESULTS)
+  return merged.slice(0, limit)
 }
 
-async function fetchGeneralWebSearch(
+async function fetchPrimaryWebSearch(
   query: string,
   locale: string,
   signal?: AbortSignal
 ): Promise<LocalWebSearchResult[]> {
   throwIfAborted(signal)
+
+  const primary = performWebsearchQuery(query, locale)
+  const timeout = new Promise<never>((_, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('primary search timeout')),
+      PRIMARY_SEARCH_TIMEOUT_MS
+    )
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer)
+        reject(new LocalWebSearchError('Web search aborted', 'aborted'))
+      },
+      { once: true }
+    )
+  })
+
   try {
-    const mcpResults = await performWebsearchQuery(query, locale)
+    const mcpResults = await Promise.race([primary, timeout])
     if (mcpResults.length > 0) return mcpResults
-  } catch {
+  } catch (error) {
+    if (error instanceof LocalWebSearchError && error.code === 'aborted') throw error
     // fall back to DuckDuckGo
   }
 
   throwIfAborted(signal)
   return fetchDdgWebSearch(query)
+}
+
+export function resultsNeedPageEnrichment(results: readonly LocalWebSearchResult[]): boolean {
+  if (results.length === 0) return false
+
+  const rich = results.filter((result) => {
+    const pageLen = result.pageContent?.trim().length ?? 0
+    const snippetLen = result.snippet.trim().length
+    return pageLen > 80 || snippetLen >= 280
+  })
+
+  if (rich.length >= 2) return false
+  if (results.every((result) => (result.pageContent?.trim().length ?? 0) > 120)) return false
+  return true
 }
 
 async function finalizeResults(
@@ -276,13 +309,11 @@ async function finalizeResults(
 ): Promise<LocalWebSearchResult[]> {
   throwIfAborted(progress?.signal)
   if (results.length === 0) return results
-  if (results.some((r) => r.pageContent && r.pageContent.trim().length > 80)) {
-    return results
-  }
+  if (!resultsNeedPageEnrichment(results)) return results
   return enrichSearchResultsWithPageContent(results, progress)
 }
 
-/** Local search: websearch-mcp + DuckDuckGo fallback. */
+/** Local search: MCP/crawler first, DuckDuckGo fallback, optional page enrichment. */
 export async function performLocalWebSearch(
   query: string,
   progress?: LocalWebSearchProgress
@@ -292,7 +323,7 @@ export async function performLocalWebSearch(
 
   let general: LocalWebSearchResult[]
   try {
-    general = await fetchGeneralWebSearch(query, locale, progress?.signal)
+    general = await fetchPrimaryWebSearch(query, locale, progress?.signal)
   } catch (error) {
     if (progress?.signal?.aborted || (error instanceof LocalWebSearchError && error.code === 'aborted')) {
       throw error
@@ -302,6 +333,8 @@ export async function performLocalWebSearch(
       'network'
     )
   }
+
+  general = normalizeWebSearchResults(general).slice(0, maxResults())
 
   throwIfAborted(progress?.signal)
   progress?.onInitialResults?.(general)

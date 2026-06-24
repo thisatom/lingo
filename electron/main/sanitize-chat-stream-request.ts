@@ -26,6 +26,9 @@ export async function sanitizeChatStreamRequest(
     }
   }
 
+  const resolvedLanguagePractice =
+    languagePractice ?? snapshot.languagePracticeEnabled ?? true
+
   const llmSettings = {
     llmBackend: snapshot.llmBackend,
     modelId: snapshot.modelId,
@@ -48,6 +51,6 @@ export async function sanitizeChatStreamRequest(
     practiceLanguage,
     ...llmFields,
     webSearch: resolveChatStreamWebSearch(llmSettings, perTurnWebSearch),
-    languagePractice: languagePractice ?? true
+    languagePractice: resolvedLanguagePractice
   }
 }

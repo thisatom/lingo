@@ -1,6 +1,6 @@
 {
   "name": "lingo",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Practice conversational speech in different languages",
   "main": "./out/main/index.js",
   "type": "module",

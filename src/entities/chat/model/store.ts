@@ -47,6 +47,8 @@ interface ChatsState {
   goBackInChatHistory: () => void
   goForwardInChatHistory: () => void
   deleteChat: (id: string) => void
+  /** Removes every chat and opens a fresh empty one. Settings are kept. */
+  deleteAllChats: () => string
   renameChat: (id: string, title: string) => void
   togglePinChat: (id: string) => void
   setChatHasError: (id: string, hasError: boolean) => void
@@ -364,6 +366,11 @@ export const useChatsStore = create<ChatsState>()(
         notifyChatDeleted(id)
         invalidateChatApiHistoryCache(id)
         useMessageQueueStore.getState().clearChat(id)
+      },
+
+      deleteAllChats: () => {
+        get().resetChats()
+        return get().createChat({ adoptPendingComposer: false })
       },
 
       setChatHasError: (id, hasError) => {

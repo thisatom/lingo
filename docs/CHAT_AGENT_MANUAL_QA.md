@@ -71,7 +71,38 @@
 
 ---
 
+## G. Language practice
+
+| # | Шаг | Ожидание | ✓ |
+|---|-----|----------|---|
+| G1 | Settings → **Language practice** OFF | Ответ general assistant, без «урока» / исправлений произношения | |
+| G2 | Language practice OFF, factual вопрос + web search ON | Ответ по фактам, не language tutor | |
+| G3 | Language practice ON | Ответ на языке практики, tutor tone | |
+
+---
+
+## H. Web search
+
+| # | Шаг | Ожидание | ✓ |
+|---|-----|----------|---|
+| H1 | Web search ON, «What is the weather in Paris today?» | `searching` → targets/chips → ответ с актуальными фактами | |
+| H2 | Web search OFF, «search the web for …» | Force-search срабатывает, search всё равно идёт | |
+| H3 | Сообщение с image attachment + factual вопрос | Search пропущен (attachments block) | |
+| H4 | Custom LLM endpoint + web search ON | Local search fallback, без native OpenRouter plugin | |
+
+---
+
+## I. Stream quality
+
+| # | Шаг | Ожидание | ✓ |
+|---|-----|----------|---|
+| I1 | Ответ с кириллицей / многострочный | Нет обрезанных слов при стриме (напр. «Привет» → «ривет») | |
+| I2 | Модель с reasoning | Нет HTML-утечек (`</u>`, `<underline>`) в видимом ответе | |
+| I3 | Длинный web-search ответ | Нет «incomplete answer» при нормальной сети | |
+
+---
+
 ## Критерий прохождения
 
-- Все пункты **A1–A2, B1–B3, C3, D1, E2** обязательны для «agent-stable».
+- Все пункты **A1–A2, B1–B3, C3, D1, E2, G1, H1, I1** обязательны для «agent-stable».
 - Остальные — по возможности; регрессии фиксировать issue с ID сценария (например `QA-C3`).

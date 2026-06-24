@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  dismissAppUpdateToast,
+  showAppUpdateStartedToast
+} from '@/features/app-update/lib/app-update-toast'
 import { AppUpdateOverlay } from '@/features/app-update/ui/AppUpdateOverlay'
 import {
   installAppUpdate,
@@ -26,7 +30,7 @@ function markAutoInstallStarted(version: string): void {
   }
 }
 
-/** Silent background updates with a minimal progress overlay. */
+/** Silent background updates with a styled toast + progress overlay. */
 export function AppUpdateGate() {
   const [progress, setProgress] = useState<AppUpdateProgress | null>(null)
   const installStartedRef = useRef(false)
@@ -35,6 +39,7 @@ export function AppUpdateGate() {
     if (installStartedRef.current || wasAutoInstallStarted(update.version)) return
     installStartedRef.current = true
     markAutoInstallStarted(update.version)
+    showAppUpdateStartedToast(update)
     void installAppUpdate()
   }, [])
 
@@ -43,6 +48,9 @@ export function AppUpdateGate() {
 
     const unsubProgress = subscribeToAppUpdateProgress((next) => {
       setProgress(next.phase === 'idle' ? null : next)
+      if (next.phase === 'restarting' || next.phase === 'failed') {
+        dismissAppUpdateToast()
+      }
     })
 
     const unsubAvailable = subscribeToAppUpdateAvailable((info) => {

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
-import { formatChatDateLabel, formatChatTimeLabel } from '@/shared/lib/chat-sidebar'
+import { formatChatTimeLabel } from '@/shared/lib/chat-sidebar'
 import {
-  buildChatCommandSearchGroups,
-  buildChatCommandSearchValue
+  buildChatCommandSearchGroups
 } from '@/features/chat-search/lib/chat-command-search'
+import { filterChatsByQuery } from '@/features/chat-search/lib/filter-chats'
 import { navigateToChat } from '@/features/chat/lib/chat-route'
 import { parseChatIdFromInput } from '@/features/chat/lib/parse-chat-id'
 import {
@@ -38,18 +38,32 @@ function ChatCommandRow({ chat }: { chat: { id: string; title: string; updatedAt
 export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
+  const [selectedChatId, setSelectedChatId] = useState('')
   const chats = useChatsStore((s) => s.chats)
   const selectChat = useChatsStore((s) => s.selectChat)
   const sidebarShowDateGroups = useSettingsStore((s) => s.sidebarShowDateGroups ?? true)
   const sidebarChatSort = useSettingsStore((s) => s.sidebarChatSort)
 
   useEffect(() => {
-    if (!open) setSearch('')
+    if (!open) {
+      setSearch('')
+      setSelectedChatId('')
+    }
   }, [open])
 
+  const visibleChats = useMemo(
+    () => filterChatsByQuery(chats, search),
+    [chats, search]
+  )
+
   const { pinned, dateGroups, flat } = useMemo(
-    () => buildChatCommandSearchGroups(chats, sidebarShowDateGroups, sidebarChatSort),
-    [chats, sidebarShowDateGroups, sidebarChatSort]
+    () =>
+      buildChatCommandSearchGroups(
+        visibleChats,
+        sidebarShowDateGroups,
+        sidebarChatSort
+      ),
+    [visibleChats, sidebarShowDateGroups, sidebarChatSort]
   )
 
   const parsedChatId = useMemo(() => parseChatIdFromInput(search), [search])
@@ -68,10 +82,13 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
       open={open}
       onOpenChange={onOpenChange}
       title="Search chats"
-      description="Find and open a chat by title, date, or chat ID"
+      description="Find and open a chat by title, message text, date, or chat ID"
+      commandValue={selectedChatId}
+      onCommandValueChange={setSelectedChatId}
+      shouldFilter={false}
     >
       <CommandPaletteInput
-        placeholder="Search by title, date, or chat ID…"
+        placeholder="Search by title, messages, date, or chat ID…"
         value={search}
         onValueChange={setSearch}
       />
@@ -103,7 +120,7 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
               <CommandItem
                 variant="palette"
                 key={chat.id}
-                value={buildChatCommandSearchValue(chat, 'Pinned')}
+                value={chat.id}
                 onSelect={() => pickChat(chat.id)}
               >
                 <ChatCommandRow chat={chat} />
@@ -123,7 +140,7 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
                   <CommandItem
                     variant="palette"
                     key={chat.id}
-                    value={buildChatCommandSearchValue(chat, group.label)}
+                    value={chat.id}
                     onSelect={() => pickChat(chat.id)}
                   >
                     <ChatCommandRow chat={chat} />
@@ -138,7 +155,7 @@ export function ChatSearchDialog({ open, onOpenChange }: ChatSearchDialogProps) 
               <CommandItem
                 variant="palette"
                 key={chat.id}
-                value={buildChatCommandSearchValue(chat, formatChatDateLabel(chat.updatedAt))}
+                value={chat.id}
                 onSelect={() => pickChat(chat.id)}
               >
                 <ChatCommandRow chat={chat} />

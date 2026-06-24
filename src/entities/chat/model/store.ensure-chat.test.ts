@@ -66,6 +66,19 @@ describe('useChatsStore ensureActiveChat', () => {
     expect(store.getComposerDraft(PENDING_COMPOSER_CHAT_ID)).toBe('')
   })
 
+  it('deleteAllChats clears every chat and opens a fresh one', () => {
+    useChatsStore.getState().createChat()
+    useChatsStore.getState().createChat()
+    expect(useChatsStore.getState().chats).toHaveLength(2)
+
+    const newChatId = useChatsStore.getState().deleteAllChats()
+    const after = useChatsStore.getState()
+
+    expect(after.chats).toHaveLength(1)
+    expect(after.activeChatId).toBe(newChatId)
+    expect(after.chats[0]?.messages).toHaveLength(0)
+  })
+
   it('createChat adopts pending composer draft onto the new chat', () => {
     useChatsStore.getState().setComposerDraft(PENDING_COMPOSER_CHAT_ID, 'Draft before new chat')
 

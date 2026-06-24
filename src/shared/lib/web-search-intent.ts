@@ -19,6 +19,20 @@ export function buildWebSearchQuery(userMessage: string): string {
   return query.trim() || userMessage.trim()
 }
 
+const CONVERSATIONAL_PREFIX =
+  /^(?:(?:please|could you|can you|would you|help me(?: find| understand)?|tell me(?: about)?|i(?:'m| am) (?:looking for|trying to find|wondering(?: about)?)|i (?:need|want) to (?:know|find|learn)(?: about)?)\s+)+/i
+
+const CONVERSATIONAL_SUFFIX = /\s*(?:please|thanks|thank you)[.!?…]*$/i
+
+/** Compact lookup string for search providers — strips chat phrasing, keeps factual terms. */
+export function optimizeWebSearchQuery(userMessage: string): string {
+  let query = buildWebSearchQuery(userMessage)
+  query = query.replace(CONVERSATIONAL_PREFIX, '')
+  query = query.replace(CONVERSATIONAL_SUFFIX, '')
+  query = query.replace(/\s+/g, ' ').replace(/[?.!…]+$/g, '').trim()
+  return query || buildWebSearchQuery(userMessage)
+}
+
 export function shouldForceWebSearch(userMessage: string): boolean {
   return FORCE_WEB_SEARCH.test(userMessage.trim())
 }
@@ -34,7 +48,10 @@ const LOCAL_TIME_OR_DATE =
 
 /** Factual / lookup-style query — worth searching when the user enabled web search. */
 const FACTUAL_QUERY =
-  /\b(?:who is|who was|what is|what are|what was|when did|when was|where is|how much|how many|why did|why is|latest|current|news|weather|forecast|price|stock|score|results|winner|release date|population|capital of|tell me about|расскажи (?:про|о))\b/i
+  /\b(?:who is|who was|what is|what are|what was|when did|when was|where is|how much|how many|why did|why is|latest|current|news|weather|forecast|price|stock|score|results|winner|release date|population|capital of|tell me about|compare|vs\.?|versus|расскажи (?:про|о)|погода|новости|курс|цена)\b/i
+
+const CREATIVE_OR_ROLEPLAY =
+  /\b(?:write (?:me )?(?:a )?(?:story|poem|song|essay|email|letter)|roleplay|pretend (?:you are|to be)|translate (?:this|to)|summarize this|proofread|fix (?:my )?(?:grammar|text)|practice (?:speaking|conversation))\b/i
 
 /**
  * Whether a turn should run web search when the toggle allows it.
@@ -48,10 +65,11 @@ export function shouldUseWebSearchForMessage(userMessage: string): boolean {
   if (!q) return false
   if (shouldForceWebSearch(q)) return true
   if (CASUAL_GREETING.test(q) || SMALL_TALK.test(q) || LOCAL_TIME_OR_DATE.test(q)) return false
+  if (CREATIVE_OR_ROLEPLAY.test(q)) return false
   if (q.length < 10 && !q.includes('?')) return false
   if (FACTUAL_QUERY.test(q)) return true
-  if (q.includes('?') && q.length >= 8 && SHORT_FACTUAL_QUESTION.test(q)) return true
-  return q.includes('?') && q.length >= 24
+  if (q.includes('?') && q.length >= 10 && SHORT_FACTUAL_QUESTION.test(q)) return true
+  return q.includes('?') && q.length >= 28
 }
 
 export function getLastUserMessageContent(messages: ChatMessagePayload[]): string {

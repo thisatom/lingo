@@ -10,7 +10,7 @@ export function resolveAppIconPath(): string | undefined {
     process.platform === 'win32'
       ? ['icon.ico']
       : process.platform === 'darwin'
-        ? ['icon.icns']
+        ? ['icon.icns', 'icon.png']
         : ['icon.png']
 
   const roots = app.isPackaged

@@ -50,8 +50,16 @@ export const agentMessageClass = cn(
 )
 
 export const messageActionButtonClass = cn(
-  'text-muted-foreground/55 hover:bg-accent hover:text-muted-foreground'
+  'size-6 shrink-0 rounded-md text-muted-foreground/75 hover:bg-accent/80 hover:text-foreground'
 )
+
+export const messageActionsBarClass = cn(
+  'flex flex-wrap items-center gap-0.5 px-3 pb-1 pt-0'
+)
+
+export const messageActionsGroupClass = 'inline-flex items-center'
+
+export const messageActionDividerClass = 'mx-0.5 h-3 w-px shrink-0 bg-border/45'
 
 /** “Thought for …” — New chat font, reasoning color token. */
 /** Trigger label — `text-sm` (rem) like before appearance settings; body uses fixed thinking tokens. */

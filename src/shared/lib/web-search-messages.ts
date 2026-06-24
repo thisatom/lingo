@@ -32,11 +32,11 @@ export function formatLocalWebSearchBlock(query: string, results: LocalWebSearch
   }
 
   return [
-    `**Web research** for "${query}" — page excerpts (not link lists):`,
+    `**Web research** for "${query}" — live page excerpts (today: ${new Date().toISOString().slice(0, 10)}):`,
     '',
     lines.join('\n\n'),
     '',
-    'Use the excerpts as factual context. Answer in your own words. Mention source titles in prose when helpful; the chat UI shows link chips separately — do not paste raw URL lists.'
+    'Use these excerpts as the primary factual source for this answer. If an excerpt conflicts with your training data, trust the excerpt. Mention source titles in prose; the chat UI shows link chips separately — do not paste raw URL lists.'
   ].join('\n')
 }
 

@@ -3,10 +3,19 @@ import {
   buildWebSearchQuery,
   isSubstantiveReply,
   looksTruncatedOrRefusal,
+  optimizeWebSearchQuery,
   shouldForceWebSearch,
   shouldRetryWebSearchAnswer,
   shouldUseWebSearchForMessage
 } from './web-search-intent'
+
+describe('optimizeWebSearchQuery', () => {
+  it('strips conversational phrasing while keeping factual terms', () => {
+    expect(
+      optimizeWebSearchQuery('Can you tell me what the weather in Paris is today?')
+    ).toBe('what the weather in Paris is today')
+  })
+})
 
 describe('buildWebSearchQuery', () => {
   it('strips explicit search phrases from the lookup query', () => {
@@ -47,10 +56,14 @@ describe('shouldUseWebSearchForMessage', () => {
     expect(shouldUseWebSearchForMessage('search the web for X')).toBe(true)
   })
 
-  it('allows short factual wh-questions', () => {
-    expect(shouldUseWebSearchForMessage('Who won?')).toBe(true)
-    expect(shouldUseWebSearchForMessage('Why now?')).toBe(true)
+  it('allows short factual wh-questions with enough context', () => {
+    expect(shouldUseWebSearchForMessage('Who won the game?')).toBe(true)
+    expect(shouldUseWebSearchForMessage('Why now?')).toBe(false)
     expect(shouldUseWebSearchForMessage('ok?')).toBe(false)
+  })
+
+  it('skips creative writing prompts', () => {
+    expect(shouldUseWebSearchForMessage('Write me a poem about the sea')).toBe(false)
   })
 })
 

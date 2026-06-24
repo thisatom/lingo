@@ -55,7 +55,7 @@ export function ReplySpeakButton({ content }: Props) {
     <TooltipIconButton
       type="button"
       variant="ghost"
-      size="iconSm"
+      size="icon-xs"
       className={messageActionButtonClass}
       tooltip={tooltip}
       aria-label={tooltip}

@@ -370,14 +370,16 @@ export function ChatComposer({
             disabled={disabled}
             tooltip={
               webSearchEnabled
-                ? 'Web search allowed'
+                ? 'Web search on'
                 : 'Web search off — say "search the web for…" to force lookup'
             }
-            aria-label={webSearchEnabled ? 'Web search allowed' : 'Web search off'}
+            tooltipSide="top"
+            tooltipClassName="w-fit max-w-none px-2 py-1 text-left [text-wrap:pretty]"
+            aria-label={webSearchEnabled ? 'Web search on' : 'Web search off'}
             aria-pressed={webSearchEnabled}
             onClick={() => setWebSearchEnabled(!webSearchEnabled)}
           >
-            <Globe />
+            <Globe className="size-4" />
           </TooltipIconButton>
 
           <ComposerAgentMenuSelect

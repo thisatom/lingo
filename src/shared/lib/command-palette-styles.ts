@@ -33,10 +33,11 @@ export const commandPaletteGroupClass = cn(
 )
 
 export const commandPaletteItemClass = cn(
-  'relative flex h-[30px] min-h-[30px] cursor-pointer items-center gap-2 py-0 pl-2 pr-[3px] text-sm leading-none text-foreground outline-hidden select-none',
+  'relative flex min-h-[30px] cursor-pointer items-center gap-2 py-0 pl-2 pr-[3px] text-sm leading-none text-foreground outline-hidden select-none',
   sidebarMenuRadiusClass,
   'data-[disabled=true]:pointer-events-none data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50',
-  '[&[aria-selected=true]]:bg-[var(--command-palette-item-hover)] [&[aria-selected=true]]:text-popover-foreground',
+  'hover:bg-[var(--command-palette-item-hover)] hover:text-popover-foreground',
+  'data-[selected=true]:bg-[var(--command-palette-item-hover)] data-[selected=true]:text-popover-foreground',
   '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4 [&_svg:not([class*="text-"])]:text-muted-foreground'
 )
 

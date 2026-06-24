@@ -251,8 +251,7 @@ export function AgentSettingsForm() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Default target language</p>
             <p className={settingsRowDescriptionClass}>
-              Where replies are translated to by default. You can change it in the translate
-              popover on each message.
+              Where replies are translated to when you use the translate button on a message.
             </p>
           </div>
           <Select

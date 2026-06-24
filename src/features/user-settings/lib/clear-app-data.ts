@@ -7,6 +7,13 @@ import { getLingo, isElectronApp, isLingoAvailable } from '@/shared/lib/lingo'
 import { isWebPlatform } from '@/shared/lib/lingo-bridge'
 import { SECRET_PROVIDER_IDS } from '@/shared/types/secret-providers'
 
+/** Removes all chats and opens a fresh empty one. Settings and API keys are kept. */
+export async function deleteAllChatsAndPersist(): Promise<string> {
+  const chatId = useChatsStore.getState().deleteAllChats()
+  await flushPersistedStore(useChatsStore as PersistCapableStore)
+  return chatId
+}
+
 /** Reset local state, flush disk, clear secrets — so restart shows in-app onboarding. */
 export async function clearAppDataAndPersist(): Promise<void> {
   useChatsStore.getState().resetChats()

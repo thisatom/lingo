@@ -16,9 +16,17 @@ describe('stripAssistantRoleMarkup', () => {
   it('removes ChatML role markers', () => {
     expect(stripAssistantRoleMarkup('<|im_start|>assistant\nHello\n')).toBe('Hello\n')
   })
+  it('removes underline html tags without eating letters', () => {
+    expect(stripAssistantRoleMarkup('<u>П</u>ривет')).toBe('Привет')
+    expect(stripAssistantRoleMarkup('Hello </underline>world')).toBe('Hello world')
+  })
 })
 
 describe('stripAssistantStreamSafeMarkup', () => {
+  it('hides partial closing tags at stream tail', () => {
+    expect(stripAssistantStreamSafeMarkup('Привет</u')).toBe('Привет')
+    expect(stripAssistantStreamSafeMarkup('Привет</u>')).toBe('Привет')
+  })
   it('does not drop partial lines while tokens arrive', () => {
     const chunks = ['П', 'р', 'ивет', '!\n\n', 'П', 'етербург']
     let raw = ''

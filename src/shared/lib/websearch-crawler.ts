@@ -1,7 +1,7 @@
 import type { LocalWebSearchResult } from '@/shared/lib/local-web-search'
 import { getWebsearchApiUrl, getWebsearchMaxResults } from '@/shared/lib/websearch-config'
 
-const CRAWL_TIMEOUT_MS = 45_000
+const CRAWL_TIMEOUT_MS = 20_000
 
 export type WebsearchCrawlHit = {
   title: string

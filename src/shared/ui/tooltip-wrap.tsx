@@ -43,6 +43,7 @@ type TooltipIconButtonProps = ButtonProps & {
   tooltipSide?: ComponentProps<typeof TooltipContent>['side']
   tooltipAlign?: ComponentProps<typeof TooltipContent>['align']
   tooltipSideOffset?: number
+  tooltipClassName?: string
 }
 
 export function TooltipIconButton({
@@ -53,6 +54,7 @@ export function TooltipIconButton({
   tooltipSide,
   tooltipAlign,
   tooltipSideOffset,
+  tooltipClassName,
   children,
   type = 'button',
   'aria-label': ariaLabelProp,
@@ -61,23 +63,42 @@ export function TooltipIconButton({
   const ariaFallback =
     typeof tooltip === 'string' || typeof tooltip === 'number' ? String(tooltip) : undefined
 
+  const button = (
+    <Button
+      type={type}
+      disabled={disabled}
+      className={cn(
+        className,
+        !disabled && triggerClassName,
+        disabled && 'pointer-events-none'
+      )}
+      {...props}
+      aria-label={ariaLabelProp ?? ariaFallback}
+    >
+      {children}
+    </Button>
+  )
+
   return (
     <Tooltip delayDuration={0}>
       <TooltipTrigger asChild>
-        <Button
-          type={type}
-          disabled={disabled}
-          className={cn(className, triggerClassName)}
-          {...props}
-          aria-label={ariaLabelProp ?? ariaFallback}
-        >
-          {children}
-        </Button>
+        {disabled ? (
+          <span
+            className={cn('inline-flex', triggerClassName)}
+            tabIndex={-1}
+            aria-disabled="true"
+          >
+            {button}
+          </span>
+        ) : (
+          button
+        )}
       </TooltipTrigger>
       <TooltipContent
         side={tooltipSide}
         align={tooltipAlign}
         sideOffset={tooltipSideOffset}
+        className={tooltipClassName}
       >
         {tooltip}
       </TooltipContent>

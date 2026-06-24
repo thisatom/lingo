@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_LINGO_OPENROUTER_MODEL?: string
   readonly VITE_LINGO_APP_URL?: string
   readonly VITE_LINGO_APP_NAME?: string
+  readonly VITE_LINGO_AI_SDK_STREAM?: string
 }
 
 interface ImportMeta {
