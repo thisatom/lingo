@@ -27,6 +27,7 @@ asarUnpack:
   - '**/*.so.*'
   - '**/node_modules/keytar/**'
   - '**/node_modules/@kutalia/whisper-node-addon/**'
+  - 'out/preload/**'
 
 npmRebuild: true
 buildDependenciesFromSource: false

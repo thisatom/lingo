@@ -3,13 +3,9 @@ import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools
 import { registerIpcHandlers } from './ipc'
 import { warmOpenRouterConnection } from './openrouter-fetch'
 import { warmSttWorker } from './stt'
-import { registerRendererScheme, setupRendererProtocol } from './renderer-protocol'
-import { setupSessionContentSecurityPolicy } from './session-csp'
 import { loadEnvBootstrap, warmSecretsCache } from './secrets'
 import { setupSingleInstanceApp, setupTitlebarOnce } from './window-manager'
 import { focusMainWindow, launchDesktopWindows } from './welcome-flow'
-
-registerRendererScheme()
 
 // Allow TTS playback after async API calls (no fresh user gesture).
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
@@ -34,9 +30,6 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
     session.defaultSession.setPermissionCheckHandler((_webContents, permission) =>
       allowMedia(permission)
     )
-
-    await setupRendererProtocol()
-    setupSessionContentSecurityPolicy()
 
     setupTitlebarOnce()
     registerDevToolsShortcut()

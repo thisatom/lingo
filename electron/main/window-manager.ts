@@ -9,9 +9,9 @@ import { getTitlebarTheme } from '../../src/shared/config/titlebar'
 import { backgroundUpdateCheck } from './app-update'
 import { resolveAppIconPath } from './icon'
 import { resolvePreloadScript } from './paths'
+import { resolvePackagedRendererHtml } from './renderer-path'
 import { registerWindowShortcuts } from './window-shortcuts'
 import { setupGracefulShutdown } from './shutdown'
-import { packagedRendererUrl } from './renderer-protocol'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -55,7 +55,9 @@ export function loadMainRenderer(mainWindow: BrowserWindow): Promise<void> {
     console.info(`[lingo] Loading dev renderer: ${url}`)
     return loadRendererUrl(mainWindow, url)
   }
-  return mainWindow.loadURL(packagedRendererUrl('index.html'))
+  // loadFile (not custom app://) — Electron 42 sandbox needs standard navigation
+  // so preload startupData is pushed before the sandbox bundle runs (macOS).
+  return mainWindow.loadFile(resolvePackagedRendererHtml('index.html'))
 }
 
 export function createMainWindow(): BrowserWindow {
