@@ -15,6 +15,17 @@ import { setupGracefulShutdown } from './shutdown'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+function isPackagedRendererFileUrl(url: string): boolean {
+  if (!url.startsWith('file:')) return false
+  try {
+    const target = fileURLToPath(url)
+    const rendererRoot = path.dirname(resolvePackagedRendererHtml('index.html'))
+    return target === rendererRoot || target.startsWith(`${rendererRoot}${path.sep}`)
+  } catch {
+    return false
+  }
+}
+
 function openDevToolsIfDev(win: BrowserWindow): void {
   if (win.webContents.isDestroyed()) return
   if (process.env.NODE_ENV === 'production' && !process.env.ELECTRON_RENDERER_URL) return
@@ -86,7 +97,8 @@ export function createMainWindow(): BrowserWindow {
         : false,
     webPreferences: {
       preload: resolvePreloadScript(),
-      sandbox: true,
+      // Electron 42 sandbox + preload is flaky on macOS (Monterey); contextIsolation stays on.
+      sandbox: false,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -146,7 +158,12 @@ export function createMainWindow(): BrowserWindow {
   })
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (url.startsWith('file:') || url.startsWith('javascript:')) {
+    if (url.startsWith('javascript:')) {
+      event.preventDefault()
+      return
+    }
+    // Packaged app uses loadFile (file://). Do not block renderer bundle paths.
+    if (app.isPackaged && url.startsWith('file:') && !isPackagedRendererFileUrl(url)) {
       event.preventDefault()
     }
   })
