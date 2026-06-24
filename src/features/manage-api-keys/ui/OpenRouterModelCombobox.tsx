@@ -1,6 +1,7 @@
 import { ChevronsUpDown } from 'lucide-react'
 import { Check, Trash2 } from '@/shared/ui/icons'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { FieldContextMenu } from '@/features/chat-composer/ui/FieldContextMenu'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { normalizeOpenRouterModelId, openRouterSuggestedModels } from '@/shared/config/openrouter'
 import {
@@ -45,6 +46,7 @@ export function OpenRouterModelCombobox({ id, value, onChange, className }: Open
   const [catalog, setCatalog] = useState<string[]>([])
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const q = search.trim().toLowerCase()
   const normalizedSearch = normalizeOpenRouterModelId(search.trim())
@@ -174,13 +176,16 @@ export function OpenRouterModelCombobox({ id, value, onChange, className }: Open
         align="start"
       >
         <Command shouldFilter={false} className={settingsCommandClass}>
-          <CommandInput
-            placeholder="Search or type model id…"
-            value={search}
-            onValueChange={setSearch}
-            wrapperClassName={settingsCommandInputWrapperClass}
-            className={settingsCommandInputClass}
-          />
+          <FieldContextMenu fieldRef={searchInputRef} onValueChange={setSearch}>
+            <CommandInput
+              ref={searchInputRef}
+              placeholder="Search or type model id…"
+              value={search}
+              onValueChange={setSearch}
+              wrapperClassName={settingsCommandInputWrapperClass}
+              className={settingsCommandInputClass}
+            />
+          </FieldContextMenu>
           <CommandList className={settingsCommandListClass}>
             {catalogLoading ? (
               <div className="px-2 py-3 text-center text-xs text-muted-foreground">Loading models…</div>

@@ -93,12 +93,14 @@ function CommandInput({
   wrapperClassName,
   variant = 'menu',
   showSearchIcon,
+  ref,
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input> & {
   wrapperClassName?: string
   /** `palette` — glass command dialog (42px input, #1e1e1e separator). */
   variant?: 'menu' | 'palette'
   showSearchIcon?: boolean
+  ref?: React.Ref<HTMLInputElement>
 }) {
   const isPalette = variant === 'palette'
   const showIcon = showSearchIcon ?? !isPalette
@@ -115,6 +117,7 @@ function CommandInput({
     >
       {showIcon ? <SearchIcon className="size-4 shrink-0 text-muted-foreground" /> : null}
       <CommandPrimitive.Input
+        ref={ref}
         data-slot="command-input"
         className={cn(
           isPalette

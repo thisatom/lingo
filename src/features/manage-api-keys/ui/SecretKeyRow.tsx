@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from '@/shared/ui/icons'
 import { useEffect, useRef, useState } from 'react'
+import { FieldContextMenu } from '@/features/chat-composer/ui/FieldContextMenu'
 import { getLingo } from '@/shared/lib/lingo'
 import { isMaskedSecretDisplay } from '@/shared/lib/secret-mask'
 import { settingsInputClass } from '@/shared/lib/settings-control'
@@ -32,6 +33,7 @@ export function SecretKeyRow({
   const [editingNewKey, setEditingNewKey] = useState(false)
   const [testMessage, setTestMessage] = useState<string | null>(null)
   const timerRef = useRef<number | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const wasKeySetRef = useRef(false)
   const prevMaskedRef = useRef<string | undefined>(undefined)
   const statusRef = useRef(status)
@@ -142,6 +144,12 @@ export function SecretKeyRow({
     setTestMessage(null)
   }
 
+  const handleValueChange = (next: string) => {
+    if (!editingNewKey) setEditingNewKey(true)
+    setValue(next)
+    schedule(next)
+  }
+
   return (
     <div className={settingsRowClass}>
       <div className={settingsRowTextWrapClass}>
@@ -156,39 +164,37 @@ export function SecretKeyRow({
                 : 'Not configured.'}
         </p>
       </div>
-      <div className="relative w-[260px] min-w-0 shrink-0">
-        <Input
-          id={id}
-          className={`${settingsInputClass} w-full pr-10`}
-          placeholder={placeholder}
-          value={value}
-          onFocus={() => {
-            const masked = status?.masked
-            if (status?.isSet && masked && value === masked && !editingNewKey) {
-              beginReplaceKey()
-            }
-          }}
-          onChange={(e) => {
-            const next = e.target.value
-            if (!editingNewKey) setEditingNewKey(true)
-            setValue(next)
-            schedule(next)
-          }}
-          autoComplete="off"
-          disabled={loading}
-          type={showSecret ? 'text' : 'password'}
-        />
-        {editingNewKey && value.trim().length > 0 ? (
-          <button
-            type="button"
-            className="absolute top-1/2 right-0.5 inline-flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
-            onClick={() => setShowSecret((v) => !v)}
-            aria-label={showSecret ? 'Hide typed key' : 'Show typed key'}
-          >
-            {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-          </button>
-        ) : null}
-      </div>
+      <FieldContextMenu fieldRef={inputRef} onValueChange={handleValueChange}>
+        <div className="relative w-[260px] min-w-0 shrink-0">
+          <Input
+            ref={inputRef}
+            id={id}
+            className={`${settingsInputClass} w-full pr-10`}
+            placeholder={placeholder}
+            value={value}
+            onFocus={() => {
+              const masked = status?.masked
+              if (status?.isSet && masked && value === masked && !editingNewKey) {
+                beginReplaceKey()
+              }
+            }}
+            onChange={(e) => handleValueChange(e.target.value)}
+            autoComplete="off"
+            disabled={loading}
+            type={showSecret ? 'text' : 'password'}
+          />
+          {editingNewKey && value.trim().length > 0 ? (
+            <button
+              type="button"
+              className="absolute top-1/2 right-0.5 inline-flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+              onClick={() => setShowSecret((v) => !v)}
+              aria-label={showSecret ? 'Hide typed key' : 'Show typed key'}
+            >
+              {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            </button>
+          ) : null}
+        </div>
+      </FieldContextMenu>
     </div>
   )
 }

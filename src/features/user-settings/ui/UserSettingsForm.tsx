@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { AppUpdateSettingsSection } from '@/features/app-update/ui/AppUpdateSettingsSection'
+import { SettingsInput } from '@/features/user-settings/ui/SettingsInput'
 import { clearAppDataAndPersist, deleteAllChatsAndPersist } from '@/features/user-settings/lib/clear-app-data'
 import { SIDEBAR_CHAT_SORT_OPTIONS, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
-import { settingsInputClass } from '@/shared/lib/settings-control'
 import {
   settingsSelectContentClass,
   settingsSelectItemClass,
@@ -31,7 +31,6 @@ import {
   AlertDialogTitle
 } from '@/shared/ui/alert-dialog'
 import { Button } from '@/shared/ui/button'
-import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import {
   Select,
@@ -89,11 +88,11 @@ export function UserSettingsForm() {
             <p className={settingsRowTitleClass}>Display name</p>
             <p className={settingsRowDescriptionClass}>Shown in the sidebar and across the app.</p>
           </div>
-          <Input
+          <SettingsInput
             id="display-name"
-            className={`${settingsInputClass} w-[220px]`}
+            className="w-[220px]"
             value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
+            onValueChange={setDisplayName}
             placeholder="Your name"
             maxLength={64}
           />
@@ -252,11 +251,11 @@ export function UserSettingsForm() {
             <Label htmlFor="clear-app-data-confirm" className="text-xs text-muted-foreground">
               Confirmation
             </Label>
-            <Input
+            <SettingsInput
               id="clear-app-data-confirm"
-              className={cn(settingsInputClass, '!h-7 dark:!h-7')}
+              className="!h-7 dark:!h-7"
               value={clearConfirmInput}
-              onChange={(e) => setClearConfirmInput(e.target.value)}
+              onValueChange={setClearConfirmInput}
               placeholder={CLEAR_APP_DATA_CONFIRM_TEXT}
               autoComplete="off"
               spellCheck={false}

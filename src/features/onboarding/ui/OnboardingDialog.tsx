@@ -3,8 +3,8 @@ import { completeOnboarding } from '@/features/onboarding/lib/complete-onboardin
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { OpenRouterModelCombobox } from '@/features/manage-api-keys/ui/OpenRouterModelCombobox'
 import { practiceLanguageOptionsForSelect } from '@/shared/config/practice-languages'
+import { SettingsInput } from '@/features/user-settings/ui/SettingsInput'
 import {
-  settingsInputClass,
   settingsSelectContentClass,
   settingsSelectItemClass,
   settingsSelectTriggerClass
@@ -22,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/shared/ui/dialog'
-import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import {
   Select,
@@ -132,11 +131,11 @@ export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
 
         <div className="grid gap-4 py-1">
           <Field id="onboarding-name" label="Your name" hint="Shown in the sidebar and chats.">
-            <Input
+            <SettingsInput
               id="onboarding-name"
-              className={cn(settingsInputClass, 'w-full')}
+              className="w-full"
               value={displayName}
-              onChange={(e) => setDisplayNameLocal(e.target.value)}
+              onValueChange={setDisplayNameLocal}
               placeholder="How should we call you?"
               maxLength={64}
               autoFocus
@@ -204,12 +203,12 @@ export function OnboardingDialog({ open, onCompleted }: OnboardingDialogProps) {
             label="OpenRouter API key"
             hint="Required for AI chat. Get a key at openrouter.ai — you can add it later in Settings."
           >
-            <Input
+            <SettingsInput
               id="onboarding-api-key"
               type="password"
-              className={cn(settingsInputClass, 'w-full')}
+              className="w-full"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onValueChange={setApiKey}
               placeholder="sk-or-…"
               autoComplete="off"
             />
