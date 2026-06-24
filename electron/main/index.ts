@@ -1,8 +1,9 @@
 import { app, BrowserWindow, session } from 'electron'
 import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools'
+import { resolveAppIconPath } from './icon'
 import { registerIpcHandlers } from './ipc'
 import { warmOpenRouterConnection } from './openrouter-fetch'
-import { warmSttWorker } from './stt'
+import { shutdownSttWorker, warmSttWorker } from './stt'
 import { loadEnvBootstrap, warmSecretsCache } from './secrets'
 import { setupSingleInstanceApp, setupTitlebarOnce } from './window-manager'
 import { focusMainWindow, launchDesktopWindows } from './welcome-flow'
@@ -15,7 +16,6 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
 } else {
   app.whenReady().then(async () => {
     if (process.platform === 'darwin') {
-      const { resolveAppIconPath } = await import('./icon')
       const iconPath = resolveAppIconPath()
       if (iconPath) app.dock?.setIcon(iconPath)
     }
@@ -59,6 +59,6 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
 
   app.on('will-quit', () => {
     unregisterDevToolsShortcut()
-    void import('./stt').then(({ shutdownSttWorker }) => shutdownSttWorker())
+    void shutdownSttWorker()
   })
 }
