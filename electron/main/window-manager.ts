@@ -7,7 +7,7 @@ import {
 } from '@incanta/custom-electron-titlebar/main'
 import { getTitlebarTheme } from '../../src/shared/config/titlebar'
 import { backgroundUpdateCheck } from './app-update'
-import { resolveAppIconPath } from './icon'
+import { createAppIconImage } from './icon'
 import { resolvePreloadScript } from './paths'
 import { resolvePackagedRendererHtml } from './renderer-path'
 import { registerWindowShortcuts } from './window-shortcuts'
@@ -72,7 +72,7 @@ export function loadMainRenderer(mainWindow: BrowserWindow): Promise<void> {
 }
 
 export function createMainWindow(): BrowserWindow {
-  const iconPath = resolveAppIconPath()
+  const icon = createAppIconImage()
 
   const mainWindow = new BrowserWindow({
     width: 1100,
@@ -82,7 +82,7 @@ export function createMainWindow(): BrowserWindow {
     show: false,
     backgroundColor: '#121212',
     title: 'Lingo',
-    ...(iconPath ? { icon: iconPath } : {}),
+    ...(icon ? { icon } : {}),
     titleBarStyle: 'hidden',
     titleBarOverlay:
       process.platform === 'win32'

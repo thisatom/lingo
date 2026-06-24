@@ -1,6 +1,6 @@
 import { app, BrowserWindow, session } from 'electron'
 import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools'
-import { resolveAppIconPath } from './icon'
+import { applyDockIcon } from './icon'
 import { registerIpcHandlers } from './ipc'
 import { warmOpenRouterConnection } from './openrouter-fetch'
 import { shutdownSttWorker, warmSttWorker } from './stt'
@@ -15,10 +15,7 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
   // Secondary process exits immediately — avoids userData / disk cache conflicts.
 } else {
   app.whenReady().then(async () => {
-    if (process.platform === 'darwin') {
-      const iconPath = resolveAppIconPath()
-      if (iconPath) app.dock?.setIcon(iconPath)
-    }
+    applyDockIcon()
 
     const allowMedia = (permission: string) =>
       permission === 'media' || permission === 'microphone' || permission === 'audioCapture'
@@ -47,6 +44,8 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
         console.error('[lingo] Failed to load API key bootstrap:', error)
       }
     })()
+  }).catch((error) => {
+    console.error('[lingo] Startup failed:', error)
   })
 
   app.on('activate', () => {
