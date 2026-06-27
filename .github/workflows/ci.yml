@@ -72,6 +72,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [typecheck, unit]
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v4
 
