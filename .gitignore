@@ -139,3 +139,34 @@ out
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# --- Lingo: generated / local artifacts (do not commit) ---
+
+# Playwright e2e output
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Vitest (if UI mode / coverage enabled locally)
+html-coverage/
+
+# Tesseract language packs (tesseract.js downloads at runtime)
+*.traineddata
+
+# Whisper / STT models (stored in userData, not in repo)
+*.ggml*.bin
+whisper-models/
+
+# Local secrets fallback (desktop uses keytar)
+secrets.json
+
+# IDE — keep .cursor/rules/ in repo; local editor state stays out
+.cursor/settings.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Accidental shadcn path (@ alias copied as folder name)
+@/
