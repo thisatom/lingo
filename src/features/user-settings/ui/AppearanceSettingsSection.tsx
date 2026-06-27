@@ -92,7 +92,7 @@ function AppearanceSwitchRow({
         <p className={settingsRowTitleClass}>{title}</p>
         <p className={settingsRowDescriptionClass}>{description}</p>
       </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={ariaLabel} />
+      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={ariaLabel} className="shrink-0" />
     </div>
   )
 }

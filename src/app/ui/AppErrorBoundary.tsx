@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { isBenignResizeObserverError } from '@/shared/lib/benign-resize-observer-error'
 
 type Props = {
   children: ReactNode
@@ -12,10 +13,16 @@ export class AppErrorBoundary extends Component<Props, State> {
   state: State = { error: null }
 
   static getDerivedStateFromError(error: Error): State {
+    if (isBenignResizeObserverError(error.message)) {
+      return { error: null }
+    }
     return { error }
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
+    if (isBenignResizeObserverError(error.message)) {
+      return
+    }
     console.error('[lingo] UI crashed:', error, info.componentStack)
   }
 

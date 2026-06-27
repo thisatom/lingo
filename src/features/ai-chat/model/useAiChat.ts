@@ -31,6 +31,7 @@ import {
   beginVoiceUserMessageAction,
   cancelVoiceUserMessageAction,
   commitVoiceUserMessageAction,
+  continueAssistantMessageAction,
   regenerateAssistantMessageAction,
   retryLastRequestAction,
   sendQueuedMessageNowAction,
@@ -109,6 +110,30 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     [buildSession, practiceLanguage, chatComposerMode, setBlurAnimateMessageId, setError]
   )
 
+  const runAssistantContinuation = useCallback(
+    async (
+      targetChatId: string,
+      assistantMessageId: string,
+      prefix: string
+    ): Promise<boolean> => {
+      return chatAgentController.runTurn({
+        targetChatId,
+        session: buildSession(),
+        practiceLanguage,
+        chatComposerMode,
+        onLiveConversationTurnComplete: optionsRef.current.onLiveConversationTurnComplete,
+        setBlurAnimateMessageId,
+        setError,
+        processNextInQueue: (chatId) =>
+          chatAgentController.processNextInQueue(chatId, runAssistantReplyRef.current),
+        tryRunPendingAgentReply: (chatId) =>
+          chatAgentController.tryRunPendingAgentReply(chatId, runAssistantReplyRef.current),
+        continuation: { assistantMessageId, prefix }
+      })
+    },
+    [buildSession, practiceLanguage, chatComposerMode, setBlurAnimateMessageId, setError]
+  )
+
   useEffect(() => {
     runAssistantReplyRef.current = runAssistantReply
   })
@@ -129,6 +154,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       updateMessageContent,
       stopAgent,
       runAssistantReply,
+      runAssistantContinuation,
       enqueueUserMessage: (content, chatId, attachments) => {
         useMessageQueueStore.getState().enqueue(chatId, content, attachments)
       },
@@ -143,6 +169,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
       updateMessageContent,
       stopAgent,
       runAssistantReply,
+      runAssistantContinuation,
       setBlurAnimateMessageId,
       setError
     ]
@@ -232,6 +259,11 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     [userActionsDeps]
   )
 
+  const continueAssistantMessage = useCallback(
+    (messageId: string) => continueAssistantMessageAction(userActionsDeps, messageId),
+    [userActionsDeps]
+  )
+
   const retryLastRequest = useCallback(
     () => retryLastRequestAction(userActionsDeps),
     [userActionsDeps]
@@ -264,6 +296,7 @@ export function useAiChat(options: UseAiChatOptions = {}) {
     cancelVoiceUserMessage,
     submitEditedUserMessage,
     regenerateAssistantMessage,
+    continueAssistantMessage,
     stopAgent,
     forceStopAgent,
     retryLastRequest,

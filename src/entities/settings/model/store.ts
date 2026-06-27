@@ -545,13 +545,14 @@ export const useSettingsStore = create<SettingsState>()(
           if (existingJson.trim()) {
             const parsed = parseCustomLlmProfileSource(existingJson)
             if (parsed.ok) {
-              if (parsed.importedApiKey) {
+              const importedApiKey = parsed.importedApiKey
+              if (importedApiKey) {
                 queueMicrotask(() => {
                   void (async () => {
                     try {
                       const { getLingo, isElectronApp } = await import('@/shared/lib/lingo')
                       if (isElectronApp()) {
-                        await getLingo().secrets.clear('custom-llm')
+                        await getLingo().secrets.set('custom-llm', importedApiKey)
                       }
                     } catch {
                       // ignore — key may already live only in secure storage

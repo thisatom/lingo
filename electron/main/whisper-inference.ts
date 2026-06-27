@@ -1,6 +1,6 @@
 import { availableParallelism } from 'node:os'
 import { resolveWhisperAudioCtx } from '../../src/features/speech-to-text/lib/whisper-audio-ctx'
-import type { TranscribeFn } from './whisper-native'
+import type { TranscribeFn, WhisperTranscribeOptions } from './whisper-native'
 
 const WARM_SILENCE_SAMPLES = 3200
 
@@ -14,7 +14,7 @@ function buildTranscribeParams(
   modelPath: string,
   language: string | undefined,
   useGpu: boolean
-): Record<string, unknown> {
+): WhisperTranscribeOptions {
   return {
     pcmf32,
     model: modelPath,

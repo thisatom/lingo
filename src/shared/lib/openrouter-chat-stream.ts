@@ -18,6 +18,7 @@ import { mergeCustomCompletionBody } from '@/shared/lib/custom-llm-profile'
 import { assertOutboundHttpUrl } from '@/shared/lib/outbound-url-policy'
 import { openaiCompatibleHeaders } from '@/shared/lib/openai-compatible-headers'
 import {
+  buildAssistantContinueUserMessage,
   buildCompletionRetryUserMessage,
   mergeContinuationAnswer,
   shouldRetryIncompleteCompletion
@@ -92,6 +93,8 @@ export type OpenRouterStreamRequest = {
   modelAutoFallback?: boolean
   maxTokens?: number
   maxTokensRetry?: number
+  /** When set, stream only the continuation after this assistant prefix. */
+  assistantContinuationPrefix?: string
 }
 
 function isCustomBackend(request: OpenRouterStreamRequest): boolean {
@@ -523,6 +526,47 @@ async function streamCompletionWithIncompleteRetry(
 
   const mergedRaw = mergeContinuationAnswer(result.rawText, continuation.rawText)
   return toCompletionResult(mergedRaw, continuation.finishReason)
+}
+
+async function streamAssistantContinuationOnly(
+  request: OpenRouterStreamRequest,
+  apiKey: string,
+  body: Record<string, unknown>,
+  prefix: string,
+  lastUserMessage: string,
+  send: SendEvent,
+  signal: AbortSignal | undefined,
+  fetchImpl: OpenRouterFetch,
+  aiSdkExtras?: AiSdkStreamExtras
+): Promise<CompletionResult> {
+  const retryMessages: ChatCompletionMessage[] = [
+    ...(body.messages as ChatCompletionMessage[]),
+    { role: 'assistant', content: prefix },
+    { role: 'user', content: buildAssistantContinueUserMessage(lastUserMessage) }
+  ]
+
+  return fetchCompletionResilientStreaming(
+    request,
+    apiKey,
+    applyCompletionMaxTokens({ ...body, messages: retryMessages }, request, 'retry'),
+    (event) => {
+      if (event.type === 'text-delta') {
+        send({
+          type: 'text-delta',
+          delta: event.delta,
+          text: mergeContinuationAnswer(prefix, event.text)
+        })
+        return
+      }
+      if (event.type === 'thinking-delta') {
+        return
+      }
+      send(event)
+    },
+    signal,
+    fetchImpl,
+    aiSdkExtras ? { ...aiSdkExtras, toolChoice: 'auto' } : undefined
+  )
 }
 
 async function fetchCompletionResilientStreaming(
@@ -961,6 +1005,7 @@ async function completeRegularTextChat(
   fetchImpl: OpenRouterFetch,
   forceWebSearch: boolean
 ): Promise<void> {
+  const continuationPrefix = request.assistantContinuationPrefix?.trim()
   const researchMode = forceWebSearch
   const promptMode = resolveTextPromptMode(request, forceWebSearch, false)
 
@@ -982,6 +1027,25 @@ async function completeRegularTextChat(
   )
 
   const lastUserMessage = getLastUserMessageContent(apiMessages)
+
+  if (continuationPrefix) {
+    const result = await streamAssistantContinuationOnly(
+      request,
+      apiKey,
+      body,
+      continuationPrefix,
+      lastUserMessage,
+      send,
+      signal,
+      fetchImpl
+    )
+    send({
+      type: 'done',
+      text: mergeContinuationAnswer(continuationPrefix, result.text)
+    })
+    return
+  }
+
   const { text } = await streamCompletionWithIncompleteRetry(
     request,
     apiKey,
@@ -1005,6 +1069,21 @@ async function completeTextChat(
   signal: AbortSignal | undefined,
   fetchImpl: OpenRouterFetch
 ): Promise<void> {
+  if (request.assistantContinuationPrefix?.trim()) {
+    await completeRegularTextChat(
+      request,
+      apiKey,
+      userModelId,
+      apiMessages,
+      practiceLanguage,
+      send,
+      signal,
+      fetchImpl,
+      false
+    )
+    return
+  }
+
   const lastUserMessage = getLastUserMessageContent(apiMessages)
   const { webSearchForTurn, forceWebSearch, blockedByAttachments } =
     resolveWebSearchForStreamTurn(request, apiMessages, lastUserMessage)

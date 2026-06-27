@@ -1,6 +1,7 @@
 import { flushPersistedStore, type PersistCapableStore } from '@/app/lib/flush-persisted-store'
 import { flushSettingsPersist } from '@/app/lib/flush-settings-persist'
 import { useChatsStore } from '@/entities/chat/model/store'
+import { useMessageQueueStore } from '@/entities/message-queue/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { clearAllWebSecrets } from '@/shared/api/web-secrets'
 import { getLingo, isElectronApp, isLingoAvailable } from '@/shared/lib/lingo'
@@ -18,6 +19,7 @@ export async function deleteAllChatsAndPersist(): Promise<string> {
 export async function clearAppDataAndPersist(): Promise<void> {
   useChatsStore.getState().resetChats()
   useSettingsStore.getState().resetSettings()
+  useMessageQueueStore.getState().clearAll()
 
   await flushPersistedStore(useChatsStore as PersistCapableStore)
   await flushSettingsPersist()

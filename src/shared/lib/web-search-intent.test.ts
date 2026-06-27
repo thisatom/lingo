@@ -6,7 +6,7 @@ import {
   optimizeWebSearchQuery,
   shouldForceWebSearch,
   shouldRetryWebSearchAnswer,
-  shouldUseWebSearchForMessage
+  shouldRunWebSearchForTurn
 } from './web-search-intent'
 
 describe('optimizeWebSearchQuery', () => {
@@ -34,36 +34,26 @@ describe('shouldForceWebSearch', () => {
     expect(shouldForceWebSearch('google search for X')).toBe(true)
     expect(shouldForceWebSearch('загугли в интернете')).toBe(true)
     expect(shouldForceWebSearch('google')).toBe(false)
-    expect(shouldForceWebSearch('как у тебя дела')).toBe(false)
-    expect(shouldForceWebSearch('который час')).toBe(false)
     expect(shouldForceWebSearch('What is quantum computing?')).toBe(false)
+    expect(shouldForceWebSearch('What is the weather in Paris today?')).toBe(false)
   })
 })
 
-describe('shouldUseWebSearchForMessage', () => {
-  it('allows factual questions when toggle permits search', () => {
-    expect(shouldUseWebSearchForMessage('What is quantum computing in simple terms?')).toBe(true)
-    expect(shouldUseWebSearchForMessage('What is the weather in Paris today?')).toBe(true)
+describe('shouldRunWebSearchForTurn', () => {
+  it('runs when web search toggle is on and message is non-empty', () => {
+    expect(shouldRunWebSearchForTurn('What is the weather in Paris today?', true)).toBe(true)
+    expect(shouldRunWebSearchForTurn('hi there', true)).toBe(true)
+    expect(shouldRunWebSearchForTurn('как у тебя дела', true)).toBe(true)
   })
 
-  it('skips small talk and local time/date', () => {
-    expect(shouldUseWebSearchForMessage('как у тебя дела')).toBe(false)
-    expect(shouldUseWebSearchForMessage('который час')).toBe(false)
-    expect(shouldUseWebSearchForMessage('hi there')).toBe(false)
+  it('does not run when toggle is off unless explicit search command', () => {
+    expect(shouldRunWebSearchForTurn('What is quantum computing?', false)).toBe(false)
+    expect(shouldRunWebSearchForTurn('hi there', false)).toBe(false)
+    expect(shouldRunWebSearchForTurn('search the web for X', false)).toBe(true)
   })
 
-  it('honors explicit search requests', () => {
-    expect(shouldUseWebSearchForMessage('search the web for X')).toBe(true)
-  })
-
-  it('allows short factual wh-questions with enough context', () => {
-    expect(shouldUseWebSearchForMessage('Who won the game?')).toBe(true)
-    expect(shouldUseWebSearchForMessage('Why now?')).toBe(false)
-    expect(shouldUseWebSearchForMessage('ok?')).toBe(false)
-  })
-
-  it('skips creative writing prompts', () => {
-    expect(shouldUseWebSearchForMessage('Write me a poem about the sea')).toBe(false)
+  it('skips empty messages', () => {
+    expect(shouldRunWebSearchForTurn('   ', true)).toBe(false)
   })
 })
 

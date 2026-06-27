@@ -33,6 +33,15 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      - name: Install Playwright browser
+        run: npm run test:e2e:install -- --with-deps
+
+      - name: E2E tests (web preview)
+        run: npm run test:e2e
+
+      - name: TypeScript
+        run: npm run typecheck
+
       - name: Production build (Electron)
         run: npm run build
 

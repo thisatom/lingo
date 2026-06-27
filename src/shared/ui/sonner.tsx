@@ -29,13 +29,13 @@ function useDocumentTheme(): 'light' | 'dark' {
 
 const toastClassNames = {
   toast:
-    'lingo-sonner-toast group toast !rounded-lg !border !border-menu-border !bg-popover !text-popover-foreground !shadow-[0_12px_28px_-8px_rgba(0,0,0,0.35)] dark:!shadow-[0_16px_36px_-10px_rgba(0,0,0,0.55)]',
+    'lingo-sonner-toast group toast !rounded-lg !bg-popover !text-popover-foreground !shadow-md !ring-1 !ring-foreground/10',
   title: 'group-[.toast]:text-sm group-[.toast]:font-medium group-[.toast]:leading-snug',
   description: 'group-[.toast]:text-xs group-[.toast]:text-muted-foreground',
   actionButton:
-    'group-[.toast]:h-7 group-[.toast]:rounded-md group-[.toast]:border group-[.toast]:border-border group-[.toast]:bg-primary group-[.toast]:px-2.5 group-[.toast]:text-xs group-[.toast]:font-medium group-[.toast]:text-primary-foreground',
+    'group-[.toast]:mt-2 group-[.toast]:h-8 group-[.toast]:rounded-md group-[.toast]:border group-[.toast]:border-border/60 group-[.toast]:bg-secondary group-[.toast]:px-3 group-[.toast]:text-xs group-[.toast]:font-medium group-[.toast]:text-secondary-foreground hover:group-[.toast]:bg-secondary/80',
   cancelButton:
-    'group-[.toast]:h-7 group-[.toast]:rounded-md group-[.toast]:border group-[.toast]:border-border group-[.toast]:bg-muted group-[.toast]:px-2.5 group-[.toast]:text-xs group-[.toast]:font-medium group-[.toast]:text-foreground',
+    'group-[.toast]:mt-2 group-[.toast]:h-8 group-[.toast]:rounded-md group-[.toast]:border-0 group-[.toast]:bg-transparent group-[.toast]:px-3 group-[.toast]:text-xs group-[.toast]:font-medium group-[.toast]:text-muted-foreground hover:group-[.toast]:bg-transparent hover:group-[.toast]:text-foreground',
   closeButton:
     'group-[.toast]:left-auto group-[.toast]:right-2 group-[.toast]:top-2 group-[.toast]:border group-[.toast]:border-border/60 group-[.toast]:bg-muted/40 group-[.toast]:text-muted-foreground hover:group-[.toast]:bg-muted hover:group-[.toast]:text-foreground'
 } as const

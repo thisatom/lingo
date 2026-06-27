@@ -6,6 +6,7 @@ import {
   filesFromDroppedReadResults,
   resolveDroppedFilesForProcessing
 } from '@/features/chat-attachments/lib/resolve-dropped-files'
+import { createDeferredResizeObserver } from '@/shared/lib/observe-element-resize'
 import { isElectronApp } from '@/shared/lib/lingo'
 import type { ComposerDropRect } from '@/shared/types/ipc'
 
@@ -74,9 +75,11 @@ export function useNativeComposerDrop({
 
     syncRect()
     const el = zoneRef.current
-    const observer =
-      el && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncRect) : null
-    if (el && observer) observer.observe(el)
+    const resizeBinding =
+      el && typeof ResizeObserver !== 'undefined'
+        ? createDeferredResizeObserver(syncRect)
+        : null
+    if (el && resizeBinding) resizeBinding.observer.observe(el)
     window.addEventListener('resize', syncRect)
 
     const unsubscribeDrop = window.lingo.files.onDesktopFileDrop((payload) => {
@@ -95,7 +98,7 @@ export function useNativeComposerDrop({
     return () => {
       unsubscribeDrop()
       unsubscribeDragOver?.()
-      observer?.disconnect()
+      resizeBinding?.disconnect()
       window.removeEventListener('resize', syncRect)
       window.lingo.files?.setComposerDropRect(null)
     }

@@ -236,7 +236,7 @@ describe.sequential('runAgentTurn (integration)', () => {
     ).toBe(true)
   })
 
-  it('removes partial tail after stop without re-applying RAF sync text', async () => {
+  it('keeps partial tail after stop without re-applying RAF sync text', async () => {
     const { cancelAgentRun } = await import('@/features/ai-chat/model/agent-run')
     let releaseStream: (() => void) | null = null
 
@@ -284,9 +284,12 @@ describe.sequential('runAgentTurn (integration)', () => {
     releaseStream?.()
     const ok = await turnPromise
 
-    expect(ok).toBe(false)
+    expect(ok).toBe(true)
     const messages = useChatsStore.getState().chats.find((c) => c.id === chatId)?.messages ?? []
-    expect(messages.some((m) => m.role === 'assistant')).toBe(false)
+    expect(messages.some((m) => m.role === 'assistant' && m.content.includes('Partial'))).toBe(
+      true
+    )
+    expect(messages.find((m) => m.role === 'assistant')?.replyStatus).toBe('interrupted')
     expect(messages.some((m) => m.role === 'thinking')).toBe(false)
   })
 
@@ -340,5 +343,83 @@ describe.sequential('runAgentTurn (integration)', () => {
 
     resolveDone?.()
     await turnPromise
+  })
+
+  it('continues an interrupted assistant reply in place', async () => {
+    useChatsStore.setState({
+      chats: [
+        {
+          id: chatId,
+          title: 'Test',
+          messages: [
+            {
+              id: 'u1',
+              role: 'user',
+              content: 'Tell me a story',
+              createdAt: Date.now()
+            },
+            {
+              id: 'a1',
+              role: 'assistant',
+              content: 'Once upon a time',
+              createdAt: Date.now() + 1,
+              replyStatus: 'interrupted'
+            }
+          ],
+          createdAt: 0,
+          updatedAt: 0
+        }
+      ],
+      activeChatId: chatId
+    })
+
+    streamMock.mockImplementationOnce(
+      (
+        request: { assistantContinuationPrefix?: string },
+        handlers: {
+          onTextDelta?: (e: { text: string }) => void
+          onDone?: (e: { text: string }) => void
+        }
+      ) => {
+        expect(request.assistantContinuationPrefix).toBe('Once upon a time')
+        handlers.onTextDelta?.({ text: 'Once upon a time there was a kingdom.' })
+        handlers.onDone?.({ text: ' there was a kingdom.' })
+        return {
+          abort: vi.fn(),
+          done: Promise.resolve()
+        }
+      }
+    )
+
+    const { runAgentTurn } = await import('@/features/ai-chat/model/run-agent-turn')
+    const ok = await runAgentTurn({
+      targetChatId: chatId,
+      session: createTestSession(),
+      practiceLanguage: 'en',
+      chatComposerMode: 'text',
+      setBlurAnimateMessageId: () => undefined,
+      setError: (error) => useConversationStore.getState().setError(error),
+      processNextInQueue: async () => undefined,
+      tryRunPendingAgentReply: async () => false,
+      continuation: {
+        assistantMessageId: 'a1',
+        prefix: 'Once upon a time'
+      },
+      agentRun: {
+        beginAgentRun: () => {
+          agentRunState.generation += 1
+          return agentRunState.generation
+        },
+        isAgentRunActive: (runId) => runId === agentRunState.generation
+      }
+    })
+
+    const messages = useChatsStore.getState().chats.find((c) => c.id === chatId)?.messages ?? []
+    const assistant = messages.find((m) => m.id === 'a1')
+
+    expect(ok).toBe(true)
+    expect(assistant?.content).toBe('Once upon a time there was a kingdom.')
+    expect(assistant?.replyStatus).toBeUndefined()
+    expect(getChatPipeline(chatId).stage).toBe('idle')
   })
 })

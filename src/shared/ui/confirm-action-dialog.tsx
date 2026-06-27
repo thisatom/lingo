@@ -9,7 +9,6 @@ import {
   confirmActionDialogFooterLabelClass,
   confirmActionDialogHeaderClass,
   confirmActionDialogPrimaryClass,
-  confirmActionDialogPrimaryStyle,
   confirmActionDialogSeparatorClass,
   confirmActionDialogTitleClass
 } from '@/shared/lib/confirm-action-dialog-styles'
@@ -104,7 +103,6 @@ export function ConfirmActionDialog({
             <AlertDialogAction
               size="xs"
               className={confirmActionDialogPrimaryClass(primaryVariant)}
-              style={confirmActionDialogPrimaryStyle(primaryVariant)}
               onClick={onPrimary}
             >
               {primaryLabel}

@@ -17,20 +17,26 @@ interface AgentMessageProps {
   content: string
   searchSources?: MessageSearchSource[]
   showSearchSpinner?: boolean
+  visitingSearchUrl?: string | null
   parseThrottleMs?: number
   showFooterActions?: boolean
   onRegenerate?: () => void
   regenerateDisabled?: boolean
+  onContinue?: () => void
+  continueDisabled?: boolean
 }
 
 export const AgentMessage = memo(function AgentMessage({
   content,
   searchSources,
   showSearchSpinner = false,
+  visitingSearchUrl = null,
   parseThrottleMs,
   showFooterActions = false,
   onRegenerate,
-  regenerateDisabled = false
+  regenerateDisabled = false,
+  onContinue,
+  continueDisabled = false
 }: AgentMessageProps) {
   const {
     displayContent,
@@ -44,8 +50,9 @@ export const AgentMessage = memo(function AgentMessage({
     updateToLang
   } = useReplyTranslation(content)
 
-  const hasSearchUi = Boolean(searchSources?.length || showSearchSpinner)
+  const hasSearchUi = Boolean(searchSources?.length || showSearchSpinner || visitingSearchUrl)
   const hasAnswer = content.trim().length > 0
+  const showActionBar = showFooterActions || Boolean(onContinue)
 
   return (
     <ChatTextContextMenu className={cn(agentMessageWrapClass, chatSelectableClass)}>
@@ -58,7 +65,11 @@ export const AgentMessage = memo(function AgentMessage({
             hasAnswer && 'pb-2'
           )}
         >
-          <WebSearchSources sources={searchSources ?? []} loading={showSearchSpinner} />
+          <WebSearchSources
+            sources={searchSources ?? []}
+            loading={showSearchSpinner}
+            visitingUrl={visitingSearchUrl}
+          />
         </div>
       ) : null}
       {hasAnswer ? (
@@ -92,18 +103,20 @@ export const AgentMessage = memo(function AgentMessage({
           {translateError}
         </p>
       ) : null}
-      {showFooterActions && hasAnswer ? (
+      {showActionBar ? (
         <AgentMessageActions
           content={displayContent}
           isShowingTranslation={isShowingTranslation}
           translateLoading={translateLoading}
           fromLang={fromLang}
           toLang={toLang}
-          onToggleTranslation={toggleTranslation}
-          onFromLangChange={updateFromLang}
-          onToLangChange={updateToLang}
-          onRegenerate={onRegenerate}
+          onToggleTranslation={showFooterActions ? toggleTranslation : undefined}
+          onFromLangChange={showFooterActions ? updateFromLang : undefined}
+          onToLangChange={showFooterActions ? updateToLang : undefined}
+          onRegenerate={showFooterActions ? onRegenerate : undefined}
           regenerateDisabled={regenerateDisabled}
+          onContinue={onContinue}
+          continueDisabled={continueDisabled}
         />
       ) : null}
     </ChatTextContextMenu>

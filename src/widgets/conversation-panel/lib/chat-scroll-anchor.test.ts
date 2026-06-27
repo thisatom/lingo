@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   captureVirtualizationScrollAnchor,
+  estimateTurnIdFromScrollTop,
   findTurnIndexByUserMessageId
 } from './chat-scroll-anchor'
 
@@ -48,5 +49,11 @@ describe('chat-scroll-anchor virtualization helpers', () => {
       scrollTop: 240,
       turnId: 'u-near'
     })
+  })
+
+  it('estimates turn id from saved scroll position', () => {
+    const turns = [{ user: { id: 'u1' } }, { user: { id: 'u2' } }, { user: { id: 'u3' } }]
+    expect(estimateTurnIdFromScrollTop(turns, 0, 1000)).toBe('u1')
+    expect(estimateTurnIdFromScrollTop(turns, 1000, 1000)).toBe('u3')
   })
 })

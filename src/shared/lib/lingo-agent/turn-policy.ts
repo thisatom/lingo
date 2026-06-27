@@ -10,7 +10,7 @@ import {
 import {
   optimizeWebSearchQuery,
   shouldForceWebSearch,
-  shouldUseWebSearchForMessage
+  shouldRunWebSearchForTurn
 } from '@/shared/lib/web-search-intent'
 
 export type AgentPromptMode = 'research' | 'practice' | 'general' | 'vision'
@@ -123,10 +123,7 @@ export function resolveRendererWebSearchForTurn(
 }
 
 export function messageNeedsWebSearch(text: string, webSearchEnabled: boolean): boolean {
-  if (!text.trim()) return false
-  if (shouldForceWebSearch(text)) return true
-  if (!webSearchEnabled) return false
-  return shouldUseWebSearchForMessage(text)
+  return shouldRunWebSearchForTurn(text, webSearchEnabled)
 }
 
 export function lastUserTextFromRendererMessages(messages: readonly Message[]): string {

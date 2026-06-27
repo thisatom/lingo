@@ -28,7 +28,7 @@ export function ContextUsageRing({ percent, className, size = 16 }: ContextUsage
         cy={viewSize / 2}
         r={RING_RADIUS}
         fill="none"
-        stroke="#3a3a3a"
+        className="stroke-border"
         strokeWidth={2}
       />
       <circle

@@ -6,17 +6,18 @@ import {
   menuCheckboxItemClass,
   menuCheckboxRadioGroupClass,
   menuContentSpacingClass,
-  menuIndicatorInsetClass,
   menuItemHighlightClass,
   menuItemPaddingClass,
   menuLabelClass,
+  menuLeadingIndicatorClass,
   menuSeparatorClass,
   menuSubTriggerPaddingClass,
-  menuSurfaceBorderClass,
-  menuTrailingInsetClass
+  menuTrailingIndicatorClass,
+  sidebarMenuRadiusClass
 } from '@/shared/lib/sidebar-filter-menu-styles'
-import { cn } from "@/shared/lib/utils"
-import { CustomScrollArea } from "@/shared/ui/custom-scroll-area"
+import { elevatedSurfaceClass } from '@/shared/lib/design-surface'
+import { cn } from '@/shared/lib/utils'
+import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
 
 function DropdownMenu({
   ...props
@@ -58,9 +59,9 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-[60] max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-md border bg-popover p-0 text-popover-foreground shadow-md",
-          menuSurfaceBorderClass,
-          " data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          'z-[60] max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden p-0',
+          elevatedSurfaceClass,
+          'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
           className
         )}
         {...props}
@@ -102,7 +103,8 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        'relative flex cursor-pointer items-center gap-2 rounded-sm text-sm outline-hidden select-none',
+        'relative flex cursor-pointer items-center gap-2 text-sm outline-hidden select-none',
+        sidebarMenuRadiusClass,
         menuItemPaddingClass,
         menuItemHighlightClass,
         'data-[inset]:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-[disabled]:data-[variant=destructive]:focus:bg-transparent data-[disabled]:data-[variant=destructive]:data-[highlighted]:bg-transparent [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4 [&_svg:not([class*=\'text-\'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive!',
@@ -126,14 +128,9 @@ function DropdownMenuCheckboxItem({
       checked={checked}
       {...props}
     >
-      <span
-        className={cn(
-          'pointer-events-none absolute top-1/2 flex size-3.5 -translate-y-1/2 items-center justify-center',
-          menuIndicatorInsetClass
-        )}
-      >
+      <span className={menuLeadingIndicatorClass}>
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
+          <CheckIcon className="size-3.5" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -165,12 +162,7 @@ function DropdownMenuRadioItem({
       className={cn(menuCheckboxItemClass, className)}
       {...props}
     >
-      <span
-        className={cn(
-          'pointer-events-none absolute top-1/2 flex size-3.5 -translate-y-1/2 items-center justify-center',
-          menuIndicatorInsetClass
-        )}
-      >
+      <span className={menuLeadingIndicatorClass}>
         <DropdownMenuPrimitive.ItemIndicator>
           <CircleIcon className="size-2 fill-current" />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -245,24 +237,30 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        'relative flex w-full cursor-pointer items-center gap-2 rounded-sm text-sm outline-hidden select-none',
+        'relative flex w-full cursor-pointer items-center gap-2 text-sm outline-hidden select-none',
+        sidebarMenuRadiusClass,
         menuSubTriggerPaddingClass,
         menuItemHighlightClass,
-        'data-[inset]:pl-8 data-[state=open]:bg-menu-hover data-[state=open]:text-popover-foreground dark:data-[state=open]:bg-[#252525] data-[disabled]:data-[state=open]:bg-transparent [&>svg:first-child]:pointer-events-none [&>svg:first-child]:shrink-0 [&>svg:first-child:not([class*=\'size-\'])]:size-4 [&>svg:first-child:not([class*=\'text-\'])]:text-muted-foreground',
+        'data-[inset]:pl-8 data-[state=open]:bg-menu-hover data-[state=open]:text-popover-foreground data-[disabled]:data-[state=open]:bg-transparent [&>svg:first-child]:pointer-events-none [&>svg:first-child]:shrink-0 [&>svg:first-child:not([class*=\'size-\'])]:size-4 [&>svg:first-child:not([class*=\'text-\'])]:text-muted-foreground',
         className
       )}
       {...props}
     >
       {children}
-      <ChevronRightIcon
-        className={cn(
-          'absolute top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground',
-          menuTrailingInsetClass
-        )}
-      />
+      <span className={menuTrailingIndicatorClass}>
+        <ChevronRightIcon className="size-3.5 text-muted-foreground" />
+      </span>
     </DropdownMenuPrimitive.SubTrigger>
   )
 }
+
+type DropdownMenuSubContentProps = React.ComponentProps<
+  typeof DropdownMenuPrimitive.SubContent
+> &
+  Pick<
+    React.ComponentProps<typeof DropdownMenuPrimitive.Content>,
+    'side' | 'align' | 'sideOffset' | 'collisionPadding'
+  >
 
 function DropdownMenuSubContent({
   className,
@@ -272,17 +270,20 @@ function DropdownMenuSubContent({
   sideOffset = 4,
   collisionPadding = 12,
   ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
+}: DropdownMenuSubContentProps) {
   return (
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
-      side={side}
-      align={align}
-      sideOffset={sideOffset}
-      collisionPadding={collisionPadding}
+      {...({
+        side,
+        align,
+        sideOffset,
+        collisionPadding
+      } as React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>)}
       className={cn(
-        "z-[60] min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-md border bg-popover p-0 text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-        menuSurfaceBorderClass,
+        'z-[60] min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden p-0',
+        elevatedSurfaceClass,
+        'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
         className
       )}
       {...props}

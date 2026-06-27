@@ -6,23 +6,17 @@ import {
   SETTINGS_SECTIONS,
   type SettingsSectionId
 } from '@/entities/settings/config/sections'
-import { APP_RADIUS_8_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
-import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from '@/shared/ui/item'
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/shared/ui/sidebar'
 import {
+  sidebarChatActiveTextClass,
   sidebarChatHoverTextClass,
+  sidebarChatRowRadiusClass,
   sidebarChatTextClass,
-  sidebarRowHeightClass
-} from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
-
-const navItemClass = cn(
-  'w-full cursor-pointer border-0 shadow-none',
-  APP_RADIUS_8_CLASS,
-  sidebarChatTextClass,
-  sidebarChatHoverTextClass,
+  sidebarNavIconColumnClass,
   sidebarRowHeightClass,
-  'focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-sidebar-ring'
-)
+  sidebarNavLabelClass
+} from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 
 const navIconClass = 'size-4 shrink-0 opacity-70'
 
@@ -37,28 +31,34 @@ const iconBySection: Record<SettingsSectionId, ReactNode> = {
 
 const sectionById = new Map(SETTINGS_SECTIONS.map((section) => [section.id, section]))
 
+const sidebarNavButtonClass = cn(
+  sidebarRowHeightClass,
+  'flex w-full items-center gap-1.5 !px-0 !py-0',
+  sidebarChatTextClass,
+  'rounded-lg bg-transparent hover:bg-transparent active:bg-transparent',
+  sidebarChatActiveTextClass
+)
+
 export function SettingsSidebarNav() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
 
   return (
-    <ItemGroup className="gap-0.5 pt-2">
-      <Item
-        asChild
-        size="nav"
-        className={cn(navItemClass, 'mb-2 text-muted-foreground hover:text-sidebar-accent-foreground')}
+    <SidebarMenu className="gap-0.5">
+      <SidebarMenuItem
+        className={cn(
+          sidebarChatRowRadiusClass,
+          sidebarChatHoverTextClass,
+          'mb-2 text-muted-foreground hover:text-sidebar-accent-foreground'
+        )}
       >
-        <button type="button" onClick={() => navigate('/')}>
-          <ItemMedia className="size-4 shrink-0 bg-transparent [&_svg]:size-3.5">
-            <ArrowLeft />
-          </ItemMedia>
-          <ItemContent className="min-w-0 flex-1 flex-row items-center">
-            <ItemTitle className="truncate text-[13px] font-normal leading-normal text-inherit">
-              Back
-            </ItemTitle>
-          </ItemContent>
-        </button>
-      </Item>
+        <SidebarMenuButton className={sidebarNavButtonClass} onClick={() => navigate('/')}>
+          <span className={sidebarNavIconColumnClass}>
+            <ArrowLeft className={navIconClass} />
+          </span>
+          <span className={sidebarNavLabelClass}>Back</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
 
       {SETTINGS_NAV_GROUPS.map((group, groupIndex) => (
         <div
@@ -70,30 +70,26 @@ export function SettingsSidebarNav() {
             if (!section) return null
             const isActive = pathname === section.path
             return (
-              <Item
+              <SidebarMenuItem
                 key={section.id}
-                asChild
-                size="nav"
+                data-active={isActive ? true : undefined}
                 className={cn(
-                  navItemClass,
-                  isActive && 'bg-sidebar-accent font-normal text-sidebar-accent-foreground'
+                  sidebarChatRowRadiusClass,
+                  !isActive && sidebarChatHoverTextClass,
+                  isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
                 )}
               >
-                <NavLink to={section.path}>
-                  <ItemMedia className="size-4 shrink-0 bg-transparent [&_svg]:size-3.5">
-                    {iconBySection[section.id]}
-                  </ItemMedia>
-                  <ItemContent className="min-w-0 flex-1">
-                    <ItemTitle className="w-full truncate text-[13px] font-normal leading-normal text-inherit">
-                      {section.label}
-                    </ItemTitle>
-                  </ItemContent>
-                </NavLink>
-              </Item>
+                <SidebarMenuButton asChild isActive={isActive} className={sidebarNavButtonClass}>
+                  <NavLink to={section.path}>
+                    <span className={sidebarNavIconColumnClass}>{iconBySection[section.id]}</span>
+                    <span className={sidebarNavLabelClass}>{section.label}</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             )
           })}
         </div>
       ))}
-    </ItemGroup>
+    </SidebarMenu>
   )
 }

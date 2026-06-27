@@ -1,3 +1,4 @@
+import { listRowHoverClass } from '@/shared/lib/design-surface'
 import { cn } from '@/shared/lib/utils'
 
 type LoadEarlierTurnsButtonProps = {
@@ -18,7 +19,10 @@ export function LoadEarlierTurnsButton({
       <button
         type="button"
         onClick={onLoad}
-        className="cursor-pointer rounded-md px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        className={cn(
+          'cursor-pointer px-3 py-1.5 text-xs text-muted-foreground',
+          listRowHoverClass
+        )}
       >
         Load earlier messages ({remaining})
       </button>

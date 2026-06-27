@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createRafCoalescer } from '@/shared/lib/raf-coalesce'
+import { createDeferredResizeObserver } from '@/shared/lib/observe-element-resize'
 import { AgentChatScrollArea } from './AgentChatScrollArea'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { Message } from '@/entities/message/model/types'
@@ -16,11 +17,20 @@ import {
 } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { CONVERSATION_DENSITY_GAP_CLASS } from '@/shared/lib/appearance'
-import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
+import { CHAT_COLUMN_MAX_WIDTH_CLASS, PAGE_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
+import {
+  CHAT_SCROLL_AGENT_BUSY_THRESHOLD_PX,
+  CHAT_SCROLL_BOTTOM_THRESHOLD_PX
+} from '@/shared/lib/chat-scroll-threshold'
+import { wheelScrollsChatNestedTarget } from '@/shared/lib/chat-nested-scroll'
 import { CHAT_BOTTOM_INSET } from '@/widgets/conversation-panel/lib/chat-layout'
 import { shouldDismissUserMessageEdit } from '@/widgets/conversation-panel/lib/user-message-edit-dismiss'
 import {
   applyScrollTop,
+  captureVirtualizationScrollAnchor,
+  estimateTurnIdFromScrollTop,
+  getMaxScrollTop,
+  restoreScrollToTurnWhenReady,
   scrollViewportToBottom,
 } from '@/widgets/conversation-panel/lib/chat-scroll-anchor'
 import {
@@ -60,6 +70,11 @@ import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-spe
 import { ConversationTurn } from './ConversationTurn'
 import { LoadEarlierTurnsButton } from './LoadEarlierTurnsButton'
 import { QueueAheadHint } from './QueueAheadHint'
+import {
+  VirtualizedConversationTurns,
+  type VirtualizedConversationScrollApi
+} from './VirtualizedConversationTurns'
+import { resolveVirtualizedTurnsActive } from '@/widgets/conversation-panel/lib/virtualization-threshold'
 import type { SubmitEditedUserMessageResult } from '@/features/ai-chat/model/submit-edited-user-message'
 
 const ACTIVE_STAGES: PipelineStage[] = [
@@ -67,10 +82,12 @@ const ACTIVE_STAGES: PipelineStage[] = [
   'transcribing',
   'thinking',
   'searching',
-  'speaking'
+  'speaking',
+  'reconnecting'
 ]
 
 const SCROLL_PERSIST_DEBOUNCE_MS = 120
+const USER_SCROLL_FOLLOW_IDLE_MS = 1800
 
 interface ConversationPanelProps {
   messages: readonly Message[]
@@ -100,6 +117,7 @@ interface ConversationPanelProps {
   /** User message id while Agent Speech capture is in progress (may be empty). */
   liveVoiceUserMessageId?: string | null
   onRegenerateAssistantMessage?: (messageId: string) => void
+  onContinueAssistantMessage?: (messageId: string) => void
 }
 
 export function ConversationPanel({
@@ -121,7 +139,8 @@ export function ConversationPanel({
   onScrollToLatestReady,
   onAttachmentError,
   liveVoiceUserMessageId = null,
-  onRegenerateAssistantMessage
+  onRegenerateAssistantMessage,
+  onContinueAssistantMessage
 }: ConversationPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -154,11 +173,9 @@ export function ConversationPanel({
   })
 
   const [editingUserMessageId, setEditingUserMessageId] = useState<string | null>(null)
-  const [pendingCheckpointSubmit, setPendingCheckpointSubmit] = useState<{
-    messageId: string
-    text: string
-    attachments?: MessageAttachment[]
-  } | null>(null)
+  const [pendingCheckpointMessageId, setPendingCheckpointMessageId] = useState<string | null>(
+    null
+  )
   const [checkpointConfirmOpen, setCheckpointConfirmOpen] = useState(false)
   const [checkpointDontShowAgain, setCheckpointDontShowAgain] = useState(false)
   const atBottomRef = useRef(true)
@@ -166,6 +183,10 @@ export function ConversationPanel({
   const pinToBottomRef = useRef(false)
   /** Follow agent stream until the user scrolls up during the reply. */
   const agentAutoFollowRef = useRef(false)
+  /** Paused while the user is actively scrolling the chat. */
+  const userScrollPausedRef = useRef(false)
+  const userScrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const programmaticScrollRef = useRef(false)
   const stickCoalescerRef = useRef(createRafCoalescer(() => {}))
   const assistantStreaming =
     agentBusy &&
@@ -205,18 +226,58 @@ export function ConversationPanel({
     CONVERSATION_DENSITY_GAP_CLASS[conversationDensity] ??
     CONVERSATION_DENSITY_GAP_CLASS.default
 
+  const latestReplyActionsReady = isReplyActionsReady({
+    agentBusy,
+    pipelineStreamingAnswer,
+    stage
+  })
+
   const tailScrollSignature = useMemo(
     () =>
       buildChatTailScrollSignature(messages, {
         pipelineStage: stage,
-        pipelineSearchActiveUrl
+        pipelineSearchActiveUrl,
+        replyActionsReady: latestReplyActionsReady
       }),
-    [messages, pipelineSearchActiveUrl, stage]
+    [latestReplyActionsReady, messages, pipelineSearchActiveUrl, stage]
   )
+
+  const resumeAutoFollowIfNearBottom = useCallback(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const threshold = agentBusy
+      ? CHAT_SCROLL_AGENT_BUSY_THRESHOLD_PX
+      : CHAT_SCROLL_BOTTOM_THRESHOLD_PX
+    if (!isViewportNearChatBottom(viewport, threshold)) return
+    pinToBottomRef.current = true
+    if (agentBusy) agentAutoFollowRef.current = true
+  }, [agentBusy])
+
+  const pauseAutoFollow = useCallback(() => {
+    userScrollPausedRef.current = true
+    pinToBottomRef.current = false
+    agentAutoFollowRef.current = false
+
+    if (userScrollIdleTimerRef.current != null) {
+      clearTimeout(userScrollIdleTimerRef.current)
+    }
+
+    userScrollIdleTimerRef.current = setTimeout(() => {
+      userScrollIdleTimerRef.current = null
+      userScrollPausedRef.current = false
+      resumeAutoFollowIfNearBottom()
+    }, USER_SCROLL_FOLLOW_IDLE_MS)
+  }, [resumeAutoFollowIfNearBottom])
 
   const scrollToLatest = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
+      userScrollPausedRef.current = false
+      if (userScrollIdleTimerRef.current != null) {
+        clearTimeout(userScrollIdleTimerRef.current)
+        userScrollIdleTimerRef.current = null
+      }
       pinToBottomRef.current = true
+      programmaticScrollRef.current = true
       const viewport = viewportRef.current
       if (viewport) {
         scrollViewportToBottom(viewport, behavior)
@@ -225,16 +286,23 @@ export function ConversationPanel({
       }
       atBottomRef.current = true
       onAtBottomChange?.(true)
+      requestAnimationFrame(() => {
+        programmaticScrollRef.current = false
+      })
     },
     [onAtBottomChange]
   )
 
   const stickToBottomNow = useCallback(() => {
     pinToBottomRef.current = true
+    programmaticScrollRef.current = true
     const viewport = viewportRef.current
     if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
     else scrollToLatest('instant')
     atBottomRef.current = true
+    requestAnimationFrame(() => {
+      programmaticScrollRef.current = false
+    })
   }, [onAtBottomChange, scrollToLatest])
 
   const followBottom = useCallback(() => {
@@ -325,10 +393,17 @@ export function ConversationPanel({
 
   const syncFollowFromViewport = useCallback(
     (viewport: HTMLDivElement) => {
-      if (isRestoringScrollRef.current || agentBusy) return
-      const nearBottom = isViewportNearChatBottom(viewport)
-      if (!nearBottom) {
+      if (isRestoringScrollRef.current || userScrollPausedRef.current) return
+      const threshold = agentBusy
+        ? CHAT_SCROLL_AGENT_BUSY_THRESHOLD_PX
+        : CHAT_SCROLL_BOTTOM_THRESHOLD_PX
+      const nearBottom = isViewportNearChatBottom(viewport, threshold)
+      if (nearBottom) {
+        pinToBottomRef.current = true
+        if (agentBusy) agentAutoFollowRef.current = true
+      } else {
         pinToBottomRef.current = false
+        agentAutoFollowRef.current = false
       }
     },
     [agentBusy]
@@ -395,17 +470,6 @@ export function ConversationPanel({
 
   const handleSubmitEditedUserMessage = useCallback(
     async (messageId: string, text: string, attachments?: MessageAttachment[]) => {
-      const messageIndex = messages.findIndex((m) => m.id === messageId)
-      const hasTrailingMessages =
-        messageIndex >= 0 && messages.slice(messageIndex + 1).some((m) => m.role !== 'system')
-
-      if (checkpointReturnConfirmEnabled && hasTrailingMessages) {
-        setPendingCheckpointSubmit({ messageId, text, attachments })
-        setCheckpointDontShowAgain(false)
-        setCheckpointConfirmOpen(true)
-        return
-      }
-
       followBottom()
       const result = await onSubmitEditedUserMessage(messageId, text, attachments)
       if (result?.rollbackToEdit) {
@@ -414,67 +478,74 @@ export function ConversationPanel({
         setEditingUserMessageId(null)
       }
     },
-    [
-      checkpointReturnConfirmEnabled,
-      followBottom,
-      messages,
-      onSubmitEditedUserMessage
-    ]
+    [followBottom, onSubmitEditedUserMessage]
   )
 
-  const handleEnterEdit = useCallback((messageId: string) => {
-    setEditingUserMessageId(messageId)
-  }, [])
+  const handleEnterEdit = useCallback(
+    (messageId: string) => {
+      if (!checkpointReturnConfirmEnabled) {
+        setEditingUserMessageId(messageId)
+        return
+      }
 
-  const handleConfirmCheckpointReturn = useCallback(async () => {
-    if (!pendingCheckpointSubmit) return
+      const messageIndex = messages.findIndex((m) => m.id === messageId)
+      const hasTrailingMessages =
+        messageIndex >= 0 && messages.slice(messageIndex + 1).length > 0
+
+      if (!hasTrailingMessages) {
+        setEditingUserMessageId(messageId)
+        return
+      }
+
+      setPendingCheckpointMessageId(messageId)
+      setCheckpointDontShowAgain(false)
+      setCheckpointConfirmOpen(true)
+    },
+    [checkpointReturnConfirmEnabled, messages]
+  )
+
+  const handleConfirmCheckpointReturn = useCallback(() => {
+    if (!pendingCheckpointMessageId) return
     if (checkpointDontShowAgain) {
       setCheckpointReturnConfirmEnabled(false)
     }
 
-    const { messageId, text, attachments } = pendingCheckpointSubmit
-    setPendingCheckpointSubmit(null)
+    setEditingUserMessageId(pendingCheckpointMessageId)
+    setPendingCheckpointMessageId(null)
     setCheckpointConfirmOpen(false)
     setCheckpointDontShowAgain(false)
-
-    followBottom()
-    const result = await onSubmitEditedUserMessage(messageId, text, attachments)
-    if (result?.rollbackToEdit) {
-      setEditingUserMessageId(result.rollbackToEdit)
-    } else {
-      setEditingUserMessageId(null)
-    }
   }, [
     checkpointDontShowAgain,
-    followBottom,
-    onSubmitEditedUserMessage,
-    pendingCheckpointSubmit,
+    pendingCheckpointMessageId,
     setCheckpointReturnConfirmEnabled
   ])
 
   const stickToBottomIfFollowing = useCallback(() => {
-    if (agentAutoFollowRef.current) {
-      stickToBottomNow()
-      return
-    }
+    if (userScrollPausedRef.current) return
+
     const viewport = viewportRef.current
     if (
       !shouldStickToBottom(
         {
           pinToBottom: pinToBottomRef.current,
           isRestoring: isRestoringScrollRef.current,
-          agentBusy
+          agentBusy: agentBusy && agentAutoFollowRef.current
         },
         viewport
       )
     ) {
       return
     }
+
+    programmaticScrollRef.current = true
     if (viewport) stickChatViewportToBottom(viewport, onAtBottomChange)
     else scrollToLatest('instant')
     pinToBottomRef.current = true
     atBottomRef.current = true
-  }, [agentBusy, onAtBottomChange, scrollToLatest, stickToBottomNow])
+    requestAnimationFrame(() => {
+      programmaticScrollRef.current = false
+    })
+  }, [agentBusy, onAtBottomChange, scrollToLatest])
 
   useEffect(() => {
     stickCoalescerRef.current.cancel()
@@ -507,7 +578,7 @@ export function ConversationPanel({
     prevRestoreChatIdRef.current = activeChatId
 
     setEditingUserMessageId(null)
-    setPendingCheckpointSubmit(null)
+    setPendingCheckpointMessageId(null)
     setCheckpointConfirmOpen(false)
     setCheckpointDontShowAgain(false)
     scrollSaveEnabledRef.current = false
@@ -573,6 +644,10 @@ export function ConversationPanel({
         clearTimeout(persistIdleTimerRef.current)
         persistIdleTimerRef.current = null
       }
+      if (userScrollIdleTimerRef.current != null) {
+        clearTimeout(userScrollIdleTimerRef.current)
+        userScrollIdleTimerRef.current = null
+      }
       flushScrollPosition(true)
       flushChatPersistDebounce()
     }
@@ -601,21 +676,61 @@ export function ConversationPanel({
     }
     return null
   }, [turns])
-  const latestReplyActionsReady = isReplyActionsReady({
-    agentBusy,
-    pipelineStreamingAnswer,
-    stage
-  })
   const [hiddenTurnCount, setHiddenTurnCount] = useState(0)
+  const [virtualizedActive, setVirtualizedActive] = useState(false)
+  const virtualizedScrollApiRef = useRef<VirtualizedConversationScrollApi | null>(null)
+
+  useEffect(() => {
+    setVirtualizedActive((prev) => resolveVirtualizedTurnsActive(messages.length, prev))
+  }, [messages.length])
 
   useEffect(() => {
     setHiddenTurnCount(initialHiddenTurnCount(turns.length))
     agentAutoFollowRef.current = false
+    userScrollPausedRef.current = false
+    if (userScrollIdleTimerRef.current != null) {
+      clearTimeout(userScrollIdleTimerRef.current)
+      userScrollIdleTimerRef.current = null
+    }
   }, [activeChatId])
 
   useEffect(() => {
     setHiddenTurnCount((current) => Math.min(current, initialHiddenTurnCount(turns.length)))
   }, [turns.length])
+
+  const prevVirtualizedRef = useRef(virtualizedActive)
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    const wasVirtualized = prevVirtualizedRef.current
+    if (wasVirtualized === virtualizedActive) return
+
+    const anchor = viewport ? captureVirtualizationScrollAnchor(viewport) : null
+    prevVirtualizedRef.current = virtualizedActive
+
+    if (virtualizedActive) {
+      setHiddenTurnCount(0)
+    }
+
+    if (!viewport || !anchor) return
+
+    const restoreScroll = () => {
+      const scrollToTurn = (turnId: string) => {
+        virtualizedScrollApiRef.current?.scrollToTurn(turnId, { align: 'start' })
+      }
+
+      if (virtualizedActive && anchor.turnId) {
+        restoreScrollToTurnWhenReady(scrollToTurn, anchor.turnId, () =>
+          applyScrollTop(viewport, anchor.scrollTop)
+        )
+        return
+      }
+
+      applyScrollTop(viewport, anchor.scrollTop)
+    }
+
+    requestAnimationFrame(restoreScroll)
+  }, [virtualizedActive])
 
   const visibleTurns = useMemo(
     () => (hiddenTurnCount > 0 ? turns.slice(hiddenTurnCount) : turns),
@@ -625,9 +740,13 @@ export function ConversationPanel({
 
   useLayoutEffect(() => {
     if (!editingUserMessageId) return
+    if (virtualizedActive && virtualizedScrollApiRef.current) {
+      virtualizedScrollApiRef.current.scrollToTurn(editingUserMessageId, { align: 'start' })
+      return
+    }
     const turnEl = document.querySelector(`[data-turn-id="${editingUserMessageId}"]`)
     turnEl?.scrollIntoView({ block: 'nearest' })
-  }, [editingUserMessageId])
+  }, [editingUserMessageId, virtualizedActive])
 
   const hasVisibleMessages = useMemo(
     () => messages.some(messageHasVisibleContent),
@@ -691,6 +810,20 @@ export function ConversationPanel({
     const attemptRestore = (): boolean => {
       if (cancelled || done) return true
 
+      if (virtualizedActive) {
+        const turnId = estimateTurnIdFromScrollTop(
+          turns,
+          savedScrollTop,
+          getMaxScrollTop(viewport)
+        )
+        if (turnId && virtualizedScrollApiRef.current) {
+          virtualizedScrollApiRef.current.scrollToTurn(turnId, { align: 'start' })
+          finishRestore()
+          return true
+        }
+        if (turnId) return false
+      }
+
       const { contentReady } = applyScrollTop(viewport, savedScrollTop)
       if (!contentReady) return false
 
@@ -706,7 +839,7 @@ export function ConversationPanel({
 
     const content =
       viewport.querySelector('[data-chat-scroll-content]') ?? viewport.firstElementChild
-    const observer = new ResizeObserver(() => {
+    const { observer, disconnect } = createDeferredResizeObserver(() => {
       attemptRestore()
     })
     if (content) observer.observe(content)
@@ -718,7 +851,7 @@ export function ConversationPanel({
 
     return () => {
       cancelled = true
-      observer.disconnect()
+      disconnect()
       cancelAnimationFrame(raf1)
       cancelAnimationFrame(raf2)
     }
@@ -730,7 +863,9 @@ export function ConversationPanel({
     scrollToLatest,
     hasVisibleMessages,
     messages.length,
-    scrollRestoreEpoch
+    scrollRestoreEpoch,
+    turns,
+    virtualizedActive
   ])
 
   useEffect(() => {
@@ -740,16 +875,27 @@ export function ConversationPanel({
     let lastScrollTop = viewport.scrollTop
 
     const onWheel = (event: WheelEvent) => {
+      if (programmaticScrollRef.current) return
+      if (wheelScrollsChatNestedTarget(event.target, event.deltaY)) return
       if (event.deltaY < 0) {
-        pinToBottomRef.current = false
-        if (agentBusy) agentAutoFollowRef.current = false
+        pauseAutoFollow()
+        return
+      }
+      const threshold = agentBusy
+        ? CHAT_SCROLL_AGENT_BUSY_THRESHOLD_PX
+        : CHAT_SCROLL_BOTTOM_THRESHOLD_PX
+      if (!isViewportNearChatBottom(viewport, threshold)) {
+        pauseAutoFollow()
       }
     }
 
     const onScroll = () => {
+      if (programmaticScrollRef.current) {
+        lastScrollTop = viewport.scrollTop
+        return
+      }
       if (viewport.scrollTop < lastScrollTop - 1) {
-        pinToBottomRef.current = false
-        if (agentBusy) agentAutoFollowRef.current = false
+        pauseAutoFollow()
       }
       lastScrollTop = viewport.scrollTop
     }
@@ -761,7 +907,7 @@ export function ConversationPanel({
       viewport.removeEventListener('wheel', onWheel)
       viewport.removeEventListener('scroll', onScroll)
     }
-  }, [scrollElement, activeChatId])
+  }, [agentBusy, pauseAutoFollow, scrollElement, activeChatId])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -775,15 +921,15 @@ export function ConversationPanel({
       scheduleStickToBottomIfFollowing()
     }
 
-    const observer = new ResizeObserver(onContentResize)
+    const { observer, disconnect } = createDeferredResizeObserver(onContentResize)
     observer.observe(content)
-    return () => observer.disconnect()
+    return () => disconnect()
   }, [activeChatId, hasVisibleMessages, scheduleStickToBottomIfFollowing])
 
   useLayoutEffect(() => {
     const stageChanged = stage !== prevStageRef.current
     prevStageRef.current = stage
-    if (!stageChanged || !agentBusy) return
+    if (!stageChanged || !agentBusy || userScrollPausedRef.current) return
     if (agentAutoFollowRef.current || pinToBottomRef.current) {
       followBottom()
     }
@@ -791,9 +937,11 @@ export function ConversationPanel({
 
   useLayoutEffect(() => {
     if (agentBusy && !prevAgentBusyRef.current) {
-      agentAutoFollowRef.current = true
-      pinToBottomRef.current = true
-      followBottom()
+      if (!userScrollPausedRef.current) {
+        agentAutoFollowRef.current = true
+        pinToBottomRef.current = true
+        followBottom()
+      }
     }
     if (!agentBusy) {
       agentAutoFollowRef.current = false
@@ -830,9 +978,11 @@ export function ConversationPanel({
     if (!contentChanged) return
 
     if (userJustSent || agentJustStarted || statusAppeared) {
-      agentAutoFollowRef.current = true
-      pinToBottomRef.current = true
-      followBottom()
+      if (!userScrollPausedRef.current) {
+        agentAutoFollowRef.current = true
+        pinToBottomRef.current = true
+        followBottom()
+      }
       return
     }
 
@@ -865,7 +1015,7 @@ export function ConversationPanel({
         onViewportScroll={handleViewportScroll}
       >
         <div
-          className={cn('mx-auto px-4 pt-[18px] sm:px-6', CHAT_COLUMN_MAX_WIDTH_CLASS)}
+          className={cn('mx-auto pt-[18px]', PAGE_HORIZONTAL_PADDING_CLASS, CHAT_COLUMN_MAX_WIDTH_CLASS)}
         >
           <div
             data-chat-scroll-content
@@ -873,65 +1023,100 @@ export function ConversationPanel({
             style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
           >
             <LoadEarlierTurnsButton
-              remaining={earlierTurnsRemaining}
+              remaining={virtualizedActive ? 0 : earlierTurnsRemaining}
               onLoad={() => setHiddenTurnCount((count) => nextHiddenTurnCount(count))}
             />
 
-            {visibleTurns.map((turn, visibleIndex) => {
-              const turnIndex = hiddenTurnCount + visibleIndex
-              const isLatestTurn = turnIndex === turns.length - 1
-              const showStopOnUserMessage = agentBusy && isLatestTurn
+            {virtualizedActive ? (
+              <VirtualizedConversationTurns
+                turns={turns}
+                scrollElement={scrollElement}
+                activeChatId={activeChatId}
+                editingUserMessageId={editingUserMessageId}
+                actionsDisabled={actionsDisabled}
+                agentBusy={agentBusy}
+                pipelineStreamingAnswer={pipelineStreamingAnswer}
+                pipelineSearchActiveUrl={pipelineSearchActiveUrl}
+                stage={stage}
+                onStopAgent={onStopAgent}
+                voiceSupported={voiceSupported}
+                voiceBusy={voiceBusy}
+                isVoiceListening={isVoiceListening}
+                onVoicePress={onVoicePress}
+                onVoiceStop={onVoiceStop}
+                onRegisterEditSpeech={onRegisterEditSpeech}
+                onEnterEdit={handleEnterEdit}
+                onExitEdit={() => setEditingUserMessageId(null)}
+                onSubmitEdit={(messageId, text, attachments) =>
+                  handleSubmitEditedUserMessage(messageId, text, attachments)
+                }
+                onAttachmentError={onAttachmentError}
+                liveVoiceUserMessageId={liveVoiceUserMessageId}
+                onTailContentChange={scheduleStickToBottomIfFollowing}
+                scrollApiRef={virtualizedScrollApiRef}
+                lastReplyMessageId={lastReplyMessageId}
+                showReplyActions={latestReplyActionsReady}
+                onRegenerateAssistantMessage={onRegenerateAssistantMessage}
+                onContinueAssistantMessage={onContinueAssistantMessage}
+              />
+            ) : (
+              visibleTurns.map((turn, visibleIndex) => {
+                const turnIndex = hiddenTurnCount + visibleIndex
+                const isLatestTurn = turnIndex === turns.length - 1
+                const showStopOnUserMessage = agentBusy && isLatestTurn
 
-              return (
-                <ConversationTurn
-                  key={turn.id}
-                  turn={turn}
-                  turnIndex={turnIndex + 1}
-                  userHeaderSticky
-                  activeChatId={activeChatId}
-                  editingUserMessageId={editingUserMessageId}
-                  actionsDisabled={actionsDisabled}
-                  showStopOnUserMessage={showStopOnUserMessage}
-                  onStopAgent={onStopAgent}
-                  voiceSupported={voiceSupported}
-                  voiceBusy={voiceBusy}
-                  isVoiceListening={isVoiceListening}
-                  onVoicePress={onVoicePress}
-                  onVoiceStop={onVoiceStop}
-                  onRegisterEditSpeech={onRegisterEditSpeech}
-                  onEnterEdit={handleEnterEdit}
-                  onExitEdit={() => setEditingUserMessageId(null)}
-                  onSubmitEdit={(messageId, text, attachments) =>
-                    handleSubmitEditedUserMessage(messageId, text, attachments)
-                  }
-                  onAttachmentError={onAttachmentError}
-                  agentBusy={agentBusy}
-                  isLatestTurn={isLatestTurn}
-                  pipelineStage={isLatestTurn ? stage : 'idle'}
-                  pipelineStreamingAnswer={
-                    agentBusy && isLatestTurn ? pipelineStreamingAnswer : false
-                  }
-                  pipelineSearchActiveUrl={
-                    isLatestTurn ? pipelineSearchActiveUrl : null
-                  }
-                  liveVoiceUserMessageId={liveVoiceUserMessageId}
-                  voiceCaptureLabel={voiceCaptureLabelForUserMessage(
-                    turn.user.id,
-                    turn.user.content,
-                    liveVoiceUserMessageId,
-                    stage
-                  )}
-                  streamingAssistantMessageId={
-                    agentBusy && isLatestTurn && pipelineStreamingAnswer
-                      ? lastAssistantMessageId(turn.assistantMessages)
-                      : undefined
-                  }
-                  lastReplyMessageId={lastReplyMessageId}
-                  showReplyActions={isLatestTurn && latestReplyActionsReady}
-                  onRegenerateAssistantMessage={onRegenerateAssistantMessage}
-                />
-              )
-            })}
+                return (
+                  <ConversationTurn
+                    key={turn.id}
+                    turn={turn}
+                    turnIndex={turnIndex + 1}
+                    userHeaderSticky
+                    activeChatId={activeChatId}
+                    editingUserMessageId={editingUserMessageId}
+                    actionsDisabled={actionsDisabled}
+                    showStopOnUserMessage={showStopOnUserMessage}
+                    onStopAgent={onStopAgent}
+                    voiceSupported={voiceSupported}
+                    voiceBusy={voiceBusy}
+                    isVoiceListening={isVoiceListening}
+                    onVoicePress={onVoicePress}
+                    onVoiceStop={onVoiceStop}
+                    onRegisterEditSpeech={onRegisterEditSpeech}
+                    onEnterEdit={handleEnterEdit}
+                    onExitEdit={() => setEditingUserMessageId(null)}
+                    onSubmitEdit={(messageId, text, attachments) =>
+                      handleSubmitEditedUserMessage(messageId, text, attachments)
+                    }
+                    onAttachmentError={onAttachmentError}
+                    agentBusy={agentBusy}
+                    isLatestTurn={isLatestTurn}
+                    pipelineStage={isLatestTurn ? stage : 'idle'}
+                    pipelineStreamingAnswer={
+                      agentBusy && isLatestTurn ? pipelineStreamingAnswer : false
+                    }
+                    pipelineSearchActiveUrl={
+                      isLatestTurn ? pipelineSearchActiveUrl : null
+                    }
+                    liveVoiceUserMessageId={liveVoiceUserMessageId}
+                    voiceCaptureLabel={voiceCaptureLabelForUserMessage(
+                      turn.user.id,
+                      turn.user.content,
+                      liveVoiceUserMessageId,
+                      stage
+                    )}
+                    streamingAssistantMessageId={
+                      agentBusy && isLatestTurn && pipelineStreamingAnswer
+                        ? lastAssistantMessageId(turn.assistantMessages)
+                        : undefined
+                    }
+                    lastReplyMessageId={lastReplyMessageId}
+                    showReplyActions={isLatestTurn && latestReplyActionsReady}
+                    onRegenerateAssistantMessage={onRegenerateAssistantMessage}
+                    onContinueAssistantMessage={onContinueAssistantMessage}
+                  />
+                )
+              })
+            )}
 
             {queueAheadPreview ? <QueueAheadHint preview={queueAheadPreview} /> : null}
 
@@ -947,12 +1132,12 @@ export function ConversationPanel({
         onOpenChange={(open) => {
           setCheckpointConfirmOpen(open)
           if (!open) {
-            setPendingCheckpointSubmit(null)
+            setPendingCheckpointMessageId(null)
             setCheckpointDontShowAgain(false)
           }
         }}
-        title="Submit from a previous message?"
-        description="Submitting from this point will remove all messages after it and start a new assistant reply from here."
+        title="Return to this message?"
+        description="Editing from this point will remove all messages after it when you submit."
         primaryLabel="Revert"
         onPrimary={handleConfirmCheckpointReturn}
         showDontAskAgain

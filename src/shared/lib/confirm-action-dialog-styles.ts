@@ -1,85 +1,55 @@
-import type { CSSProperties } from 'react'
+import { modalSurfaceClass } from '@/shared/lib/design-surface'
 import { cn } from '@/shared/lib/utils'
 
-/** Primary / destructive buttons — same in light and dark. */
-export const CONFIRM_DIALOG_PRIMARY = '#599ce7'
-export const CONFIRM_DIALOG_PRIMARY_BORDER = '#7eb3ef'
-export const CONFIRM_DIALOG_DESTRUCTIVE = '#e5484d'
-export const CONFIRM_DIALOG_DESTRUCTIVE_BORDER = '#f07575'
-export const CONFIRM_DIALOG_CHECKBOX_CHECKED = CONFIRM_DIALOG_PRIMARY
-
 export const confirmActionDialogContentClass = cn(
-  'gap-0 overflow-hidden rounded-lg border p-0 shadow-xl',
-  'border-[#d6d6d6] bg-white',
-  'dark:border-[#303030] dark:bg-[#181818]',
+  modalSurfaceClass,
+  'gap-0 overflow-hidden p-0',
   'data-[size=default]:sm:max-w-[440px] data-[size=sm]:max-w-[400px]'
 )
 
 export const confirmActionDialogTitleClass = cn(
-  'text-[15px] font-semibold leading-snug text-[#171717]',
-  'dark:text-[#ececec]'
+  'text-[15px] font-semibold leading-snug text-foreground'
 )
 
 export const confirmActionDialogDescriptionClass = cn(
-  'text-[13px] leading-[1.45] text-[#525252]',
-  'dark:text-[#a3a3a3]'
+  'text-[13px] leading-[1.45] text-muted-foreground'
 )
 
 export const confirmActionDialogSeparatorClass = cn(
-  'h-[2px] w-full shrink-0 bg-[#e8e8e8]',
-  'dark:bg-[#202020]'
+  'h-px w-full shrink-0 bg-separator'
 )
 
 export const confirmActionDialogFooterCheckboxClass = cn(
-  '!size-3.5 shrink-0 rounded-[3px] border border-solid shadow-none outline-none',
-  '!border-[#c8c8c8] !bg-white',
-  'focus-visible:!border-[#599ce7] focus-visible:ring-1 focus-visible:ring-[#599ce7]/30 focus-visible:ring-offset-0',
-  'data-[state=checked]:!border-[#599ce7] data-[state=checked]:!bg-[#599ce7] data-[state=checked]:!text-white',
-  'dark:!border-[#404040] dark:!bg-[#181818]',
-  'dark:focus-visible:!border-[#599ce7]',
-  'dark:data-[state=checked]:!border-[#599ce7] dark:data-[state=checked]:!bg-[#599ce7]',
+  '!size-3.5 shrink-0 rounded-[3px] border border-solid border-input bg-background shadow-none outline-none',
+  'focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:ring-offset-0',
+  'data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
   '[&_[data-slot=checkbox-indicator]_svg]:!size-2.5'
 )
 
 export const confirmActionDialogFooterLabelClass = cn(
-  'cursor-pointer select-none text-[13px] leading-none text-[#525252]',
-  'dark:text-[#a3a3a3]'
+  'cursor-pointer select-none text-[13px] leading-none text-muted-foreground'
 )
 
 export const confirmActionDialogCloseClass = cn(
   'mt-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full',
-  'text-[#6b6b6b] transition-colors hover:bg-[#ebebeb] hover:text-[#171717]',
-  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c8c8c8]',
-  'dark:text-[#737373] dark:hover:bg-[#252525] dark:hover:text-[#ececec]',
-  'dark:focus-visible:ring-[#404040]'
+  'text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
 )
 
 export const confirmActionDialogHeaderClass = 'flex items-start gap-2 px-4 pt-2.5 pb-2'
 
 export const confirmActionDialogCancelClass = cn(
-  '!h-[21px] min-h-[21px] min-w-0 border-0 bg-transparent px-2.5 py-0 text-[13px] font-normal leading-none text-[#525252]',
-  'shadow-none hover:bg-transparent hover:text-[#171717]',
-  'focus-visible:ring-1 focus-visible:ring-[#c8c8c8]',
-  'dark:text-[#a3a3a3] dark:hover:text-[#ececec]',
-  'dark:focus-visible:ring-[#404040]'
+  'inline-flex !h-[21px] min-h-[21px] min-w-0 items-center justify-center border-0 bg-transparent px-2.5 py-0 text-[13px] font-normal leading-none text-muted-foreground',
+  'shadow-none hover:bg-transparent hover:text-foreground',
+  'focus-visible:ring-1 focus-visible:ring-ring/50'
 )
 
 export function confirmActionDialogPrimaryClass(variant: 'accent' | 'destructive' = 'accent') {
   return cn(
-    '!h-[21px] min-h-[21px] min-w-[4.5rem] rounded-md border border-solid px-3 py-0 text-[13px] font-medium leading-none text-white shadow-none',
+    'inline-flex !h-[21px] min-h-[21px] min-w-[4.5rem] items-center justify-center rounded-md border border-solid px-3 py-0 text-[13px] font-medium leading-none shadow-none',
     'hover:brightness-110 focus-visible:ring-2 focus-visible:ring-offset-0',
     variant === 'destructive'
-      ? 'focus-visible:ring-[#e5484d]/50'
-      : 'focus-visible:ring-[#599ce7]/50'
+      ? 'border-destructive/70 bg-destructive text-destructive-foreground focus-visible:ring-destructive/50'
+      : 'border-primary/70 bg-primary text-primary-foreground focus-visible:ring-primary/50'
   )
-}
-
-export function confirmActionDialogPrimaryStyle(
-  variant: 'accent' | 'destructive' = 'accent'
-): CSSProperties {
-  const isDestructive = variant === 'destructive'
-  return {
-    backgroundColor: isDestructive ? CONFIRM_DIALOG_DESTRUCTIVE : CONFIRM_DIALOG_PRIMARY,
-    borderColor: isDestructive ? CONFIRM_DIALOG_DESTRUCTIVE_BORDER : CONFIRM_DIALOG_PRIMARY_BORDER
-  }
 }

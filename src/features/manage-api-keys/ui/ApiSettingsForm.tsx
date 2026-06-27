@@ -4,7 +4,7 @@ import { useSettingsStore } from '@/entities/settings/model/store'
 import {
   settingsSelectContentClass,
   settingsSelectItemClass,
-  settingsSelectTriggerClass
+  settingsRowSelectTriggerClass,
 } from '@/shared/lib/settings-control'
 import {
   settingsCardClass,
@@ -45,8 +45,8 @@ const LLM_BACKEND_OPTIONS: { value: LlmBackend; label: string }[] = [
 ]
 
 const BACKEND_HINT: Record<LlmBackend, string> = {
-  openrouter: 'Cloud models via OpenRouter — free models, web search, auto-fallback.',
-  custom: 'Any OpenAI-compatible API (Ollama, LM Studio, vLLM, OpenAI, …).'
+  openrouter: 'Cloud models via OpenRouter — free models and auto-fallback. Web search works on any backend when enabled in Agent settings.',
+  custom: 'Any OpenAI-compatible API (Ollama, LM Studio, vLLM, OpenAI, …). Web search works when enabled in Agent settings.'
 }
 
 type ProviderDef = {
@@ -105,7 +105,7 @@ export function ApiSettingsForm() {
             <SelectTrigger
               id="llm-backend"
               size="sm"
-              className={cn(settingsSelectTriggerClass, 'w-[220px] min-w-0')}
+              className={settingsRowSelectTriggerClass}
             >
               <SelectValue placeholder="Select mode" />
             </SelectTrigger>
@@ -170,7 +170,7 @@ export function ApiSettingsForm() {
             className={cn(
               settingsRowClass,
               'w-full cursor-pointer select-none border-0 bg-transparent text-left outline-none',
-              'hover:bg-muted/25 dark:hover:bg-[#252525]/40',
+              'hover:bg-muted/25 dark:hover:bg-accent/40',
               'focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0'
             )}
           >

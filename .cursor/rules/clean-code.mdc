@@ -1,0 +1,40 @@
+---
+description: Clean code — читаемость, минимальный scope, без over-engineering
+alwaysApply: true
+---
+
+# Clean code (Lingo)
+
+## Принципы
+
+- **Минимальный diff** — только то, что решает задачу; не рефакторить соседний код «заодно».
+- **Один уровень абстракции** в функции; длинные хуки (`useAiChat`) не раздувать — выносить в `features/*/lib/` с Vitest.
+- **Имена говорят сами** — `isAgentBusy`, `flushStreamSync`, не `handleStuff`.
+- **DRY через существующие модули** — расширять, не дублировать (`executeAgentStop`, `chat-pipeline-registry`).
+- **Комментарии** — только неочевидный контракт или инвариант; код должен читаться без простыни комментариев.
+
+## TypeScript / React
+
+- Функциональные компоненты и хуки; без классов.
+- `function` для чистых хелперов и lib; arrow — для колбэков и коротких хуков.
+- Явные типы на границах (IPC, store, публичный API слайса); не `any`.
+- Named exports в lib; default export — только страницы/виджеты по принятому стилю файла.
+
+## Запрещено
+
+- Одноразовые хелперы на 1–2 строки «для красоты».
+- Лишние try/catch без действия или «на всякий случай».
+- Новые зависимости без явной просьбы пользователя.
+- Копипаста логики между main и renderer — общий контракт в `shared/`.
+
+## Пример
+
+```typescript
+// ❌ Раздувание useAiChat
+const stop = () => { /* 40 строк inline */ }
+
+// ✅ Контракт в lib
+executeAgentStop({ chatId, force: true }, buildDefaultAgentStopContext())
+```
+
+См. также `.cursor/rules/stability.mdc`, `fsd.mdc`.

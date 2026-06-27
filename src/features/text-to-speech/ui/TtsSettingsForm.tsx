@@ -13,6 +13,7 @@ import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
 import {
   settingsSelectContentClass,
   settingsSelectItemClass,
+  settingsRowSelectTriggerClass,
   settingsSelectTriggerClass
 } from '@/shared/lib/settings-control'
 import {
@@ -156,7 +157,7 @@ export function TtsSettingsForm() {
             <SelectTrigger
               id="speech-rate"
               size="sm"
-              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+              className={settingsRowSelectTriggerClass}
             >
               <SelectValue />
             </SelectTrigger>
@@ -217,7 +218,7 @@ export function TtsSettingsForm() {
             <SelectTrigger
               id="speech-voice"
               size="sm"
-              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+              className={settingsRowSelectTriggerClass}
             >
               <SelectValue placeholder="Automatic" />
             </SelectTrigger>

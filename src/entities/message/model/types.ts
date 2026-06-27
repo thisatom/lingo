@@ -2,6 +2,9 @@ import type { MessageAttachment } from './attachment'
 
 export type MessageRole = 'user' | 'assistant' | 'thinking'
 
+/** Set when the assistant reply was stopped or failed before finishing. */
+export type MessageReplyStatus = 'interrupted' | 'incomplete'
+
 export type MessageSearchSource = {
   title: string
   url: string
@@ -15,6 +18,8 @@ export interface Message {
   attachments?: MessageAttachment[]
   /** Web pages used for this assistant reply. */
   searchSources?: MessageSearchSource[]
+  /** Omitted when the reply finished normally. */
+  replyStatus?: MessageReplyStatus
 }
 
 /** Stable empty reference for Zustand selectors. */

@@ -1,18 +1,37 @@
 ---
-description: UI/UX — shadcn/ui и Tailwind
+description: UI/UX — TrustRouter-aligned shadcn design system
 globs: "{src/**/*.tsx,src/**/*.css,components.json}"
 alwaysApply: false
 ---
 
-# UI — shadcn/ui
+# UI — shadcn/ui (TrustRouter-aligned)
 
 - Компоненты: **shadcn/ui** в `src/shared/ui/`
-- Стили: **Tailwind CSS**; `cn()` из `@/shared/lib/utils`
-- Добавление: `npx shadcn@latest add <name>` → `shared/ui`, не в features
+- Стили: **Tailwind CSS v4**; `cn()` из `@/shared/lib/utils`
+- Дизайн-референс: `/home/ex0/gi/trustrouter/frontend/src/app/globals.css`
+- Поверхности: `src/shared/lib/design-surface.ts` (`elevatedSurfaceClass`, `modalSurfaceClass`)
+
+## Палитра (semantic tokens)
+
+- **Primary / links:** `--tr-accent` → `#5b8def` (`bg-primary`, `text-primary`)
+- **Фоны:** `--tr-bg-main` (#141414), `--tr-bg-2` sidebar/popover, `--tr-bg-item` cards
+- **Hover:** `--tr-hover` (#252525) → `bg-accent`
+- **Overlay menus:** `ring-1 ring-foreground/10` + `shadow-md` — не тяжёлые `border` + `shadow-lg`
+- **Switch on:** `--tr-switch-on` (#3fa266)
+- **Radius base:** `0.625rem`
 
 ## Правила
 
 - Импорт: `@/shared/ui/button`, не дублировать примитивы в слайсах
-- Страницы/widgets/features собирают UI из shared + локальная композиция в `*/ui`
-- Тема: CSS variables в `app/styles/globals.css`
-- Подробности: `docs/UI.md`
+- **Не хардкодить hex** в TSX — только CSS variables / Tailwind semantic classes
+- Диалоги: `bg-popover`, overlay `bg-black/10 backdrop-blur-xs`, footer `border-separator bg-muted/50`
+- Кнопки primary: `bg-primary` + `hover:bg-primary/80`
+- Компактные контролы: `h-8` default, `h-7` sm/compact, `size-7` icon-sm
+- **Исключение:** градиент над composer input в `custom-scroll-area.tsx` (`from-background`) — не менять
+
+## UI-стабильность
+
+- Не менять layout «заодно»; проверять settings rows (`FieldContextMenu` + `triggerClassName`)
+- Поведение кнопок — по state machine, не по тексту в поле ввода
+
+См. `docs/UI.md`, `stability.mdc`.

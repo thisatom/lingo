@@ -12,6 +12,16 @@ if (args.length === 0) {
 }
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+const nativeCheck = spawnSync(process.execPath, ['scripts/ensure-native-modules.mjs'], {
+  cwd: rootDir,
+  stdio: 'inherit',
+  env: process.env
+})
+if (nativeCheck.status !== 0) {
+  process.exit(nativeCheck.status ?? 1)
+}
+
 const electronVite = path.join(rootDir, 'node_modules', '.bin', 'electron-vite')
 
 const result = spawnSync(electronVite, args, {

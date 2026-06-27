@@ -7,6 +7,7 @@ export type PipelineStage =
   | 'thinking'
   | 'searching'
   | 'speaking'
+  | 'reconnecting'
   | 'error'
 
 export type PipelineSearchTarget = {

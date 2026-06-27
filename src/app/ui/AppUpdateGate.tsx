@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   dismissAppUpdateToast,
+  showAppUpdateAvailableToast,
   showAppUpdateStartedToast
 } from '@/features/app-update/lib/app-update-toast'
+import { isAppUpdateOverlayVisible } from '@/features/app-update/lib/app-update-progress-label'
 import { AppUpdateOverlay } from '@/features/app-update/ui/AppUpdateOverlay'
 import {
   installAppUpdate,
@@ -12,33 +14,17 @@ import {
 } from '@/shared/lib/updater'
 import type { AppUpdateInfo, AppUpdateProgress } from '@/shared/types/ipc'
 
-const AUTO_INSTALL_SESSION_KEY = 'lingo-update-auto-install'
-
-function wasAutoInstallStarted(version: string): boolean {
-  try {
-    return sessionStorage.getItem(AUTO_INSTALL_SESSION_KEY) === version
-  } catch {
-    return false
-  }
-}
-
-function markAutoInstallStarted(version: string): void {
-  try {
-    sessionStorage.setItem(AUTO_INSTALL_SESSION_KEY, version)
-  } catch {
-    // ignore
-  }
-}
-
-/** Silent background updates with a styled toast + progress overlay. */
+/** User-confirmed install only — no silent full-screen block on startup. */
 export function AppUpdateGate() {
   const [progress, setProgress] = useState<AppUpdateProgress | null>(null)
+  const [installing, setInstalling] = useState(false)
   const installStartedRef = useRef(false)
 
-  const startSilentInstall = useCallback((update: AppUpdateInfo) => {
-    if (installStartedRef.current || wasAutoInstallStarted(update.version)) return
+  const startInstall = useCallback((update: AppUpdateInfo) => {
+    if (installStartedRef.current) return
     installStartedRef.current = true
-    markAutoInstallStarted(update.version)
+    setInstalling(true)
+    dismissAppUpdateToast()
     showAppUpdateStartedToast(update)
     void installAppUpdate()
   }, [])
@@ -51,19 +37,26 @@ export function AppUpdateGate() {
       if (next.phase === 'restarting' || next.phase === 'failed') {
         dismissAppUpdateToast()
       }
+      if (next.phase === 'idle' || next.phase === 'failed') {
+        installStartedRef.current = false
+        setInstalling(false)
+      }
     })
 
     const unsubAvailable = subscribeToAppUpdateAvailable((info) => {
-      startSilentInstall(info)
+      showAppUpdateAvailableToast(info, () => startInstall(info))
     })
 
     return () => {
       unsubProgress()
       unsubAvailable()
     }
-  }, [startSilentInstall])
+  }, [startInstall])
 
-  if (!isUpdaterAvailable()) return null
+  const overlayProgress =
+    progress ?? (installing ? ({ phase: 'checking' } satisfies AppUpdateProgress) : null)
 
-  return <AppUpdateOverlay progress={progress} />
+  if (!isUpdaterAvailable() || !isAppUpdateOverlayVisible(overlayProgress)) return null
+
+  return <AppUpdateOverlay progress={overlayProgress} />
 }

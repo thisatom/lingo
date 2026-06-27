@@ -1,7 +1,8 @@
 import type { ReactNode, RefObject } from 'react'
 import { ChevronDown, Search, X } from '@/shared/ui/icons'
 import { FieldContextMenu } from '@/features/chat-composer/ui/FieldContextMenu'
-import { composerStackPanelHeaderClass } from '@/widgets/chat-composer/lib/composer-stack-panel'
+import { composerPanelSearchInputClass, composerStackPanelHeaderClass } from '@/widgets/chat-composer/lib/composer-stack-panel'
+import { iconButtonHoverClass } from '@/shared/lib/design-surface'
 import { cn } from '@/shared/lib/utils'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
@@ -24,10 +25,8 @@ type Props = {
 }
 
 const searchToggleClass = cn(
-  'size-7 shrink-0 bg-transparent text-muted-foreground shadow-none',
-  'hover:bg-transparent hover:text-foreground',
-  'dark:hover:bg-transparent dark:hover:text-foreground',
-  'focus-visible:bg-transparent'
+  'size-7 shrink-0 text-muted-foreground shadow-none',
+  iconButtonHoverClass
 )
 
 export function ComposerStackPanelHeader({
@@ -81,7 +80,7 @@ export function ComposerStackPanelHeader({
           ) : null}
           <button
             type="button"
-            className="flex shrink-0 cursor-pointer items-center gap-0.5 whitespace-nowrap text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="flex shrink-0 cursor-pointer items-center gap-0.5 whitespace-nowrap rounded-lg px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-expanded={!listCollapsed}
             aria-controls={listId}
             onClick={onToggleCollapse}
@@ -114,9 +113,8 @@ export function ComposerStackPanelHeader({
               onChange={(event) => onSearchQueryChange(event.target.value)}
               placeholder={searchPlaceholder}
               className={cn(
-                'h-7 w-full rounded-md border border-border bg-input py-0 pl-7 text-xs leading-none text-foreground',
-                searchQuery ? 'pr-7' : 'pr-2',
-                'placeholder:text-muted-foreground outline-none focus-visible:border-ring'
+                composerPanelSearchInputClass,
+                searchQuery ? 'pr-7' : 'pr-2'
               )}
               aria-label={searchPlaceholder}
             />

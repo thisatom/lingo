@@ -68,7 +68,6 @@ export function AppUpdateSettingsSection() {
       if (result.update) {
         setRemoteVersion(result.update.version)
         setStatus('available')
-        void installAppUpdate()
       } else {
         setStatus('current')
       }
@@ -122,7 +121,7 @@ export function AppUpdateSettingsSection() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Lingo desktop</p>
             <p className={settingsRowDescriptionClass}>
-              Updates download and install automatically in the background.
+              Check for updates manually; install when you are ready.
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span
@@ -141,16 +140,33 @@ export function AppUpdateSettingsSection() {
             </div>
             {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            className="h-6 shrink-0 px-2 text-[11px]"
-            disabled={status === 'loading' || status === 'updating'}
-            onClick={() => void runCheck()}
-          >
-            Check now
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            {status === 'available' || (status === 'error' && remoteVersion) ? (
+              <Button
+                type="button"
+                variant="default"
+                size="xs"
+                className="h-6 shrink-0 px-2 text-[11px]"
+                onClick={() => {
+                  setStatus('updating')
+                  setError(null)
+                  void installAppUpdate()
+                }}
+              >
+                Install update
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              className="h-6 shrink-0 px-2 text-[11px]"
+              disabled={status === 'loading' || status === 'updating'}
+              onClick={() => void runCheck()}
+            >
+              Check now
+            </Button>
+          </div>
         </div>
       </div>
     </>

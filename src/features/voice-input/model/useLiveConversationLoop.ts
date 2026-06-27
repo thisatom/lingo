@@ -118,7 +118,8 @@ export function useLiveConversationLoop({
         pipelineBlocksListen ||
         voiceBusyRef.current ||
         agentPhaseRef.current !== 'idle' ||
-        isAgentSessionBusy(getAgentSessionSnapshot(currentActiveChatId))
+        (currentActiveChatId != null &&
+          isAgentSessionBusy(getAgentSessionSnapshot(currentActiveChatId)))
       ) {
         return
       }

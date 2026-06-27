@@ -32,7 +32,7 @@ export function formatLocalWebSearchBlock(query: string, results: LocalWebSearch
   }
 
   return [
-    `**Web research** for "${query}" — live page excerpts (today: ${new Date().toISOString().slice(0, 10)}):`,
+    `**Web research** for "${query}" — live page excerpts in Markdown (today: ${new Date().toISOString().slice(0, 10)}):`,
     '',
     lines.join('\n\n'),
     '',

@@ -7,8 +7,8 @@ export function buildTurnContentSignature(turn: ConversationTurn): string {
     .map(
       (message) =>
         `${message.id}:${message.role}:${message.content.length}:${
-          message.searchSources?.length ?? 0
-        }`
+          message.replyStatus ?? ''
+        }:${message.searchSources?.length ?? 0}`
     )
     .join('|')
   return `${turn.user.content.length}:a${attachments}:${assistant}`

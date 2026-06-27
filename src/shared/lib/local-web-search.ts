@@ -46,7 +46,7 @@ export type LocalWebSearchResult = {
   title: string
   url: string
   snippet: string
-  /** Plain text extracted from the page (used in the prompt instead of links). */
+  /** Markdown excerpt from the page (Readability/Turndown or Jina Reader). */
   pageContent?: string
 }
 

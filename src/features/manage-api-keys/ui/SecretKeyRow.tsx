@@ -164,9 +164,12 @@ export function SecretKeyRow({
                 : 'Not configured.'}
         </p>
       </div>
-      <FieldContextMenu fieldRef={inputRef} onValueChange={handleValueChange}>
-        <div className="relative w-[260px] min-w-0 shrink-0">
-          <Input
+      <FieldContextMenu
+        fieldRef={inputRef}
+        onValueChange={handleValueChange}
+        triggerClassName="relative w-[260px] shrink-0"
+      >
+        <Input
             ref={inputRef}
             id={id}
             className={`${settingsInputClass} w-full pr-10`}
@@ -183,17 +186,16 @@ export function SecretKeyRow({
             disabled={loading}
             type={showSecret ? 'text' : 'password'}
           />
-          {editingNewKey && value.trim().length > 0 ? (
-            <button
+        {editingNewKey && value.trim().length > 0 ? (
+          <button
               type="button"
               className="absolute top-1/2 right-0.5 inline-flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
               onClick={() => setShowSecret((v) => !v)}
               aria-label={showSecret ? 'Hide typed key' : 'Show typed key'}
             >
               {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-            </button>
-          ) : null}
-        </div>
+          </button>
+        ) : null}
       </FieldContextMenu>
     </div>
   )

@@ -3,7 +3,7 @@ import { isAgentStreamActiveForChat } from '@/features/ai-chat/lib/agent-stream-
 import { getChatPipeline } from '@/features/ai-chat/lib/chat-pipeline-registry'
 import { setPipelineStageForChat } from '@/features/ai-chat/lib/pipeline-stage'
 
-const STALE_AGENT_STAGES: PipelineStage[] = ['thinking', 'searching', 'speaking']
+const STALE_AGENT_STAGES: PipelineStage[] = ['thinking', 'searching', 'speaking', 'reconnecting']
 
 /** Clears a stuck per-chat pipeline when this turn was superseded but never reached `finishAgentTurnForChat`. */
 export function releaseStaleAgentPipelineStage(chatId: string): void {

@@ -74,7 +74,6 @@ export function CustomLlmProfileEditor() {
       timerRef.current = window.setTimeout(() => {
         const parsed = parseCustomLlmProfileSource(next)
         if (!parsed.ok) {
-          setCustomLlmProfileJson(next)
           setParseError(parsed.error)
           return
         }
@@ -157,7 +156,7 @@ export function CustomLlmProfileEditor() {
 
       <div
         className={cn(
-          'overflow-hidden rounded-md border border-border dark:border-[#373737]',
+          'overflow-hidden rounded-md border border-border',
           parseError && 'border-destructive/60'
         )}
       >

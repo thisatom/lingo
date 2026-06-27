@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
+import { CHAT_NESTED_SCROLL_ATTR } from '@/shared/lib/chat-nested-scroll'
 import { cn } from '@/shared/lib/utils'
 import { typography } from '@/shared/ui/typography'
 
 export function MarkdownTable({ children }: { children?: ReactNode }) {
   return (
-    <div className={typography.tableWrap}>
+    <div className={typography.tableWrap} {...{ [CHAT_NESTED_SCROLL_ATTR]: '' }}>
       <table className={typography.table}>{children}</table>
     </div>
   )

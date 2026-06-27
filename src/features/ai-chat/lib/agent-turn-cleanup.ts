@@ -47,6 +47,40 @@ export function hasPersistedAssistantTurn(
   return Boolean(message?.content.trim())
 }
 
+export function readAssistantMessageContent(
+  targetChatId: string,
+  assistantMessageId: string | null
+): string {
+  if (!assistantMessageId) return ''
+  const chat = useChatsStore.getState().chats.find((c) => c.id === targetChatId)
+  return chat?.messages.find((m) => m.id === assistantMessageId)?.content.trim() ?? ''
+}
+
+export function hasPersistedPartialAssistantTurn(
+  targetChatId: string,
+  assistantMessageId: string | null,
+  finalText: string
+): boolean {
+  if (finalText.trim()) return true
+  return Boolean(readAssistantMessageContent(targetChatId, assistantMessageId))
+}
+
+export function shouldKeepPartialTurnOnStop(
+  targetChatId: string,
+  assistantMessageId: string | null,
+  finalText: string,
+  streamCompleted: boolean
+): boolean {
+  if (
+    hasPersistedAssistantTurn(targetChatId, assistantMessageId, finalText, {
+      streamCompleted: true
+    })
+  ) {
+    return true
+  }
+  return hasPersistedPartialAssistantTurn(targetChatId, assistantMessageId, finalText)
+}
+
 export function removeAgentTurnTail(
   removeMessagesFrom: (messageId: string, targetChatId?: string) => void,
   targetChatId: string,

@@ -5,9 +5,12 @@ import { Select as SelectPrimitive } from "radix-ui"
 import {
   menuContentSpacingClass,
   menuItemHighlightClass,
-  menuItemPaddingClass,
-  menuSurfaceBorderClass
+  menuItemTrailingIconPaddingClass,
+  menuTrailingIndicatorClass,
+  sidebarMenuPickerChevronClass,
+  sidebarMenuRadiusClass
 } from '@/shared/lib/sidebar-filter-menu-styles'
+import { elevatedSurfaceClass } from '@/shared/lib/design-surface'
 import { cn } from "@/shared/lib/utils"
 import { CustomScrollArea } from "@/shared/ui/custom-scroll-area"
 
@@ -30,14 +33,14 @@ function SelectValue({
 }
 
 const selectTriggerBaseClass = cn(
-  "flex w-fit cursor-pointer items-center justify-between gap-2 rounded-md border border-menu-border bg-input px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none hover:bg-accent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[placeholder]:text-muted-foreground data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 dark:bg-transparent dark:hover:bg-input/50 dark:focus-visible:bg-input/30 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
+  "relative flex w-fit cursor-pointer items-center justify-between gap-2 rounded-lg border border-input bg-input py-2 pl-3 pr-8 text-sm whitespace-nowrap shadow-none transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[placeholder]:text-muted-foreground data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 dark:bg-secondary dark:hover:bg-accent dark:focus-visible:bg-secondary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
 )
 
 const selectTriggerComposerClass = cn(
-  "inline-flex h-7 w-fit min-w-0 cursor-pointer items-center gap-1 rounded-full border-0 bg-transparent px-2 py-0 shadow-none",
+  "relative inline-flex h-7 w-fit min-w-0 cursor-pointer items-center gap-1 rounded-full border-0 bg-transparent py-0 pl-2 pr-6 shadow-none",
   "text-[13px] text-muted-foreground outline-none transition-colors",
   "focus-visible:ring-1 focus-visible:ring-ring/50",
-  "hover:bg-accent hover:text-foreground dark:hover:bg-[#303030] dark:hover:text-foreground",
+  'hover:bg-accent hover:text-foreground',
   "disabled:cursor-not-allowed disabled:opacity-50"
 )
 
@@ -57,8 +60,10 @@ function SelectTrigger({
         {...props}
       >
         <span className="block min-w-0 truncate leading-[28px]">{children}</span>
-        <SelectPrimitive.Icon className="flex size-3.5 shrink-0 items-center justify-center opacity-70">
-          <ChevronDownIcon className="block size-3.5" />
+        <SelectPrimitive.Icon asChild>
+          <span className="pointer-events-none absolute top-1/2 right-[3px] flex size-4 -translate-y-1/2 items-center justify-center">
+            <ChevronDownIcon className={sidebarMenuPickerChevronClass} />
+          </span>
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
     )
@@ -73,7 +78,9 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="size-4 opacity-50" />
+        <span className="pointer-events-none absolute top-1/2 right-[3px] flex size-4 -translate-y-1/2 items-center justify-center">
+          <ChevronDownIcon className={sidebarMenuPickerChevronClass} />
+        </span>
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -91,8 +98,8 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-hidden rounded-md border bg-popover p-0 text-popover-foreground shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-          menuSurfaceBorderClass,
+          'relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-hidden p-0',
+          elevatedSurfaceClass,
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className
@@ -147,20 +154,18 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        'relative flex w-full cursor-pointer items-center gap-2 rounded-sm pr-8 text-sm outline-hidden select-none',
-        menuItemPaddingClass,
+        'relative flex w-full cursor-pointer items-center gap-2 text-sm outline-hidden select-none',
+        menuItemTrailingIconPaddingClass,
+        sidebarMenuRadiusClass,
         menuItemHighlightClass,
         '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4 [&_svg:not([class*=\'text-\'])]:text-muted-foreground *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2',
         className
       )}
       {...props}
     >
-      <span
-        data-slot="select-item-indicator"
-        className="absolute top-1/2 right-[3px] flex size-3.5 -translate-y-1/2 items-center justify-center"
-      >
+      <span data-slot="select-item-indicator" className={menuTrailingIndicatorClass}>
         <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
+          <CheckIcon className="size-3.5" />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

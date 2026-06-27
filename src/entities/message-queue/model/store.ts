@@ -22,6 +22,7 @@ interface MessageQueueState {
   remove: (chatId: string, id: string) => void
   dequeue: (chatId: string) => QueuedMessage | undefined
   clearChat: (chatId: string) => void
+  clearAll: () => void
 }
 
 export const useMessageQueueStore = create<MessageQueueState>((set, get) => ({
@@ -96,5 +97,9 @@ export const useMessageQueueStore = create<MessageQueueState>((set, get) => ({
       delete byChatId[chatId]
       return { byChatId }
     })
+  },
+
+  clearAll: () => {
+    set({ byChatId: {} })
   }
 }))

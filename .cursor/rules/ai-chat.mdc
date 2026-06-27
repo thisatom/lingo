@@ -1,41 +1,49 @@
 ---
-description: AI-диалог — SDK и store
-globs: "{src/features/ai-chat/**,src/entities/conversation/**}"
+description: AI chat — контракт, стабильность, без keyword-intent
+globs: "{src/features/ai-chat/**,src/entities/chat/**,src/entities/message/**,src/shared/lib/openrouter*.ts,src/shared/lib/lingo-agent/**,src/shared/lib/web-search*.ts,electron/main/*chat*}"
 alwaysApply: false
 ---
 
-# AI chat (управление моделью)
+# AI chat
 
 ## Провайдер
 
-**OpenRouter** — `baseURL` `https://openrouter.ai/api/v1`, ключ из secure storage (не хардкод).
+**OpenRouter** — `https://openrouter.ai/api/v1`, ключ из secure storage (main).
 
-## Инструменты
+## Архитектура
 
-| Задача | Инструмент |
-|--------|------------|
-| Диалог, streaming, история | Vercel AI SDK **или** OpenAI SDK + store |
-| Ключ и модель | `features/manage-api-keys`, `entities/api-credential` |
-| Сложные сценарии позже | LangGraph |
+| Модуль | Роль |
+|--------|------|
+| `run-agent-turn.ts` | Один ход LLM + search + cleanup |
+| `useAiChat.ts` | Оркестрация UI; **не** раздувать |
+| `chat-pipeline-registry.ts` | Per-chat stage |
+| `chat-agent-stop`, `chat-agent-policies` | Stop / queue / TTS policy |
+| `openrouter-chat-stream.ts` | SSE, sanitizers |
 
-## FSD
+LangGraph — не на MVP.
 
-- `features/ai-chat/model` — streamText к OpenRouter, abort при новой записи
-- `entities/conversation` — messages[], sessionId
-- `shared/api/openrouter` — createClient(baseURL, apiKey)
-- `shared/config` — system prompt, default modelId
+## Контракты (обязательно)
 
-Ключ подставлять при каждом запросе из актуальных credentials. См. `docs/OPENROUTER.md`.
+- [`docs/CHAT_AGENT.md`](../../docs/CHAT_AGENT.md)
+- [`docs/CHAT_AGENT_STABILITY_PLAN.md`](../../docs/CHAT_AGENT_STABILITY_PLAN.md)
+- QA: [`docs/CHAT_AGENT_MANUAL_QA.md`](../../docs/CHAT_AGENT_MANUAL_QA.md)
 
-На MVP не добавлять LangChain без запроса.
+## Стабильность
 
-Без валидного ключа OpenRouter — не стартовать чат; направить в settings.
-
-## Стабильность агента
-
-- Контракт: `docs/CHAT_AGENT.md`, план: `docs/CHAT_AGENT_STABILITY_PLAN.md`, QA: `docs/CHAT_AGENT_MANUAL_QA.md`
-- Логику хода не раздувать в `useAiChat` — выносить в `features/ai-chat/lib/` (`chat-agent-stop`, `chat-agent-policies`, `chat-agent-stream-turn`) с Vitest
 - `stop(force)` → `executeAgentStop` (session, queue, pending, idle)
-- TTS только `conversation` + `ttsEnabled` → `shouldPlayAgentTts`
-- PR: чеклист из `docs/CHAT_AGENT.md` § PR checklist
+- TTS: только `conversation` + `ttsEnabled` → `shouldPlayAgentTts`
+- Фоновый стрим: смена чата **не** `force: true` abort без сценария delete/stop
+- Partial на Stop → `replyStatus`; Continue через `assistantContinuationPrefix`
+- Логику — в `lib/` + Vitest; PR — чеклист из `CHAT_AGENT.md`
 
+## Web search — toggle + explicit command
+
+- Toggle ON → search на **любом** непустом сообщении (кроме attachments)
+- Toggle OFF → только явная команда (`search the web`, «поищи в интернете»)
+- API: `shouldRunWebSearchForTurn(message, webSearchEnabled)` — **без** keyword-intent
+
+## Запрещено
+
+- Keyword-классификаторы по тексту сообщения (см. `no-content-heuristics.mdc`)
+- Новая логика только в `useAiChat` без теста
+- Ослабление sanitizers без regression-теста (`strip-assistant-display-leaks`)

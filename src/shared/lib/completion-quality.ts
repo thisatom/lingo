@@ -74,3 +74,12 @@ export function buildCompletionRetryUserMessage(userMessage: string): string {
   }
   return `Your previous reply was cut off before you finished. Continue from where you stopped, then complete the answer. Original request: "${trimmed}"`
 }
+
+/** User clicked Continue after Stop or incomplete stream — do not repeat partial text. */
+export function buildAssistantContinueUserMessage(userMessage: string): string {
+  const trimmed = userMessage.trim()
+  if (!trimmed) {
+    return 'Continue the assistant reply from the exact stopping point in the partial message above. Do not repeat any sentence already written.'
+  }
+  return `Continue the assistant reply from the exact stopping point in the partial message above. Do not repeat any text already written. Original user request: "${trimmed}"`
+}

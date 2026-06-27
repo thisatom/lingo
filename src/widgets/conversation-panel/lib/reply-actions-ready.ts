@@ -1,12 +1,13 @@
 import type { PipelineStage } from '@/entities/conversation/model/store'
 
-/** Copy / regenerate appear only after the assistant text stream finishes. */
+/** Copy / Continue / Speak appear only after the agent finishes the current turn. */
 export function isReplyActionsReady(options: {
   agentBusy: boolean
   pipelineStreamingAnswer: boolean
   stage: PipelineStage
 }): boolean {
+  void options.stage
   if (options.pipelineStreamingAnswer) return false
-  if (!options.agentBusy) return true
-  return options.stage !== 'thinking' && options.stage !== 'searching'
+  if (options.agentBusy) return false
+  return true
 }

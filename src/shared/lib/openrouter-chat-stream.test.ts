@@ -162,6 +162,40 @@ describe('streamOpenRouterChat', () => {
     expect(done?.type === 'done' && done.text).toBe('Short complete answer.')
   })
 
+  it('keeps cumulative text-delta length monotonic during web-search retry merge', async () => {
+    let call = 0
+    const fetchImpl = vi.fn(async () => {
+      call += 1
+      if (call === 1) {
+        return sseResponse([
+          { choices: [{ delta: { content: 'Short' } }] },
+          { choices: [{ finish_reason: 'stop' }] }
+        ])
+      }
+      return sseResponse([
+        { choices: [{ delta: { content: ' complete answer.' } }] },
+        { choices: [{ finish_reason: 'stop' }] }
+      ])
+    })
+
+    const events = await collectStream(
+      {
+        messages: [{ role: 'user', content: 'search the web for quantum computing news' }],
+        webSearch: false,
+        maxTokens: 2048
+      },
+      fetchImpl
+    )
+
+    let prevLength = 0
+    for (const event of events) {
+      if (event.type !== 'text-delta') continue
+      expect(event.text.length).toBeGreaterThanOrEqual(prevLength)
+      prevLength = event.text.length
+    }
+    expect(prevLength).toBeGreaterThan(0)
+  })
+
   it('runs local web search for explicit force-search phrases when toggle is off', async () => {
     const fetchImpl = vi.fn(async () =>
       sseResponse([
@@ -186,11 +220,11 @@ describe('streamOpenRouterChat', () => {
     expect(performLocalWebSearchMock.mock.calls[0]?.[0]).toBe('latest Mars news')
   })
 
-  it('skips web search for small talk when toggle is on', async () => {
+  it('runs web search for any non-empty message when toggle is on', async () => {
     const fetchImpl = vi.fn(async () =>
       sseResponse([
         {
-          choices: [{ delta: { content: 'Привет!' } }]
+          choices: [{ delta: { content: 'Привет! У меня всё хорошо, спасибо что спросил.' } }]
         },
         {
           choices: [{ finish_reason: 'stop' }]
@@ -206,7 +240,8 @@ describe('streamOpenRouterChat', () => {
       fetchImpl
     )
 
-    expect(performLocalWebSearchMock).not.toHaveBeenCalled()
+    expect(performLocalWebSearchMock).toHaveBeenCalledOnce()
+    expect(performLocalWebSearchMock.mock.calls[0]?.[0]).toBe('как у тебя дела')
   })
 
   it('runs web search for factual questions when toggle is on', async () => {
@@ -298,5 +333,33 @@ describe('streamOpenRouterChat', () => {
     expect(fetchImpl).toHaveBeenCalled()
     expect(events.some((e) => e.type === 'search-fallback')).toBe(true)
     expect(events.some((e) => e.type === 'done')).toBe(true)
+  })
+
+  it('streams assistant continuation from prefix without web search', async () => {
+    const fetchImpl = vi.fn(async () =>
+      sseResponse([
+        {
+          choices: [{ delta: { content: ' there was a kingdom.' } }]
+        },
+        {
+          choices: [{ finish_reason: 'stop' }]
+        }
+      ])
+    )
+
+    const events = await collectStream(
+      {
+        messages: [{ role: 'user', content: 'Tell me a story' }],
+        assistantContinuationPrefix: 'Once upon a time'
+      },
+      fetchImpl
+    )
+
+    expect(performLocalWebSearchMock).not.toHaveBeenCalled()
+    expect(events.some((e) => e.type === 'searching')).toBe(false)
+    expect(events.at(-1)).toEqual({
+      type: 'done',
+      text: 'Once upon a time there was a kingdom.'
+    })
   })
 })

@@ -12,8 +12,8 @@
     var dark =
       pref === 'dark' ||
       (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-    var bg = dark ? '#121212' : '#f5f5f5'
-    var fg = dark ? '#d1d1d1' : '#1e1e1e'
+    var bg = dark ? '#141414' : '#f5f5f5'
+    var fg = dark ? '#ececec' : '#1a1a1a'
     var root = document.documentElement
     root.classList.toggle('dark', dark)
     root.style.colorScheme = dark ? 'dark' : 'light'

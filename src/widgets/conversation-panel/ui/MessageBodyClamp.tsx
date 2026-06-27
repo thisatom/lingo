@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createDeferredResizeObserver } from '@/shared/lib/observe-element-resize'
 import { cn } from '@/shared/lib/utils'
 
 export const MESSAGE_BODY_MAX_HEIGHT_PX = 90
@@ -38,9 +39,9 @@ export function MessageBodyClamp({
     }
 
     check()
-    const observer = new ResizeObserver(check)
+    const { observer, disconnect } = createDeferredResizeObserver(check)
     observer.observe(el)
-    return () => observer.disconnect()
+    return () => disconnect()
   }, [children, expanded])
 
   return (

@@ -1,4 +1,5 @@
 import { useChatsStore } from '@/entities/chat/model/store'
+import { formatQueuePreview } from '@/entities/message-queue/lib/format-queue-preview'
 import { useMessageQueueStore } from '@/entities/message-queue/model/store'
 import type { ChatComposerMode } from '@/entities/settings/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
@@ -15,9 +16,8 @@ import { getHistoryForApi } from '@/features/ai-chat/lib/chat-api-history'
 import { createStreamContentSync } from '@/features/ai-chat/lib/stream-content-sync'
 import {
   agentTurnTailMessageId,
-  hasPersistedAssistantTurn,
   removeAgentTurnTail,
-  removeAgentTurnTailUnlessPersisted
+  shouldKeepPartialTurnOnStop
 } from '@/features/ai-chat/lib/agent-turn-cleanup'
 import {
   endAgentTurnStreamBinding,
@@ -59,12 +59,18 @@ import {
   type WebSearchSource
 } from '@/shared/lib/web-search-targets'
 import { getLingo, isLingoAvailable } from '@/shared/lib/lingo'
+import type { ChatStreamController } from '@/shared/types/ipc'
 import { getLastUserMessageContent } from '@/shared/lib/web-search-intent'
 import {
   resolvePracticeLanguage
 } from '@/shared/config/practice-languages'
 import { useConversationStore } from '@/entities/conversation/model/store'
-import type { ChatStreamController } from '@/shared/types/ipc'
+import {
+  reconnectDelayMs,
+  isRetryableStreamError,
+  sleepMs,
+  STREAM_RECONNECT_MAX_ATTEMPTS
+} from '@/features/ai-chat/lib/stream-reconnect'
 
 export type AgentTurnSession = {
   getStreamController: () => ChatStreamController | null
@@ -91,6 +97,11 @@ export type RunAgentTurnParams = {
   setError: (error: string | null, targetChatId?: string) => void
   processNextInQueue: (chatId: string) => Promise<void>
   tryRunPendingAgentReply: (chatId: string) => Promise<boolean>
+  /** Resume an interrupted assistant reply in place. */
+  continuation?: {
+    assistantMessageId: string
+    prefix: string
+  }
   /** Vitest: inject run token so stream handlers stay active under mocked IPC. */
   agentRun?: AgentRunApi
 }
@@ -106,6 +117,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     setError,
     processNextInQueue,
     tryRunPendingAgentReply,
+    continuation,
     agentRun: agentRunOverride
   } = params
 
@@ -127,6 +139,10 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
   const removeMessage = useChatsStore.getState().removeMessage
   const updateMessageContent = useChatsStore.getState().updateMessageContent
   const updateMessageSearchSources = useChatsStore.getState().updateMessageSearchSources
+  const updateMessageReplyStatus = useChatsStore.getState().updateMessageReplyStatus
+
+  const continuationPrefix = continuation?.prefix.trim() ?? ''
+  const isContinuation = Boolean(continuation?.assistantMessageId && continuationPrefix)
 
   const customError = validateCustomLlmSettings(llmSettings)
   if (customError) {
@@ -164,11 +180,14 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     llmSettings.llmBackend === 'custom' ? llmSettings.customModelId : llmSettings.modelId
   const history = await getHistoryForApi(targetChatId, {
     modelId: activeModelId,
-    maxTokens: llmSettings.llmMaxTokens
+    maxTokens: llmSettings.llmMaxTokens,
+    excludeMessageIds: isContinuation ? [continuation!.assistantMessageId] : undefined
   })
   const chatMessages =
     useChatsStore.getState().chats.find((c) => c.id === targetChatId)?.messages ?? []
-  const webSearchForTurn = resolveWebSearchForChatTurn(llmSettings, chatMessages)
+  const webSearchForTurn = isContinuation
+    ? false
+    : resolveWebSearchForChatTurn(llmSettings, chatMessages)
   const lastUserMessageText = getLastUserMessageContent(history)
 
   if (webSearchForTurn) {
@@ -177,7 +196,9 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     setPipelineStageForChat(targetChatId, 'thinking')
   }
 
-  let assistantMessageId: string | null = null
+  let assistantMessageId: string | null = isContinuation
+    ? continuation!.assistantMessageId
+    : null
   let thinkingMessageId: string | null = null
 
   const ensureThinkingPlaceholder = () => {
@@ -188,7 +209,7 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
 
   let finalThinkingText = ''
   let hasThinkingStream = false
-  let finalText = ''
+  let finalText = isContinuation ? continuationPrefix : ''
   let streamCompleted = false
   const agentSpeechMode = chatComposerMode === 'conversation'
   const playTts = shouldPlayAgentTts(llmSettings.ttsEnabled, chatComposerMode)
@@ -248,118 +269,183 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     turnSearchSources = []
   }
 
+  if (isContinuation && assistantMessageId) {
+    updateMessageReplyStatus(assistantMessageId, undefined, targetChatId)
+  }
+
+  const flushPartialToStore = () => {
+    if (finalThinkingText.trim()) thinkingSync.flushNow(finalThinkingText)
+    if (finalText.trim()) streamSync.flushNow(finalText)
+  }
+
+  const finalizePartialTurnOnStop = (
+    replyStatus: 'interrupted' | 'incomplete'
+  ): boolean => {
+    flushPartialToStore()
+    const keepTail = shouldKeepPartialTurnOnStop(
+      targetChatId,
+      assistantMessageId,
+      finalText,
+      streamCompleted
+    )
+    if (keepTail) {
+      if (assistantMessageId && !streamCompleted) {
+        updateMessageReplyStatus(assistantMessageId, replyStatus, targetChatId)
+      }
+      if (thinkingMessageId && !finalThinkingText.trim()) {
+        removeMessage(thinkingMessageId, targetChatId)
+        thinkingMessageId = null
+      }
+      return true
+    }
+    removeAgentTurnTail(
+      removeMessagesFrom,
+      targetChatId,
+      thinkingMessageId,
+      assistantMessageId
+    )
+    return false
+  }
+
   try {
-    const stream = getLingo().chat.stream(
-      {
+    let receivedStreamTokens = false
+    const streamHandlers = {
+      onSearching: () => {
+        if (!isAgentRunActive(runId)) return
+        setPipelineStageForChat(targetChatId, 'searching')
+      },
+      onSearchFallback: ({ message }: { message: string }) => {
+        if (!isAgentRunActive(runId)) return
+        setPipelineSearchActiveUrlForChat(targetChatId, null)
+        setPipelineStageForChat(targetChatId, 'thinking')
+        setPipelineErrorForChat(targetChatId, message)
+      },
+      onSearchTargets: ({ targets }: { targets: WebSearchSource[] }) => {
+        if (!isAgentRunActive(runId)) return
+        const browsable = targets.filter(isBrowsableSearchTarget)
+        turnSearchSources = browsable
+        setPipelineSearchTargetsForChat(targetChatId, browsable)
+        if (browsable.length === 0) return
+        if (!assistantMessageId) {
+          const id = addMessage({ role: 'assistant', content: '' }, targetChatId)
+          assistantMessageId = id || null
+        }
+        if (assistantMessageId) {
+          updateMessageSearchSources(assistantMessageId, browsable, targetChatId)
+        }
+      },
+      onSearchVisiting: ({ url }: { url: string }) => {
+        if (!isAgentRunActive(runId)) return
+        setPipelineSearchActiveUrlForChat(targetChatId, url)
+      },
+      onThinkingDelta: ({ text }: { text: string }) => {
+        if (!isAgentRunActive(runId)) return
+        setPipelineSearchActiveUrlForChat(targetChatId, null)
+        hasThinkingStream = true
+        finalThinkingText = text
+        setPipelineStageForChat(targetChatId, 'thinking')
+        ensureThinkingPlaceholder()
+        thinkingSync.push(text)
+      },
+      onTextDelta: ({ text }: { text: string }) => {
+        if (!isAgentRunActive(runId)) return
+        receivedStreamTokens = true
+        setPipelineSearchActiveUrlForChat(targetChatId, null)
+        if (useConversationStore.getState().error === SEARCH_FALLBACK_NOTICE) {
+          setPipelineErrorForChat(targetChatId, null)
+        }
+        const effects = applyTextDeltaToTurn(
+          { finalText, finalThinkingText, hasThinkingStream },
+          text,
+          Boolean(thinkingMessageId)
+        )
+        finalText = effects.accumulators.finalText
+        finalThinkingText = effects.accumulators.finalThinkingText
+        hasThinkingStream = effects.accumulators.hasThinkingStream
+        if (effects.removeThinkingPlaceholder && thinkingMessageId) {
+          removeMessage(thinkingMessageId, targetChatId)
+          thinkingMessageId = null
+        }
+        if (effects.flushThinkingNow) {
+          thinkingSync.flushNow(finalThinkingText)
+        }
+        if (effects.pushAnswerToSync) {
+          setPipelineStreamingAnswerForChat(targetChatId, true)
+          clearPipelineDetailForChat(targetChatId)
+          streamSync.push(text)
+          feedAnswerTts(finalText)
+        }
+        persistTurnSearchSources()
+      },
+      onDone: ({ text }: { text: string }) => {
+        if (!isAgentRunActive(runId)) return
+        streamCompleted = true
+        const thinkingContent =
+          !finalThinkingText.trim() && thinkingMessageId
+            ? (useChatsStore
+                .getState()
+                .chats.find((c) => c.id === targetChatId)
+                ?.messages.find((m) => m.id === thinkingMessageId)
+                ?.content.trim() ?? '')
+            : ''
+        const effects = applyDoneToTurn(
+          { finalText, finalThinkingText, hasThinkingStream },
+          text,
+          thinkingContent
+        )
+        finalText = effects.accumulators.finalText
+        finalThinkingText = effects.accumulators.finalThinkingText
+        hasThinkingStream = effects.accumulators.hasThinkingStream
+        thinkingSync.flushNow(effects.flushThinkingText)
+        if (effects.flushAnswerText) {
+          streamSync.flushNow(effects.flushAnswerText)
+          feedAnswerTts(finalText)
+        }
+        setPipelineStreamingAnswerForChat(targetChatId, false)
+        persistTurnSearchSources()
+      }
+    }
+
+    const buildStreamRequest = () => {
+      const prefix = finalText.trim() || (isContinuation ? continuationPrefix : '')
+      return {
         messages: history,
         practiceLanguage: storedPracticeLanguage,
         ...buildChatStreamLlmFields(llmSettings),
         webSearch: webSearchForTurn,
-        languagePractice: llmSettings.languagePracticeEnabled
-      },
-      {
-        onSearching: () => {
-          if (!isAgentRunActive(runId)) return
-          setPipelineStageForChat(targetChatId, 'searching')
-        },
-        onSearchFallback: ({ message }) => {
-          if (!isAgentRunActive(runId)) return
-          setPipelineSearchActiveUrlForChat(targetChatId, null)
-          setPipelineStageForChat(targetChatId, 'thinking')
-          setPipelineErrorForChat(targetChatId, message)
-        },
-        onSearchTargets: ({ targets }) => {
-          if (!isAgentRunActive(runId)) return
-          const browsable = targets.filter(isBrowsableSearchTarget)
-          turnSearchSources = browsable
-          setPipelineSearchTargetsForChat(targetChatId, browsable)
-          if (browsable.length === 0) return
-          if (!assistantMessageId) {
-            const id = addMessage({ role: 'assistant', content: '' }, targetChatId)
-            assistantMessageId = id || null
-          }
-          if (assistantMessageId) {
-            updateMessageSearchSources(assistantMessageId, browsable, targetChatId)
-          }
-        },
-        onSearchVisiting: ({ url }) => {
-          if (!isAgentRunActive(runId)) return
-          setPipelineSearchActiveUrlForChat(targetChatId, url)
-        },
-        onThinkingDelta: ({ text }) => {
-          if (!isAgentRunActive(runId)) return
-          setPipelineSearchActiveUrlForChat(targetChatId, null)
-          hasThinkingStream = true
-          finalThinkingText = text
-          setPipelineStageForChat(targetChatId, 'thinking')
-          ensureThinkingPlaceholder()
-          thinkingSync.push(text)
-        },
-        onTextDelta: ({ text }) => {
-          if (!isAgentRunActive(runId)) return
-          setPipelineSearchActiveUrlForChat(targetChatId, null)
-          if (useConversationStore.getState().error === SEARCH_FALLBACK_NOTICE) {
-            setPipelineErrorForChat(targetChatId, null)
-          }
-          const effects = applyTextDeltaToTurn(
-            { finalText, finalThinkingText, hasThinkingStream },
-            text,
-            Boolean(thinkingMessageId)
-          )
-          finalText = effects.accumulators.finalText
-          finalThinkingText = effects.accumulators.finalThinkingText
-          hasThinkingStream = effects.accumulators.hasThinkingStream
-          if (effects.removeThinkingPlaceholder && thinkingMessageId) {
-            removeMessage(thinkingMessageId, targetChatId)
-            thinkingMessageId = null
-          }
-          if (effects.flushThinkingNow) {
-            thinkingSync.flushNow(finalThinkingText)
-          }
-          if (effects.pushAnswerToSync) {
-            setPipelineStreamingAnswerForChat(targetChatId, true)
-            clearPipelineDetailForChat(targetChatId)
-            streamSync.push(text)
-            feedAnswerTts(finalText)
-          }
-          persistTurnSearchSources()
-        },
-        onDone: ({ text }) => {
-          if (!isAgentRunActive(runId)) return
-          streamCompleted = true
-          const thinkingContent =
-            !finalThinkingText.trim() && thinkingMessageId
-              ? (useChatsStore
-                  .getState()
-                  .chats.find((c) => c.id === targetChatId)
-                  ?.messages.find((m) => m.id === thinkingMessageId)
-                  ?.content.trim() ?? '')
-              : ''
-          const effects = applyDoneToTurn(
-            { finalText, finalThinkingText, hasThinkingStream },
-            text,
-            thinkingContent
-          )
-          finalText = effects.accumulators.finalText
-          finalThinkingText = effects.accumulators.finalThinkingText
-          hasThinkingStream = effects.accumulators.hasThinkingStream
-          thinkingSync.flushNow(effects.flushThinkingText)
-          if (effects.flushAnswerText) {
-            streamSync.flushNow(effects.flushAnswerText)
-            feedAnswerTts(finalText)
-          }
-          setPipelineStreamingAnswerForChat(targetChatId, false)
-          persistTurnSearchSources()
-        }
+        languagePractice: llmSettings.languagePracticeEnabled,
+        ...(prefix ? { assistantContinuationPrefix: prefix } : {})
       }
-    )
+    }
 
-    session.setStreamController(stream)
-    session.setStreamTargetChatId(targetChatId)
-    session.setStreamActive(true)
-    setAgentStreamSession(targetChatId, true)
-    // IPC abort resolves `stream.done` without throwing; post-await paths check `isAgentRunActive`.
-    await stream.done
+    for (let reconnectAttempt = 0; reconnectAttempt < STREAM_RECONNECT_MAX_ATTEMPTS; reconnectAttempt++) {
+      if (!isAgentRunActive(runId)) break
+
+      try {
+        const stream = getLingo().chat.stream(buildStreamRequest(), streamHandlers)
+
+        session.setStreamController(stream)
+        session.setStreamTargetChatId(targetChatId)
+        session.setStreamActive(true)
+        setAgentStreamSession(targetChatId, true)
+        // IPC abort resolves `stream.done` without throwing; post-await paths check `isAgentRunActive`.
+        await stream.done
+        break
+      } catch (streamError) {
+        if (!isAgentRunActive(runId)) throw streamError
+        const canReconnect =
+          !receivedStreamTokens &&
+          reconnectAttempt < STREAM_RECONNECT_MAX_ATTEMPTS - 1 &&
+          isRetryableStreamError(streamError)
+        if (!canReconnect) throw streamError
+        setPipelineStageForChat(targetChatId, 'reconnecting')
+        await sleepMs(reconnectDelayMs(reconnectAttempt))
+        setPipelineStageForChat(
+          targetChatId,
+          webSearchForTurn ? 'searching' : 'thinking'
+        )
+      }
+    }
 
     const chatMessagesAfterStream =
       useChatsStore.getState().chats.find((c) => c.id === targetChatId)?.messages ?? []
@@ -395,20 +481,8 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     }
 
     if (!isAgentRunActive(runId)) {
-      const keepTail =
-        streamCompleted &&
-        hasPersistedAssistantTurn(targetChatId, assistantMessageId, finalText, {
-          streamCompleted: true
-        })
-      if (!keepTail) {
-        removeAgentTurnTail(
-          removeMessagesFrom,
-          targetChatId,
-          thinkingMessageId,
-          assistantMessageId
-        )
-        discardPendingSync = true
-      }
+      const keepTail = finalizePartialTurnOnStop('interrupted')
+      if (!keepTail) discardPendingSync = true
       setPipelineStageForChat(targetChatId, 'idle')
       return keepTail
     }
@@ -436,6 +510,10 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
       const removeId = agentTurnTailMessageId(thinkingMessageId, assistantMessageId)
       if (removeId) removeMessagesFrom(removeId, targetChatId)
       throw new Error('Model returned an empty response')
+    }
+
+    if (assistantMessageId) {
+      updateMessageReplyStatus(assistantMessageId, undefined, targetChatId)
     }
 
     useChatsStore.getState().notifyChatReplyReady(targetChatId)
@@ -496,49 +574,25 @@ export async function runAgentTurn(params: RunAgentTurnParams): Promise<boolean>
     const aborted = msg.includes('aborted') || (e instanceof Error && e.name === 'AbortError')
 
     if (!isAgentRunActive(runId)) {
-      if (aborted) {
-        removeAgentTurnTail(
-          removeMessagesFrom,
-          targetChatId,
-          thinkingMessageId,
-          assistantMessageId
-        )
-        discardPendingSync = true
-      } else {
-        removeAgentTurnTailUnlessPersisted(
-          removeMessagesFrom,
-          targetChatId,
-          thinkingMessageId,
-          assistantMessageId,
-          finalText,
-          { streamCompleted }
-        )
-      }
+      const keepTail = finalizePartialTurnOnStop(aborted ? 'interrupted' : 'incomplete')
+      if (!keepTail) discardPendingSync = true
       setPipelineStageForChat(targetChatId, 'idle')
-      return false
+      return keepTail
     }
 
     if (aborted) {
       session.getStreamingTts()?.cancel()
       session.setStreamingTts(null)
-      removeAgentTurnTail(
-        removeMessagesFrom,
-        targetChatId,
-        thinkingMessageId,
-        assistantMessageId
-      )
-      discardPendingSync = true
+      const keepTail = finalizePartialTurnOnStop('interrupted')
+      if (!keepTail) discardPendingSync = true
       setPipelineStageForChat(targetChatId, 'idle')
-      return false
+      return keepTail
     }
 
-    removeAgentTurnTail(
-      removeMessagesFrom,
-      targetChatId,
-      thinkingMessageId,
-      assistantMessageId
-    )
-    discardPendingSync = true
+    const keepPartial = finalizePartialTurnOnStop('incomplete')
+    if (!keepPartial) {
+      discardPendingSync = true
+    }
     if (isViewingChat(targetChatId)) setBlurAnimateMessageId(null)
     if (msg.includes('NO_OPENROUTER_KEY')) {
       setError('Add your OpenRouter API key in Settings.', targetChatId)

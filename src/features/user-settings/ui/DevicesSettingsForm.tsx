@@ -11,6 +11,7 @@ import {
   settingsInputClass,
   settingsSelectContentClass,
   settingsSelectItemClass,
+  settingsRowSelectTriggerWideClass,
   settingsSelectTriggerClass
 } from '@/shared/lib/settings-control'
 import {
@@ -137,7 +138,7 @@ export function DevicesSettingsForm() {
             <p className={settingsRowDescriptionClass}>
               {micPermissionDenied
                 ? 'Microphone access denied. Allow access and refresh.'
-                : 'Input device for voice capture and speech recognition.'}
+                : 'Input device for voice capture and speech recognition. First use downloads the on-device Whisper model (~190 MB); keep the app open until transcription works.'}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -164,7 +165,7 @@ export function DevicesSettingsForm() {
               }}
               disabled={micLoading || micPermissionDenied}
             >
-              <SelectTrigger id="devices-microphone" size="sm" className={`${settingsSelectTriggerClass} w-[280px] min-w-0`}>
+              <SelectTrigger id="devices-microphone" size="sm" className={settingsRowSelectTriggerWideClass}>
                 <SelectValue placeholder="System default" />
               </SelectTrigger>
               <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
@@ -200,7 +201,7 @@ export function DevicesSettingsForm() {
               if (option) setMicNoiseSuppression(option.value)
             }}
           >
-            <SelectTrigger id="devices-noise-suppression" size="sm" className={`${settingsSelectTriggerClass} w-[280px] min-w-0`}>
+            <SelectTrigger id="devices-noise-suppression" size="sm" className={settingsRowSelectTriggerWideClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
@@ -250,7 +251,7 @@ export function DevicesSettingsForm() {
               }}
               disabled={speakerLoading || !sinkSupported}
             >
-              <SelectTrigger id="devices-speaker" size="sm" className={`${settingsSelectTriggerClass} w-[280px] min-w-0`}>
+              <SelectTrigger id="devices-speaker" size="sm" className={settingsRowSelectTriggerWideClass}>
                 <SelectValue placeholder="System default" />
               </SelectTrigger>
               <SelectContent position="popper" className={cn(settingsSelectContentClass)}>

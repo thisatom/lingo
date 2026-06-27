@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
+import { useLayoutEffect, useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { createRafCoalescer } from '@/shared/lib/raf-coalesce'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
@@ -58,6 +58,10 @@ type VirtualizedConversationTurnsProps = {
   /** Called after the tail turn height changes during an active agent reply. */
   onTailContentChange?: () => void
   scrollApiRef?: MutableRefObject<VirtualizedConversationScrollApi | null>
+  lastReplyMessageId?: string | null
+  showReplyActions?: boolean
+  onRegenerateAssistantMessage?: (messageId: string) => void
+  onContinueAssistantMessage?: (messageId: string) => void
 }
 
 export function VirtualizedConversationTurns({
@@ -83,7 +87,11 @@ export function VirtualizedConversationTurns({
   onAttachmentError,
   liveVoiceUserMessageId = null,
   onTailContentChange,
-  scrollApiRef
+  scrollApiRef,
+  lastReplyMessageId = null,
+  showReplyActions = false,
+  onRegenerateAssistantMessage,
+  onContinueAssistantMessage
 }: VirtualizedConversationTurnsProps) {
   const tailCoalescerRef = useRef(createRafCoalescer(() => onTailContentChange?.()))
 
@@ -121,7 +129,8 @@ export function VirtualizedConversationTurns({
     tailThinkingLen,
     stage,
     pipelineStreamingAnswer,
-    pipelineSearchActiveUrl
+    pipelineSearchActiveUrl,
+    showReplyActions
   ])
 
   useEffect(() => {
@@ -129,7 +138,7 @@ export function VirtualizedConversationTurns({
     virtualizer.measure()
   }, [scrollElement, turnIdsSignature, turnContentSignature, virtualizer])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!scrollApiRef) return
     scrollApiRef.current = {
       scrollToTurn(messageId, options) {
@@ -201,6 +210,10 @@ export function VirtualizedConversationTurns({
                   ? lastAssistantMessageId(turn.assistantMessages)
                   : undefined
               }
+              lastReplyMessageId={lastReplyMessageId}
+              showReplyActions={isLatestTurn && showReplyActions}
+              onRegenerateAssistantMessage={onRegenerateAssistantMessage}
+              onContinueAssistantMessage={onContinueAssistantMessage}
             />
           </div>
         )

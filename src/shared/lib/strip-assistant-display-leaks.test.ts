@@ -68,8 +68,27 @@ Response Safety: safe
     expect(stripAssistantDisplayLeaks(raw).trim()).toBe('Привет! У меня всё хорошо.')
   })
 
+  it('removes standalone user safety line', () => {
+    const raw = `User Safety: safe
+
+Напишу драйвер для роутера.`
+    expect(stripAssistantDisplayLeaks(raw).trim()).toBe('Напишу драйвер для роутера.')
+  })
+
+  it('removes corrupted safety prefix with undefined tail', () => {
+    const raw = `User Safety: safe undefinedundefinedundefined
+
+Реальный ответ.`
+    expect(stripAssistantDisplayLeaks(raw).trim()).toBe('Реальный ответ.')
+  })
+
   it('removes agent answer template prefix', () => {
     expect(stripAssistantDisplayLeaks('agent: ### Answer: Hello there.')).toBe('Hello there.')
+  })
+
+  it('normalizes collapsed IRP_MJ constants split by invisible chars', () => {
+    const raw = `'IRPM\u200bJR\u200bREAD','IRPM\u200bJW\u200bRITE'`
+    expect(stripAssistantDisplayLeaks(raw)).toBe(`'IRP_MJ_READ','IRP_MJ_WRITE'`)
   })
 
   it('removes search preamble before tool XML', () => {

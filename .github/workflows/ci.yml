@@ -13,9 +13,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  typecheck:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript
+        run: npm run typecheck
+
+  unit:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +49,44 @@ jobs:
 
       - name: Unit tests
         run: npm run test
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npm run test:e2e:install -- --with-deps
+
+      - name: E2E tests (web preview)
+        run: npm run test:e2e
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [typecheck, unit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 libsecret-1-dev
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Production build (Electron)
         run: npm run build

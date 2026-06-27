@@ -11,6 +11,7 @@ import { createAppIconImage } from './icon'
 import { resolvePreloadScript } from './paths'
 import { resolvePackagedRendererHtml } from './renderer-path'
 import { registerWindowShortcuts } from './window-shortcuts'
+import { registerDevToolsWindowShortcuts, openDevToolsIfDev } from './devtools'
 import { setupGracefulShutdown } from './shutdown'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -24,13 +25,6 @@ function isPackagedRendererFileUrl(url: string): boolean {
   } catch {
     return false
   }
-}
-
-function openDevToolsIfDev(win: BrowserWindow): void {
-  if (win.webContents.isDestroyed()) return
-  if (process.env.NODE_ENV === 'production' && !process.env.ELECTRON_RENDERER_URL) return
-  if (win.webContents.isDevToolsOpened()) return
-  win.webContents.openDevTools({ mode: 'detach' })
 }
 
 /** Vite dev server may bind to 127.0.0.1 while electron-vite sets localhost — fix ERR_FAILED on Windows. */
@@ -80,7 +74,7 @@ export function createMainWindow(): BrowserWindow {
     minWidth: 800,
     minHeight: 560,
     show: false,
-    backgroundColor: '#121212',
+    backgroundColor: '#141414',
     title: 'Lingo',
     ...(icon ? { icon } : {}),
     titleBarStyle: 'hidden',
@@ -106,6 +100,7 @@ export function createMainWindow(): BrowserWindow {
 
   attachTitlebarToWindow(mainWindow)
   registerWindowShortcuts(mainWindow)
+  registerDevToolsWindowShortcuts(mainWindow)
   setupGracefulShutdown(mainWindow)
 
   if (process.platform === 'win32') {

@@ -11,7 +11,7 @@ export type AgentTurnPhase =
   | 'streaming'
   | 'speaking'
 
-const BUSY_PIPELINE_STAGES: PipelineStage[] = ['thinking', 'searching', 'speaking']
+const BUSY_PIPELINE_STAGES: PipelineStage[] = ['thinking', 'searching', 'speaking', 'reconnecting']
 
 /** Maps UI pipeline stage to agent turn phase (approximation until full controller). */
 export function pipelineStageToAgentPhase(stage: PipelineStage): AgentTurnPhase {
@@ -21,6 +21,8 @@ export function pipelineStageToAgentPhase(stage: PipelineStage): AgentTurnPhase 
     case 'speaking':
       return 'speaking'
     case 'thinking':
+      return 'streaming'
+    case 'reconnecting':
       return 'streaming'
     case 'idle':
     case 'listening':

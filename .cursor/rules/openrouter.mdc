@@ -1,28 +1,27 @@
 ---
 description: OpenRouter и смена API-ключей
-globs: "{src/features/ai-chat/**,src/features/manage-api-keys/**,src/entities/api-credentials/**,src/pages/settings/**,electron/main/**}"
+globs: "{src/features/ai-chat/**,src/features/manage-api-keys/**,src/pages/settings/**,electron/main/**}"
 alwaysApply: false
 ---
 
 # OpenRouter + ключи
 
-## Провайдер AI
+## Провайдер
 
 - Base URL: `https://openrouter.ai/api/v1`
-- Ключ: OpenRouter API key (не OpenAI напрямую)
-- SDK: `@ai-sdk/openai` / `openai` с кастомным `baseURL`
-- Заголовки: `HTTP-Referer`, `X-Title: Lingo`
+- SDK: `@ai-sdk/openai` / `openai` + custom `baseURL`
+- Headers: `HTTP-Referer`, `X-Title: Lingo`
 
-## Смена ключей (обязательно)
+## Ключи
 
 - UI: `pages/settings` + `features/manage-api-keys`
-- Хранение: main + `safeStorage`, IPC `setApiKey` / `clearApiKey` / `getApiKeyStatus`
-- После сохранения — следующий чат с новым ключом
-- UI: password input, masked display, не логировать ключ
+- Хранение: **keytar** в main, IPC `lingo:secrets:*`
+- Renderer: только masked / `configured`, не полный секрет
+- Приоритет: UI key → `.env` dev fallback
 
-## Приоритет
+## Запрещено
 
-1. Ключ из secure storage (UI)
-2. Fallback `.env` `LINGO_OPENROUTER_API_KEY` (dev)
+- Хардкод ключа, localStorage секретов (desktop), логирование ключей
+- OpenRouter из renderer на desktop (proxy через main)
 
-См. `docs/OPENROUTER.md`, `docs/API_KEYS.md`.
+См. `docs/OPENROUTER.md`, `docs/API_KEYS.md`, `api-keys.mdc`.

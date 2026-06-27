@@ -47,7 +47,7 @@ export function UserMessageActionButton({
       data-checkpoint-return-action
       className={cn(
         userMessageEditButtonClass,
-        'text-muted-foreground/55 hover:bg-accent hover:text-muted-foreground',
+        'text-muted-foreground/70',
         disabled && 'pointer-events-none opacity-0'
       )}
       tooltip="Return to this point"

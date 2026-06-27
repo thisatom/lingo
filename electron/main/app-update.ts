@@ -3,40 +3,34 @@ import {
   createWriteStream,
   existsSync,
   mkdirSync,
+  statSync,
   unlinkSync
 } from 'node:fs'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import type { AppUpdateCheckResult, AppUpdateInfo } from '../../src/shared/types/ipc'
+import { pickAssetForPlatform } from './app-update-assets'
 import { installDownloadedUpdate } from './app-update-install'
 import { emitAppUpdateProgress } from './app-update-progress'
+import { flushThenExitForUpdate } from './app-update-quit'
+import type { GitHubRelease } from './app-update-types'
 
 const GITHUB_OWNER = 'thisatom'
 const GITHUB_REPO = 'lingo'
 const RELEASES_PAGE = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`
 const API_BASE = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`
 
-const GITHUB_HEADERS: Record<string, string> = {
-  Accept: 'application/vnd.github+json',
-  'User-Agent': 'Lingo-Desktop-Updater'
-}
-
-type GitHubAsset = {
-  name: string
-  browser_download_url: string
-  size: number
-}
-
-type GitHubRelease = {
-  tag_name: string
-  name: string
-  body: string | null
-  html_url: string
-  published_at: string
-  draft: boolean
-  prerelease: boolean
-  assets: GitHubAsset[]
+function githubHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'Lingo-Desktop-Updater'
+  }
+  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN
+  if (token?.trim()) {
+    headers.Authorization = `Bearer ${token.trim()}`
+  }
+  return headers
 }
 
 let cachedCheck: AppUpdateCheckResult | null = null
@@ -64,20 +58,18 @@ export function isVersionNewer(latest: string, current: string): boolean {
 }
 
 async function githubFetch<T>(url: string): Promise<T | null> {
-  const response = await fetch(url, { headers: GITHUB_HEADERS })
+  const response = await fetch(url, { headers: githubHeaders() })
   if (response.status === 404) return null
   if (!response.ok) {
     const text = await response.text().catch(() => '')
-    throw new Error(
-      text ? `GitHub API error (${response.status})` : `GitHub API error (${response.status})`
-    )
+    throw new Error(text ? `GitHub API error (${response.status})` : `GitHub API error (${response.status})`)
   }
   return (await response.json()) as T
 }
 
 async function fetchLatestRelease(): Promise<GitHubRelease | null> {
   const latest = await githubFetch<GitHubRelease>(`${API_BASE}/releases/latest`)
-  if (latest && !latest.draft) return latest
+  if (latest && !latest.draft && !latest.prerelease) return latest
 
   const releases = await githubFetch<GitHubRelease[]>(`${API_BASE}/releases?per_page=10`)
   if (!releases?.length) return null
@@ -85,38 +77,6 @@ async function fetchLatestRelease(): Promise<GitHubRelease | null> {
   return (
     releases.find((release) => !release.draft && !release.prerelease) ??
     releases.find((release) => !release.draft) ??
-    null
-  )
-}
-
-function pickWindowsAsset(assets: GitHubAsset[]): GitHubAsset | null {
-  const installers = assets.filter(
-    (asset) =>
-      asset.browser_download_url.toLowerCase().endsWith('.exe') ||
-      asset.browser_download_url.toLowerCase().endsWith('.msi')
-  )
-  if (!installers.length) return null
-
-  return (
-    installers.find((asset) => /setup|installer|win|x64/i.test(asset.name)) ?? installers[0] ?? null
-  )
-}
-
-function pickMacAsset(assets: GitHubAsset[]): GitHubAsset | null {
-  const archHint = process.arch === 'arm64' ? 'arm64' : 'x64'
-  const zips = assets.filter((asset) => /\.zip$/i.test(asset.name))
-  const matchArch = (list: GitHubAsset[]) =>
-    list.find((asset) => asset.name.includes(archHint)) ?? list[0] ?? null
-
-  return matchArch(zips.filter((asset) => /mac/i.test(asset.name))) ?? matchArch(zips)
-}
-
-function pickAssetForPlatform(assets: GitHubAsset[]): GitHubAsset | null {
-  if (process.platform === 'win32') return pickWindowsAsset(assets)
-  if (process.platform === 'darwin') return pickMacAsset(assets)
-  return (
-    assets.find((asset) => /\.AppImage$/i.test(asset.name)) ??
-    assets.find((asset) => /\.deb$/i.test(asset.name)) ??
     null
   )
 }
@@ -182,9 +142,10 @@ export async function checkForAppUpdate(): Promise<AppUpdateCheckResult> {
 async function downloadAsset(
   url: string,
   destination: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  knownTotal?: number | null
 ): Promise<void> {
-  const response = await fetch(url, { headers: GITHUB_HEADERS, redirect: 'follow' })
+  const response = await fetch(url, { headers: githubHeaders(), redirect: 'follow' })
   if (!response.ok) {
     throw new Error(`Download failed (${response.status})`)
   }
@@ -192,7 +153,8 @@ async function downloadAsset(
     throw new Error('Download failed (empty response)')
   }
 
-  const total = Number(response.headers.get('content-length') ?? 0)
+  const headerTotal = Number(response.headers.get('content-length') ?? 0)
+  const total = headerTotal > 0 ? headerTotal : (knownTotal ?? 0)
   let received = 0
   const reader = response.body.getReader()
 
@@ -212,6 +174,18 @@ async function downloadAsset(
     ),
     createWriteStream(destination)
   )
+
+  if (!existsSync(destination)) {
+    throw new Error('Download failed (file missing)')
+  }
+
+  const size = statSync(destination).size
+  if (size <= 0) {
+    throw new Error('Download failed (empty file)')
+  }
+  if (total > 0 && size < total * 0.95) {
+    throw new Error('Download failed (incomplete file)')
+  }
 }
 
 export async function downloadAndInstallUpdate(): Promise<{ ok: boolean; error?: string }> {
@@ -232,12 +206,16 @@ export async function downloadAndInstallUpdate(): Promise<{ ok: boolean; error?:
       }
     }
 
-    const update = cachedCheck!.update!
+    const update = cachedCheck?.update
+    if (!update) {
+      emitAppUpdateProgress({ phase: 'idle' })
+      return { ok: false, error: 'No update available' }
+    }
 
     if (!app.isPackaged) {
       await shell.openExternal(update.htmlUrl || RELEASES_PAGE)
       emitAppUpdateProgress({ phase: 'idle' })
-      return { ok: true }
+      return { ok: false, error: 'Install updates from a packaged build of Lingo.' }
     }
 
     if (!update.downloadUrl) {
@@ -253,9 +231,14 @@ export async function downloadAndInstallUpdate(): Promise<{ ok: boolean; error?:
     emitAppUpdateProgress({ phase: 'downloading', version: update.version, percent: 0 })
 
     try {
-      await downloadAsset(update.downloadUrl, installerPath, (percent) => {
-        emitAppUpdateProgress({ phase: 'downloading', version: update.version, percent })
-      })
+      await downloadAsset(
+        update.downloadUrl,
+        installerPath,
+        (percent) => {
+          emitAppUpdateProgress({ phase: 'downloading', version: update.version, percent })
+        },
+        update.downloadSize
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Download failed'
       emitAppUpdateProgress({ phase: 'failed', message })
@@ -266,13 +249,15 @@ export async function downloadAndInstallUpdate(): Promise<{ ok: boolean; error?:
 
     try {
       await installDownloadedUpdate(installerPath, fileName)
-      emitAppUpdateProgress({ phase: 'restarting', version: update.version })
-      return { ok: true }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not install update'
       emitAppUpdateProgress({ phase: 'failed', message })
       return { ok: false, error: message }
     }
+
+    emitAppUpdateProgress({ phase: 'restarting', version: update.version })
+    await flushThenExitForUpdate()
+    return { ok: true }
   } finally {
     installInFlight = false
   }
@@ -285,6 +270,7 @@ export async function openReleasesPage(): Promise<void> {
 export async function backgroundUpdateCheck(
   sendAvailable: (info: AppUpdateInfo) => void
 ): Promise<void> {
+  if (!app.isPackaged) return
   const result = await checkForAppUpdate()
   if (result.update) sendAvailable(result.update)
 }

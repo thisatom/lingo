@@ -62,11 +62,18 @@ export function stickChatViewportToBottom(
 export type ChatTailScrollExtras = {
   pipelineStage?: string
   pipelineSearchActiveUrl?: string | null
+  /** Tail action bar (Copy/Speak) appeared or reply status changed. */
+  replyActionsReady?: boolean
 }
 
 /** Tracks streaming tail growth (assistant + thinking) and pipeline UI for auto-follow. */
 export function buildChatTailScrollSignature(
-  messages: readonly { id: string; role: string; content: string }[],
+  messages: readonly {
+    id: string
+    role: string
+    content: string
+    replyStatus?: string
+  }[],
   extras?: ChatTailScrollExtras
 ): string {
   if (messages.length === 0) return '0'
@@ -79,9 +86,18 @@ export function buildChatTailScrollSignature(
       break
     }
   }
-  const base = `${messages.length}:${last.id}:${last.content.length}:${last.role}:t${thinkingLen}`
+  let lastAssistantReplyStatus = ''
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]!
+    if (message.role === 'assistant') {
+      lastAssistantReplyStatus = message.replyStatus ?? ''
+      break
+    }
+  }
+  const base = `${messages.length}:${last.id}:${last.content.length}:${last.role}:t${thinkingLen}:rs${lastAssistantReplyStatus}`
   if (!extras) return base
   const stage = extras.pipelineStage ?? ''
   const searchUrl = extras.pipelineSearchActiveUrl ?? ''
-  return `${base}:st${stage}:su${searchUrl}`
+  const actionsReady = extras.replyActionsReady ? '1' : '0'
+  return `${base}:st${stage}:su${searchUrl}:ar${actionsReady}`
 }

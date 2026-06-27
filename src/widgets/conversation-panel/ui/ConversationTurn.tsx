@@ -12,6 +12,7 @@ import {
   isThinkingMessageLive,
   shouldShowThinkingInTurn
 } from '@/widgets/conversation-panel/lib/group-turns'
+import { canContinueAssistantReply } from '@/features/ai-chat/lib/assistant-continuation'
 import { AgentMessage } from './AgentMessage'
 import { AgentThinkingMessage } from './AgentThinkingMessage'
 import { UserMessage } from './UserMessage'
@@ -23,7 +24,6 @@ export const ConversationTurn = memo(function ConversationTurn({
   turnIndex,
   activeChatId,
   editingUserMessageId,
-  actionsDisabled,
   showStopOnUserMessage,
   onStopAgent,
   voiceSupported,
@@ -46,7 +46,9 @@ export const ConversationTurn = memo(function ConversationTurn({
   userHeaderSticky = false,
   lastReplyMessageId = null,
   showReplyActions = false,
-  onRegenerateAssistantMessage
+  onRegenerateAssistantMessage,
+  onContinueAssistantMessage,
+  actionsDisabled = false
 }: ConversationTurnProps) {
   const isEditing = editingUserMessageId === turn.user.id
   const latestAssistantMessageId =
@@ -82,7 +84,11 @@ export const ConversationTurn = memo(function ConversationTurn({
           content={turn.user.content}
           attachments={turn.user.attachments}
           chatId={activeChatId}
-          disabled={actionsDisabled && !showStopOnUserMessage}
+          disabled={
+            isLatestTurn
+              ? (actionsDisabled || voiceBusy) && !showStopOnUserMessage
+              : actionsDisabled
+          }
           isEditing={isEditing}
           showStop={showStopOnUserMessage}
           onStopAgent={onStopAgent}
@@ -127,13 +133,28 @@ export const ConversationTurn = memo(function ConversationTurn({
           return null
         }
 
-        const showSearchSpinner =
+        const showSearchUi =
           message.role === 'assistant' &&
           searchInProgress &&
           message.id === searchUiAssistantMessageId &&
           !pipelineStreamingAnswer &&
+          !isAnswerStream
+
+        const isLastReply = message.id === lastReplyMessageId
+        const hasAnswer = message.content.trim().length > 0
+        const agentAnsweringLatest = agentBusy && isLatestTurn && isLastReply
+
+        const showContinue =
+          message.role === 'assistant' &&
+          canContinueAssistantReply(message) &&
           !isAnswerStream &&
-          !message.content.trim()
+          !agentAnsweringLatest
+
+        const showFullActions =
+          hasAnswer &&
+          !agentAnsweringLatest &&
+          !isAnswerStream &&
+          (!isLastReply || showReplyActions)
 
         return (
           <article key={message.id} className="relative z-0 mt-1.5 min-w-0 max-w-full">
@@ -147,19 +168,22 @@ export const ConversationTurn = memo(function ConversationTurn({
               <AgentMessage
                 content={message.content}
                 searchSources={message.searchSources}
-                showSearchSpinner={showSearchSpinner}
+                showSearchSpinner={showSearchUi}
+                visitingSearchUrl={showSearchUi ? pipelineSearchActiveUrl : null}
                 parseThrottleMs={isAnswerStream ? 50 : undefined}
-                showFooterActions={
-                  message.id === lastReplyMessageId &&
-                  showReplyActions &&
-                  message.content.trim().length > 0
-                }
+                showFooterActions={showFullActions}
                 onRegenerate={
-                  onRegenerateAssistantMessage
+                  onRegenerateAssistantMessage && showFullActions
                     ? () => onRegenerateAssistantMessage(message.id)
                     : undefined
                 }
-                regenerateDisabled={agentBusy}
+                regenerateDisabled={(agentBusy && isLastReply) || actionsDisabled}
+                onContinue={
+                  onContinueAssistantMessage && showContinue
+                    ? () => onContinueAssistantMessage(message.id)
+                    : undefined
+                }
+                continueDisabled={agentBusy || actionsDisabled}
               />
             )}
           </article>

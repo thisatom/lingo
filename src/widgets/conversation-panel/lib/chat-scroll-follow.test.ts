@@ -76,5 +76,15 @@ describe('buildChatTailScrollSignature', () => {
     )
     expect(sig).toContain(':stsearching')
     expect(sig).toContain(':suhttps://example.com')
+    expect(sig).toContain(':ar0')
+  })
+
+  it('includes reply status and action bar readiness', () => {
+    const sig = buildChatTailScrollSignature(
+      [{ id: '1', role: 'assistant', content: 'partial', replyStatus: 'interrupted' }],
+      { replyActionsReady: true }
+    )
+    expect(sig).toContain(':rsinterrupted')
+    expect(sig).toContain(':ar1')
   })
 })

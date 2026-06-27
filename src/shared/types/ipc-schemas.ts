@@ -63,7 +63,8 @@ export const chatStreamRequestSchema = z.object({
   languagePractice: z.boolean().optional(),
   modelAutoFallback: z.boolean().optional(),
   maxTokens: z.number().int().min(0).max(128_000).optional(),
-  maxTokensRetry: z.number().int().min(0).max(128_000).optional()
+  maxTokensRetry: z.number().int().min(0).max(128_000).optional(),
+  assistantContinuationPrefix: z.string().max(500_000).optional()
 })
 
 export const chatCompleteRequestSchema = z.object({

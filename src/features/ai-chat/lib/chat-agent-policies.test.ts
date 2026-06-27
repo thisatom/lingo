@@ -14,6 +14,15 @@ describe('chat-agent-policies', () => {
     it('keeps streamed text when done is empty', () => {
       expect(resolveStreamDoneAnswer('', '  Streamed answer  ')).toBe('Streamed answer')
     })
+
+    it('keeps merged streamed text when done is a continuation tail only', () => {
+      expect(
+        resolveStreamDoneAnswer(
+          ' there was a kingdom.',
+          'Once upon a time there was a kingdom.'
+        )
+      ).toBe('Once upon a time there was a kingdom.')
+    })
   })
 
   describe('shouldRemoveEmptyThinkingPlaceholder', () => {

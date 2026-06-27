@@ -12,6 +12,7 @@ import { useComposerPaste } from '@/features/chat-attachments/model/useComposerP
 import { useNativeComposerDrop } from '@/features/chat-attachments/model/useNativeComposerDrop'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { VoiceRecordButton, type VoiceInteractionMode } from '@/features/voice-capture/ui/VoiceRecordButton'
+import { PAGE_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
 import { composerInputHoverClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { CHAT_MODE_LABELS, composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
 import {
@@ -24,6 +25,7 @@ import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
 import { ComposerTextareaContextMenu } from '@/features/chat-composer/ui/ComposerTextareaContextMenu'
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import { isElectronApp } from '@/shared/lib/lingo'
+import { createDeferredResizeObserver } from '@/shared/lib/observe-element-resize'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
@@ -174,10 +176,7 @@ export function ChatComposer({
     onError: onAttachmentError
   })
   const showDropOverlay = attachmentsEnabled && dragOver && !disabled
-  const voiceDisabled =
-    disabled ||
-    voiceBusy ||
-    (agentBusy && !(liveConversationActive && chatComposerMode === 'conversation'))
+  const voiceDisabled = disabled || voiceBusy
   const showStop = Boolean(
     onStop &&
       !canSend &&
@@ -185,6 +184,8 @@ export function ChatComposer({
         voiceBusy ||
         (liveConversationActive && chatComposerMode === 'conversation'))
   )
+  const speechListening = Boolean(isListening && onVoiceStop)
+  const showAgentStop = Boolean(showStop && !speechListening)
   const sendTooltip = agentBusy && canSend ? 'Send follow-up (queued)' : 'Send'
   const micLabel = voiceMicLabel(chatComposerMode, liveConversationActive, Boolean(isListening))
 
@@ -226,13 +227,16 @@ export function ChatComposer({
     }
 
     syncTextareaHeight()
-    const observer = new ResizeObserver(syncTextareaHeight)
+    const { observer, disconnect } = createDeferredResizeObserver(syncTextareaHeight)
     observer.observe(shell)
-    return () => observer.disconnect()
+    return () => disconnect()
   }, [showAttachmentPanel, showQueuePanel])
 
   return (
-    <div className={cn('w-full shrink-0', !overlay && 'px-4 pb-4 pt-2')} data-composer-root>
+    <div
+      className={cn('w-full shrink-0', !overlay && cn(PAGE_HORIZONTAL_PADDING_CLASS, 'pb-4 pt-2'))}
+      data-composer-root
+    >
       <div
         ref={zoneRef}
         className={cn(
@@ -245,7 +249,7 @@ export function ChatComposer({
       >
         {showDropOverlay ? (
           <div
-            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-accent/60 backdrop-blur-[1px]"
+            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-accent/75"
             aria-hidden
           >
             <div className="flex flex-col items-center gap-1.5 px-4 text-center">
@@ -282,6 +286,7 @@ export function ChatComposer({
           <ComposerTextareaContextMenu onValueChange={onChange} textareaRef={textareaRef}>
             <textarea
               ref={textareaRef}
+              data-testid="chat-composer-input"
               value={value}
               onChange={(e) => {
                 if (disabled) return
@@ -397,68 +402,73 @@ export function ChatComposer({
 
           <div className="min-w-0 flex-1" />
 
-          {showStop ? (
-            <TooltipIconButton
-              size="iconSm"
-              className="shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/90"
-              tooltip="Stop"
-              onClick={onStop}
-            >
-              <Square className="size-3.5 fill-current" strokeWidth={0} />
-            </TooltipIconButton>
-          ) : canSend ? (
-            <TooltipIconButton
-              size="iconSm"
-              className="shrink-0 rounded-full bg-foreground text-background transition-colors hover:bg-foreground/90"
-              tooltip={sendTooltip}
-              onClick={onSend}
-            >
-              <ArrowUp className="size-3.5" strokeWidth={2} />
-            </TooltipIconButton>
-          ) : voiceAvailable ? (
-            isListening && onVoiceStop ? (
+          <div className="flex shrink-0 items-center gap-1">
+            {voiceAvailable ? (
+              speechListening ? (
+                <TooltipIconButton
+                  type="button"
+                  variant="destructive"
+                  size="iconSm"
+                  className="shrink-0 rounded-full animate-pulse"
+                  disabled={disabled}
+                  tooltip="Stop recording"
+                  aria-label="Stop recording"
+                  onClick={onVoiceStop}
+                >
+                  <Square className="size-3.5 fill-current" strokeWidth={0} />
+                </TooltipIconButton>
+              ) : (
+                <VoiceRecordButton
+                  variant="secondary"
+                  size="iconSm"
+                  interactionMode={voiceInteractionMode}
+                  isListening={!!isListening}
+                  disabled={voiceDisabled}
+                  label={micLabel}
+                  highlight={liveConversationActive && chatComposerMode === 'conversation'}
+                  onPress={onVoicePress}
+                  onRelease={onVoiceStop ?? onVoiceRelease ?? (() => undefined)}
+                  className={cn(
+                    'shrink-0 rounded-full',
+                    liveConversationActive &&
+                      chatComposerMode === 'conversation' &&
+                      !isListening &&
+                      'ring-1 ring-emerald-500/50'
+                  )}
+                />
+              )
+            ) : null}
+
+            {showAgentStop ? (
               <TooltipIconButton
-                type="button"
-                variant="destructive"
                 size="iconSm"
-                className="shrink-0 rounded-full animate-pulse"
-                disabled={disabled}
-                tooltip="Stop recording"
-                aria-label="Stop recording"
-                onClick={onVoiceStop}
+                className="shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/80"
+                tooltip="Stop"
+                onClick={onStop}
               >
                 <Square className="size-3.5 fill-current" strokeWidth={0} />
               </TooltipIconButton>
-            ) : (
-              <VoiceRecordButton
-                variant="secondary"
+            ) : canSend ? (
+              <TooltipIconButton
                 size="iconSm"
-                interactionMode={voiceInteractionMode}
-                isListening={!!isListening}
-                disabled={voiceDisabled}
-                label={micLabel}
-                highlight={liveConversationActive && chatComposerMode === 'conversation'}
-                onPress={onVoicePress}
-                onRelease={onVoiceStop ?? onVoiceRelease ?? (() => undefined)}
-                className={cn(
-                  'shrink-0 rounded-full',
-                  liveConversationActive &&
-                    chatComposerMode === 'conversation' &&
-                    !isListening &&
-                    'ring-1 ring-emerald-500/50'
-                )}
-              />
-            )
-          ) : (
-            <TooltipIconButton
-              size="iconSm"
-              className="shrink-0 rounded-full bg-muted text-muted-foreground"
-              disabled
-              tooltip="Send"
-            >
-              <ArrowUp className="size-3.5" strokeWidth={2} />
-            </TooltipIconButton>
-          )}
+                data-testid="chat-send"
+                className="shrink-0 rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/80"
+                tooltip={sendTooltip}
+                onClick={onSend}
+              >
+                <ArrowUp className="size-3.5" strokeWidth={2} />
+              </TooltipIconButton>
+            ) : !voiceAvailable && !showStop ? (
+              <TooltipIconButton
+                size="iconSm"
+                className="shrink-0 rounded-full bg-muted text-muted-foreground"
+                disabled
+                tooltip="Send"
+              >
+                <ArrowUp className="size-3.5" strokeWidth={2} />
+              </TooltipIconButton>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

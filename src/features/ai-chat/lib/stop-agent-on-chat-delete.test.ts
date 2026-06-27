@@ -39,10 +39,11 @@ describe('stopAgentOnChatDeleted', () => {
     expect(executeAgentStopMock).not.toHaveBeenCalled()
   })
 
-  it('does not force-stop when another chat is streaming', () => {
+  it('does not stop when a stale stream ref points at the deleted chat but another chat streams', () => {
     setAgentStreamSession('other-chat', true)
+    getSharedAgentChatSessionRefs().streamTargetChatIdRef.current = 'deleted-chat'
 
-    stopAgentOnChatDeleted('busy-deleted')
+    stopAgentOnChatDeleted('deleted-chat')
 
     expect(executeAgentStopMock).not.toHaveBeenCalled()
   })

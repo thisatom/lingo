@@ -40,6 +40,7 @@ function withUserNameSystemPrompt(base: ChatMessagePayload[]): ChatMessagePayloa
 export type ChatApiHistoryOptions = {
   modelId: string
   maxTokens: number
+  excludeMessageIds?: string[]
 }
 
 export async function getHistoryForApi(
@@ -47,9 +48,10 @@ export async function getHistoryForApi(
   options: ChatApiHistoryOptions
 ): Promise<ChatMessagePayload[]> {
   const chat = useChatsStore.getState().chats.find((c) => c.id === chatId)
+  const exclude = new Set(options.excludeMessageIds ?? [])
   const visible =
     chat?.messages.filter(
-      (m) => messageHasVisibleContent(m) && m.role !== 'thinking'
+      (m) => messageHasVisibleContent(m) && m.role !== 'thinking' && !exclude.has(m.id)
     ) ?? []
   const alternating = normalizeAlternatingChatMessages(visible)
   const { messages: trimmed, historyTruncated } = trimMessagesToTokenBudgetWithMeta(

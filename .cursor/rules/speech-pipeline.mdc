@@ -1,45 +1,31 @@
 ---
-description: STT → AI → TTS пайплайн
-globs: "{src/features/**,docs/SPEECH_PIPELINE.md}"
+description: STT → AI → TTS — контракт стадий
+globs: "{src/features/**,electron/main/**,docs/SPEECH_PIPELINE.md}"
 alwaysApply: false
 ---
 
 # Speech pipeline
 
-Цепочка (строго по шагам):
+1. **Capture** — `voice-capture`, `voice-input`
+2. **STT** — Whisper (main) / Web Speech (web preview)
+3. **AI** — `features/ai-chat` → IPC `lingo:chat:stream`
+4. **TTS** — edge-tts (main) / web API (preview)
 
-1. **Capture** — `MediaRecorder` / Web Audio (renderer) или main при необходимости
-2. **STT** — текст пользователя
-3. **AI** — запрос с историей диалога и целевым языком
-4. **TTS** — озвучка ответа
+## Стадии
 
-## Контракты (план)
+`idle` | `listening` | `transcribing` | `thinking` | `searching` | `speaking` | `error` | `reconnecting`
 
-```typescript
-type PipelineStage = 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking' | 'error';
-
-interface Transcript { text: string; language: string; isFinal: boolean; }
-interface AiReply { text: string; language: string; }
-```
+- Голосовые стадии — `voice-input`; LLM — `ai-chat` + registry
+- Stop прерывает TTS и не автозапускает очередь/mic без контракта Agent Speech
 
 ## Правила
 
-- Каждый шаг — отдельный feature-слайс с единой точкой входа (hook или service)
-- Ошибка на шаге N не ломает состояние слайсов 1..N-1 без явного reset
-- Отмена: пользователь может прервать запись или TTS
-- Язык тренировки передаётся в промпт AI и в STT/TTS locale
+- Отмена на шаге N не ломает store без явного reset
+- edge-tts **только** main; `TtsProvider` в `shared/api/tts/`
+- Язык практики — settings → промпт / locale STT-TTS
 
-## AI
+## Стабильность
 
-- Провайдер: **OpenRouter** (`https://openrouter.ai/api/v1`)
-- SDK: **Vercel AI SDK** или **OpenAI SDK** + store в `entities/conversation`
-- Ключ: `features/manage-api-keys`, хранение в main — см. `docs/API_KEYS.md`
-- Сложные ветвления позже: **LangGraph** (не на старте)
+- Не ветвить pipeline по keyword в transcript («погода», «найди») — отправка текста как есть; web search по toggle + explicit command
 
-## TTS
-
-- Dev: **edge-tts** только в `electron/main` → IPC → renderer
-- Prod: **Azure Speech** (предпочтительно тот же провайдер, что STT)
-- Абстракция: `TtsProvider` в `shared/api/tts/`
-
-См. `docs/STACK.md`.
+См. `docs/SPEECH_PIPELINE.md`, `speech-pipeline` audit domain.

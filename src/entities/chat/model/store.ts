@@ -16,7 +16,9 @@ import type { Message, MessageSearchSource } from '@/entities/message/model/type
 import { notifyActiveChatChange } from '@/entities/chat/model/active-chat-effects'
 import { notifyChatsReset } from '@/entities/chat/model/chat-reset-effects'
 import {
-  scheduleDeleteAttachmentsFromMessages
+  scheduleDeleteAttachmentsFromMessages,
+  scheduleDeleteAttachmentBlobs,
+  collectAttachmentIds
 } from '@/entities/message/lib/attachment-cleanup'
 import { clearAllAttachmentBlobs } from '@/entities/message/lib/attachment-storage'
 import { notifyChatDeleted } from '@/entities/chat/model/chat-delete-effects'
@@ -26,6 +28,7 @@ import {
   omitPendingComposerFromRecord,
   PENDING_COMPOSER_CHAT_ID
 } from '@/entities/chat/lib/pending-composer'
+import { sanitizePersistedChats } from '@/entities/chat/lib/sanitize-persisted-messages'
 import { sortChatsForSidebar } from '@/shared/lib/chat-sidebar'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import type { Chat } from './types'
@@ -75,6 +78,11 @@ interface ChatsState {
   updateMessageSearchSources: (
     messageId: string,
     searchSources: MessageSearchSource[],
+    targetChatId?: string
+  ) => void
+  updateMessageReplyStatus: (
+    messageId: string,
+    replyStatus: Message['replyStatus'],
     targetChatId?: string
   ) => void
   getComposerDraft: (chatId: string) => string
@@ -319,8 +327,12 @@ export const useChatsStore = create<ChatsState>()(
       deleteChat: (id) => {
         const prevActive = get().activeChatId
         const deletedChat = get().chats.find((c) => c.id === id)
+        const composerAttachments = get().composerAttachmentsByChatId?.[id] ?? []
         if (deletedChat) {
           scheduleDeleteAttachmentsFromMessages(deletedChat.messages)
+        }
+        if (composerAttachments.length > 0) {
+          scheduleDeleteAttachmentBlobs(collectAttachmentIds(composerAttachments))
         }
         set((state) => {
           const drafts = state.composerDraftByChatId ?? {}
@@ -620,6 +632,35 @@ export const useChatsStore = create<ChatsState>()(
         }))
       },
 
+      updateMessageReplyStatus: (messageId, replyStatus, targetChatId) => {
+        const chatId = targetChatId ?? get().activeChatId
+        if (!chatId) return
+
+        set((state) => ({
+          chats: withSortedChats(
+            state.chats.map((c) => {
+              if (c.id !== chatId) return c
+              const index = c.messages.findIndex((m) => m.id === messageId)
+              if (index === -1) return c
+              const message = c.messages[index]
+              if (message.role !== 'assistant') return c
+              if (message.replyStatus === replyStatus) return c
+              const next = { ...message }
+              if (replyStatus) {
+                next.replyStatus = replyStatus
+              } else {
+                delete next.replyStatus
+              }
+              return {
+                ...c,
+                messages: c.messages.map((m) => (m.id === messageId ? next : m)),
+                updatedAt: Date.now()
+              }
+            })
+          )
+        }))
+      },
+
       getComposerDraft: (chatId) => get().composerDraftByChatId?.[chatId] ?? '',
 
       setComposerDraft: (chatId, draft) => {
@@ -796,7 +837,7 @@ export const useChatsStore = create<ChatsState>()(
     {
       name: 'lingo-chats-v3',
       storage: createJSONStorage(() => chatPersistStorage),
-      version: 5,
+      version: 6,
       partialize: (state): PersistedChatsState => ({
         chats: chatsForPersist(state.chats),
         activeChatId: state.activeChatId,
@@ -824,7 +865,9 @@ export const useChatsStore = create<ChatsState>()(
           chatScrollByChatId = migrated
         }
 
-        return { ...state, chatScrollByChatId }
+        const chats = sanitizePersistedChats(state.chats)
+
+        return { ...state, chats, chatScrollByChatId }
       },
       merge: (persisted, current) => {
         const saved = normalizePersistedState(
@@ -849,6 +892,7 @@ export const useChatsStore = create<ChatsState>()(
           state.chatHistoryPast = state.chatHistoryPast ?? []
           state.chatHistoryFuture = state.chatHistoryFuture ?? []
           state.chatScrollByChatId = state.chatScrollByChatId ?? {}
+          state.chats = sanitizePersistedChats(state.chats)
         }
         state?.reconcileActiveChat()
       }

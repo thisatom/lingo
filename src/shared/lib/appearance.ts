@@ -20,11 +20,9 @@ export function isConversationDensity(value: unknown): value is ConversationDens
 }
 
 const FONT_SANS_STACK: Record<UiFontFamily, string> = {
-  system:
-    "-apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+  system: "'Geist Variable', system-ui, sans-serif",
   serif: "Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', Times, serif",
-  monospace:
-    "ui-monospace, SFMono-Regular, 'SF Mono', Consolas, Menlo, Monaco, 'Cascadia Mono', 'Courier New', monospace"
+  monospace: "'Geist Mono Variable', ui-monospace, monospace"
 }
 
 const CHAT_TEXT_SCALE: Record<TextScale, { fontSize: string; lineHeight: string }> = {

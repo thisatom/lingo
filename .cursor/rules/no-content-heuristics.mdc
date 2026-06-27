@@ -1,0 +1,40 @@
+---
+description: Запрет угадывания intent по тексту пользователя или стрима агента
+alwaysApply: true
+---
+
+# Без эвристик по содержимому текста
+
+**Не добавляй и не расширяй логику, которая угадывает намерение пользователя или состояние чата по подстрокам в сообщении или в стриме ассистента.**
+
+## Запрещено в продуктовом коде
+
+- Regex / keyword lists по типу `weather`, `news`, `what is`, `погода`, `курс`, `latest`, `who is` для решения «искать в web / не искать / другой режим».
+- Классификаторы «factual vs casual vs creative» по форме вопроса.
+- Парсинг **стрима агента** (assistant/thinking) чтобы вывести intent, валидацию ввода или следующий шаг пайплайна.
+- Эвристики «если в тексте есть X — значит пользователь хотел Y» без **явной** команды или настройки.
+
+## Разрешено
+
+| Механизм | Пример |
+|----------|--------|
+| **Настройка UI** | Toggle «Web search» в Settings |
+| **Явная команда пользователя** | «search the web for …», «поищи в интернете» → `shouldForceWebSearch` (узкий список **команд**, не тем) |
+| **Structured API** | `PipelineStage`, `replyStatus`, флаги turn policy из **метаданных хода**, не из текста |
+| **Attachments / mode** | Vision blocked, `chatComposerMode`, `ttsEnabled` |
+
+## Legacy (removed)
+
+Keyword-intent (`FACTUAL_QUERY`, `shouldUseWebSearchForMessage`) **удалены**. Используй `shouldRunWebSearchForTurn(message, webSearchEnabled)` — toggle или explicit command only.
+
+## Тесты
+
+- Фразы вроде «What is the weather in Paris?» — только **фикстуры** сценариев, не образец для новых regex в prod.
+- Тестируй **контракт** (toggle on/off, explicit search phrase), не «угадали погоду».
+
+## Cursor-агент (ты)
+
+- Не предлагай «добавим проверку на weather/news» как фикс багов чата.
+- Не выводи intent пользователя из фрагментов стрима в коде — читай store, stage, IPC events.
+
+См. `ai-chat.mdc`, `docs/CHAT_AGENT.md`.

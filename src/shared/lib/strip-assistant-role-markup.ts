@@ -1,5 +1,6 @@
 import {
   stripAssistantDisplayLeaks,
+  stripAssistantStreamDisplayLeaks,
   stripInvisibleFormatChars
 } from '@/shared/lib/strip-assistant-display-leaks'
 
@@ -45,7 +46,8 @@ export function stripAssistantStreamSafeMarkup(text: string): string {
   let s = stripAssistantRoleTags(text)
   s = stripKnownFormattingTags(s)
   s = stripPartialTagSuffix(s)
-  return stripInvisibleFormatChars(s)
+  s = stripAssistantStreamDisplayLeaks(s)
+  return s
 }
 
 /** Remove chat-template markup and tool/citation leaks from final assistant text. */

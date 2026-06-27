@@ -1,3 +1,4 @@
+import { iconButtonHoverClass, listRowHoverClass } from '@/shared/lib/design-surface'
 import { cn } from '@/shared/lib/utils'
 import { chatTextClass } from '@/shared/ui/typography'
 
@@ -32,8 +33,9 @@ export const userMessageTextClass = cn(
 )
 
 export const userMessageEditButtonClass = cn(
-  'absolute right-1 top-1/2 z-10 size-6 -translate-y-1/2 shrink-0 rounded-full',
-  'text-muted-foreground/55 hover:bg-accent hover:text-muted-foreground'
+  'absolute right-1 top-1/2 z-10 size-6 -translate-y-1/2 shrink-0 rounded-full active:!translate-y-[-50%]',
+  'text-muted-foreground/70',
+  iconButtonHoverClass
 )
 
 export const agentMessageWrapClass = 'w-full min-w-0 max-w-full'
@@ -50,9 +52,11 @@ export const agentMessageClass = cn(
 )
 
 export const messageActionButtonClass = cn(
-  'size-6 shrink-0 rounded-md text-muted-foreground/75 hover:bg-accent/80 hover:text-foreground'
+  'size-6 shrink-0 text-muted-foreground/75',
+  iconButtonHoverClass
 )
 
+/** Row for message actions — Continue lives inline with Copy / Speak / Regenerate. */
 export const messageActionsBarClass = cn(
   'flex flex-wrap items-center gap-0.5 px-3 pb-1 pt-0'
 )
@@ -60,6 +64,13 @@ export const messageActionsBarClass = cn(
 export const messageActionsGroupClass = 'inline-flex items-center'
 
 export const messageActionDividerClass = 'mx-0.5 h-3 w-px shrink-0 bg-border/45'
+
+export const messageContinueActionClass = cn(
+  'inline-flex cursor-pointer items-center gap-1 px-2 py-1',
+  'text-xs font-medium text-muted-foreground',
+  listRowHoverClass,
+  'disabled:pointer-events-none disabled:opacity-50'
+)
 
 /** “Thought for …” — New chat font, reasoning color token. */
 /** Trigger label — `text-sm` (rem) like before appearance settings; body uses fixed thinking tokens. */

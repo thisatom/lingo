@@ -1,0 +1,41 @@
+@keyframes lingo-tooltip-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes lingo-tooltip-exit {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(2px);
+  }
+}
+
+.lingo-tooltip-content[data-state='delayed-open'],
+.lingo-tooltip-content[data-state='instant-open'] {
+  animation: lingo-tooltip-enter 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lingo-tooltip-content[data-state='closed'] {
+  animation: lingo-tooltip-exit 110ms ease-in forwards;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lingo-tooltip-content[data-state='delayed-open'],
+  .lingo-tooltip-content[data-state='instant-open'],
+  .lingo-tooltip-content[data-state='closed'] {
+    animation: none;
+  }
+}

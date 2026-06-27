@@ -1,63 +1,67 @@
 # Lingo
 
-**Lingo** is a desktop app for practicing conversational speech in different languages. Type or speak, get an AI reply, and optionally hear it read aloud.
+**Lingo** is a desktop app for practicing conversational speech in different languages. Speak or type, get a streaming AI reply, and hear it read aloud.
 
-Version **0.1.0** · Windows, macOS, Linux
+**Current version:** 0.1.7 · **Windows, macOS, Linux**
+
+> **Web preview** (`npm run dev:web`) is for UI development only — limited parity, no OS keychain, no Whisper/edge-tts in main.
 
 ## Download
 
 Installers are published on [GitHub Releases](https://github.com/thisatom/lingo/releases):
 
-| Platform | File |
-|----------|------|
-| Windows (64-bit) | `Lingo-*-win-setup.exe` — NSIS installer |
+| Platform | Artifact |
+|----------|----------|
+| Windows (64-bit) | `Lingo-*-win-setup.exe` (NSIS installer) |
 | Linux (64-bit) | `Lingo-*-linux-x64.AppImage`, `.deb`, or `.tar.gz` |
 | macOS (Intel / Apple Silicon) | `Lingo-*-mac-*.dmg` or `.zip` |
 
 In the app: **Settings → About** — check for updates and open the download page.
 
-## What you can do
+## Features
 
-- **Chat** — text and voice input, streaming replies, attachments, search across chats, auto-saved history
-- **Cloud models** — [OpenRouter](https://openrouter.ai/): model catalog, web search, automatic fallback to a free model on failure
-- **Your own server** — any OpenAI-compatible API (Ollama, LM Studio, vLLM, etc.); JSON profile editor, import snippets from axios or the OpenAI SDK; API keys stay in secure storage, not in JSON
-- **Voice input** — hold the mic button; local Whisper or browser speech recognition; noise suppression in settings
-- **Text-to-speech** — synthesis runs in the app process (not in a browser tab); volume and speed in settings
-- **First launch** — setup dialog in the main window (name, theme, language, OpenRouter key)
-- **UI** — dark and light themes, custom window title bar, [shadcn/ui](https://ui.shadcn.com/) components
+| Area | What you get |
+|------|----------------|
+| **Chat** | Streaming replies, attachments, search across chats, per-chat drafts, auto-saved history |
+| **Cloud AI** | [OpenRouter](https://openrouter.ai/) — model catalog, web search toggle, fallback to a free model |
+| **Custom LLM** | Any OpenAI-compatible API (Ollama, LM Studio, vLLM, …); JSON profile editor; import from axios/OpenAI SDK snippets |
+| **Voice input** | Hold mic — local Whisper (desktop) or Web Speech (web preview); noise suppression in settings |
+| **TTS** | Synthesis in the app process (desktop); volume and speed in settings |
+| **Onboarding** | First-run setup in the main window (name, theme, language, optional OpenRouter key) |
+| **UI** | Dark/light themes, resizable sidebar, custom title bar, [shadcn/ui](https://ui.shadcn.com/) |
 
 ## Quick start
 
-1. Install from a [release](https://github.com/thisatom/lingo/releases) or [build from source](#build-from-source) below.
-2. On first launch the main window opens; complete the setup dialog if it appears.
-3. You can **skip the OpenRouter key** during setup and add it later under **Settings → API**.
-4. Hold the **microphone** to speak or type in the composer. In conversation mode, replies can be spoken automatically.
+1. Install from a [release](https://github.com/thisatom/lingo/releases) or [build from source](#build-from-source).
+2. Complete the setup dialog on first launch (OpenRouter key can be skipped and added later).
+3. Hold the **microphone** or type in the composer. In conversation mode, replies can be spoken automatically.
 
 ## API keys and models
 
 ### OpenRouter (default)
 
-1. Open **Settings → API → Chat source → OpenRouter**.
-2. Paste your API key — it is stored in the **system credential store** (Windows Credential Manager, macOS Keychain, Linux Secret Service), not in app data files or browser storage.
-3. Pick a model from the catalog or enter a model ID manually.
+1. **Settings → API → Chat source → OpenRouter**
+2. Paste your API key — stored in the **OS credential store** (Windows Credential Manager, macOS Keychain, Linux Secret Service).
+3. Pick a model from the catalog or enter a model ID.
 
-More detail: [`docs/OPENROUTER.md`](./docs/OPENROUTER.md), [`docs/API_KEYS.md`](./docs/API_KEYS.md).
+See [`docs/OPENROUTER.md`](./docs/OPENROUTER.md) and [`docs/API_KEYS.md`](./docs/API_KEYS.md).
 
 ### Custom LLM endpoint
 
-1. **Settings → API → Chat source → Custom server**.
-2. In the profile: base URL, model, and optional parameters (temperature, streaming, reasoning mode, etc.).
-3. Use **API key for custom server** when needed; local Ollama often needs no key.
-4. **Import code snippet** — paste an axios or OpenAI SDK example: URL and model go into the profile; auth tokens go to secure storage.
-5. **Reset template** — example `http://127.0.0.1:11434/v1` with `llama3.2`.
+1. **Settings → API → Chat source → Custom server**
+2. Set base URL, model, and optional parameters in the JSON profile.
+3. Use **API key for custom server** when needed (local Ollama often needs none).
+4. **Import code snippet** — paste axios or OpenAI SDK example; URL/model go to profile, tokens to secure storage.
 
-Secrets are stripped from saved JSON (`apiKey` / `api_key` fields are removed on write).
+Secrets are stripped from saved JSON (`apiKey` / `api_key` removed on write).
 
 ## System requirements
 
-- **Windows** 10/11 (64-bit), **macOS** 12+, **Linux** x64 with glibc (common distros)
-- For development: **Node.js** 20+, **npm** 10+
-- Microphone for voice input; internet for cloud models and online TTS
+| | |
+|---|---|
+| **Desktop** | Windows 10/11 (64-bit), macOS 12+, Linux x64 (glibc) |
+| **Development** | Node.js 20+, npm 10+ |
+| **Hardware** | Microphone for voice input; network for cloud models |
 
 ## Build from source
 
@@ -68,78 +72,91 @@ npm install
 npm run dev
 ```
 
-### Linux (Debian, Ubuntu, etc.)
-
-Install build tools and **libsecret** (for `keytar` / OS credential storage):
+### Linux dependencies
 
 ```bash
 sudo apt update
 sudo apt install -y build-essential python3 libsecret-1-dev
 ```
 
-Use **npm** (not `pnpm`) for the first install, and do not pass `--ignore-scripts` — Electron downloads its binary in `postinstall`.
+Use **npm** (not `pnpm`) for the first install. Do **not** pass `--ignore-scripts` — `postinstall` downloads Electron and rebuilds native modules (`keytar`, Whisper).
 
-If `npm run dev` fails with **`Error: Electron uninstall`**, the Electron binary was not installed:
+### Troubleshooting
 
-```bash
-npm run electron:install
-# or manually:
-node node_modules/electron/install.js
-npm run dev
-```
+| Problem | Fix |
+|---------|-----|
+| `Cannot find module '../build/Release/keytar.node'` | `npm run rebuild:native` or `npm run postinstall` |
+| `Error: Electron uninstall` / missing binary | `npm run electron:install` |
+| Slow Electron download | `export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"` then reinstall |
 
-Behind a slow or filtered network, set a mirror before reinstalling:
-
-```bash
-export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
-rm -rf node_modules/electron
-npm install
-```
-
-UI-only in the browser (no Electron): `npm run dev:web` — keys are not stored in the OS keychain.
+### Commands
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev` | Development (Electron + hot reload) |
-| `npm run dev:web` | UI only in the browser (no TTS, no OS keychain — **not for real secrets**) |
-| `npm run build` | Production build |
-| `npm run dist` | Installer for the current OS → `release/` |
-| `npm run dist:win` | Windows NSIS installer |
-| `npm run dist:linux` | Linux AppImage, deb, and tar.gz |
-| `npm run dist:mac` | macOS DMG and ZIP (**macOS only**) |
-| `npm run typecheck` | TypeScript check |
-| `npm run test` | Unit tests (Vitest) — also run in [CI](.github/workflows/ci.yml) on push/PR |
+| `npm run dev` | Electron + hot reload |
+| `npm run dev:web` | UI in browser only (no keytar / main STT-TTS) |
+| `npm run build` | Production Electron build → `out/` |
+| `npm run build:web` | Static web preview build |
+| `npm run dist` | Installer for current OS → `release/` |
+| `npm run dist:win` / `dist:linux` / `dist:mac` | Platform-specific installers |
+| `npm run typecheck` | TypeScript (renderer + main) |
+| `npm run test` | Unit & integration tests (Vitest) |
+| `npm run test:e2e` | Playwright E2E (web preview) |
+| `npm run test:e2e:ui` | Playwright interactive mode |
+| `npm run rebuild:native` | Rebuild keytar for Electron ABI |
 | `npm run icons:png` | Convert `resources/icon.ico` to PNG |
 
-**Build notes**
+### Release builds (CI)
 
-- Push a tag `v*` (e.g. `v0.1.0`) to run [Release builds](.github/workflows/release.yml): Windows, Linux, and macOS artifacts are attached to a GitHub Release.
-- Windows: `npm run dist:win` → `release/Lingo-<version>-win-setup.exe`
-- Linux on Windows: use CI Release on Ubuntu for AppImage/deb; locally you get tar.gz via `dist:linux`
-- macOS: run `npm run dist:mac` on a Mac, or push tag `v*` for GitHub Actions
+Push a tag `v*` (e.g. `v0.1.7`) to run [`.github/workflows/release.yml`](.github/workflows/release.yml): tests, then Windows/Linux/macOS artifacts attached to a GitHub Release.
+
+- **Windows:** `npm run dist:win` → `release/Lingo-<version>-win-setup.exe`
+- **Linux on Windows:** use CI release for AppImage/deb; local cross-build is limited
+- **macOS:** run `npm run dist:mac` on a Mac, or use the release workflow
 
 ### Dev-only API key (optional)
 
-Create `.env` in the project root (do not commit):
+Create `.env` in the project root (never commit):
 
 ```env
 LINGO_OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Template: [`docs/env.example.md`](./docs/env.example.md). In packaged builds, use **Settings → API** instead.
+Template: [`docs/env.example.md`](./docs/env.example.md). Packaged builds use **Settings → API**.
+
+## Testing
+
+```bash
+npm run typecheck
+npm run test
+npm run test:e2e:install   # once: Chromium for Playwright
+npm run test:e2e
+```
+
+| Layer | Tool | Scope |
+|-------|------|--------|
+| Unit / integration | Vitest | Store, agent, IPC helpers, scroll, sanitization |
+| E2E | Playwright | Web preview UI — load, sidebar, settings nav, composer |
+| CI | GitHub Actions | typecheck, unit, e2e, Electron + web builds on every push/PR |
+
+E2E details: [`docs/E2E.md`](./docs/E2E.md). Electron smoke (keytar, Whisper, titlebar) is **not** in CI yet.
 
 ## Project layout
 
 ```
 lingo/
-├── electron/          # Main process: windows, IPC, TTS, secrets
-├── src/               # React UI (app → pages → widgets → features → entities → shared)
+├── electron/          # Main: windows, IPC, STT/TTS, secrets, stream proxy
+├── electron/preload/  # contextBridge → window.lingo
+├── src/               # React UI (FSD: app → pages → widgets → features → entities → shared)
+├── e2e/               # Playwright specs (web preview)
 ├── docs/              # Architecture and contracts
-├── resources/         # Build icons
-└── index.html         # Main window entry
+├── audit/             # Stabilization QA matrices
+├── resources/         # App icons
+├── index.html         # Electron renderer shell
+└── index.web.html     # Web preview entry
 ```
 
-Imports in `src/` follow [Feature-Sliced Design](https://feature-sliced.design/) — only top-down. See [`docs/FSD.md`](./docs/FSD.md).
+UI imports follow [Feature-Sliced Design](https://feature-sliced.design/) — top-down only. See [`docs/FSD.md`](./docs/FSD.md).
 
 ## Documentation
 
@@ -151,16 +168,30 @@ Imports in `src/` follow [Feature-Sliced Design](https://feature-sliced.design/)
 | [docs/UI.md](./docs/UI.md) | Components and styling |
 | [docs/OPENROUTER.md](./docs/OPENROUTER.md) | OpenRouter usage |
 | [docs/API_KEYS.md](./docs/API_KEYS.md) | Storing and rotating keys |
+| [docs/E2E.md](./docs/E2E.md) | Playwright E2E |
 | [docs/voice-input-architecture.md](./docs/voice-input-architecture.md) | Voice input |
 | [docs/env.example.md](./docs/env.example.md) | Dev environment variables |
 | [AGENTS.md](./AGENTS.md) | Context for AI coding assistants |
 
+## Mobile (iPhone / Android)
+
+**Not supported today.** Lingo is an **Electron desktop** app (Windows/macOS/Linux).
+
+| Approach | Effort | Parity |
+|----------|--------|--------|
+| **Web preview on phone** | Low — open dev server or host `build:web` | No keytar, no Whisper in main, Web Speech only, keys in browser storage — **not for production secrets** |
+| **Capacitor / TWA wrapper** around web build | Medium | Same gaps as web preview unless you rebuild STT/TTS/secrets for mobile |
+| **React Native / Flutter rewrite** | Very high | Full native mobile product |
+| **GitHub Actions “mobile build”** | N/A without mobile stack | Current CI builds **desktop** artifacts only |
+
+Using Lingo on a phone realistically requires a **dedicated mobile architecture** (or accepting web-preview limits in the mobile browser). That is out of scope for the current Electron release pipeline.
+
 ## Security
 
-- Do not commit `.env`, API keys, or secret files from user data directories.
-- **Desktop app** — keys in the OS credential store; the renderer has no direct filesystem or full-secret access.
-- **`dev:web`** — for UI development only: keys live in browser `localStorage` in plain text; do not use production secrets.
-- Custom LLM profiles never store keys in JSON; imported tokens go to secure storage.
+- Do not commit `.env`, API keys, or user data directories.
+- **Desktop** — keys in OS credential store; renderer has no direct secret filesystem access.
+- **`dev:web`** — keys in `localStorage` (plain text); development only.
+- Custom LLM profiles never persist keys in JSON.
 
 ## License
 

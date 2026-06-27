@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, PanelLeftClose, Search } from '@/shared/ui/icons'
+import type { ReactNode } from 'react'
+import { ArrowLeft, ArrowRight, NewChat, PanelLeftClose, Search } from '@/shared/ui/icons'
 import { sidebarChromeIconButtonClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 import { EMPTY_CHAT_HISTORY, useChatsStore } from '@/entities/chat/model/store'
@@ -6,11 +7,11 @@ import { Kbd, KbdGroup } from '@/shared/ui/kbd'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 
 interface SidebarTopActionsProps {
-  onOpenSearch: () => void
+  onNewChat: () => void
 }
 
-export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
-  const { toggleSidebarPanel, sidebarCollapsed } = useResizableSidebar()
+export function SidebarTopActions({ onNewChat }: SidebarTopActionsProps) {
+  const { toggleSidebarPanel, openChatSearch } = useResizableSidebar()
   const chatHistoryPast = useChatsStore((s) => s.chatHistoryPast ?? EMPTY_CHAT_HISTORY)
   const chatHistoryFuture = useChatsStore((s) => s.chatHistoryFuture ?? EMPTY_CHAT_HISTORY)
   const goBackInChatHistory = useChatsStore((s) => s.goBackInChatHistory)
@@ -19,13 +20,18 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
   const canGoBack = chatHistoryPast.length > 0
   const canGoForward = chatHistoryFuture.length > 0
 
-  if (sidebarCollapsed) return null
+  const shortcutTooltip = (label: string, keys: ReactNode) => (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span>{label}</span>
+      {keys}
+    </span>
+  )
 
   return (
-    <div className="flex items-center gap-0.5 px-1">
+    <div className="flex min-h-8 min-w-0 items-center gap-0.5">
       <TooltipIconButton
         variant="ghost"
-        size="icon"
+        size="icon-sm"
         className={sidebarChromeIconButtonClass}
         tooltip="Hide sidebar"
         aria-label="Hide sidebar"
@@ -36,28 +42,43 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
 
       <TooltipIconButton
         variant="ghost"
-        size="icon"
+        size="icon-sm"
         className={sidebarChromeIconButtonClass}
         aria-label="Search chats"
-        tooltip={
-          <span className="inline-flex flex-wrap items-center gap-1.5">
-            <span>Search chats</span>
-            <KbdGroup className="opacity-90" aria-hidden>
-              <Kbd>Ctrl</Kbd>
-              <Kbd>K</Kbd>
-            </KbdGroup>
-          </span>
-        }
-        onClick={onOpenSearch}
+        tooltip={shortcutTooltip(
+          'Search chats',
+          <KbdGroup className="opacity-95" aria-hidden>
+            <Kbd>Ctrl</Kbd>
+            <Kbd>K</Kbd>
+          </KbdGroup>
+        )}
+        onClick={openChatSearch}
       >
         <Search className="size-4 shrink-0" />
+      </TooltipIconButton>
+
+      <TooltipIconButton
+        variant="ghost"
+        size="icon-sm"
+        className={sidebarChromeIconButtonClass}
+        aria-label="New chat"
+        tooltip={shortcutTooltip(
+          'New chat',
+          <KbdGroup className="opacity-95" aria-hidden>
+            <Kbd>Ctrl</Kbd>
+            <Kbd>N</Kbd>
+          </KbdGroup>
+        )}
+        onClick={onNewChat}
+      >
+        <NewChat className="size-4 shrink-0" />
       </TooltipIconButton>
 
       <div className="min-w-0 flex-1" />
 
       <TooltipIconButton
         variant="ghost"
-        size="icon"
+        size="icon-sm"
         className={sidebarChromeIconButtonClass}
         disabled={!canGoBack}
         tooltip="Previous chat"
@@ -67,7 +88,7 @@ export function SidebarTopActions({ onOpenSearch }: SidebarTopActionsProps) {
       </TooltipIconButton>
       <TooltipIconButton
         variant="ghost"
-        size="icon"
+        size="icon-sm"
         className={sidebarChromeIconButtonClass}
         disabled={!canGoForward}
         tooltip="Next chat"

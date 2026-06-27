@@ -6,6 +6,7 @@ import {
   menuItemPaddingClass,
   menuSeparatorClass
 } from '@/shared/lib/sidebar-filter-menu-styles'
+import { elevatedSurfaceClass } from '@/shared/lib/design-surface'
 import { cn } from '@/shared/lib/utils'
 
 function ContextMenu({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
@@ -27,7 +28,8 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
-          'z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
+          'z-50 min-w-[10rem] overflow-hidden rounded-lg bg-popover text-popover-foreground',
+          elevatedSurfaceClass,
           menuContentPaddingClass,
           'animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
           className

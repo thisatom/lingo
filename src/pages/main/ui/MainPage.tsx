@@ -23,6 +23,7 @@ import {
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { ChatComposer } from '@/widgets/chat-composer/ui/ChatComposer'
+import { resolveComposerPlaceholder } from '@/widgets/chat-composer/lib/composer-placeholder'
 import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
 import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
 import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
@@ -35,9 +36,11 @@ import { flushChatPersistDebounce } from '@/entities/chat/lib/chat-persist-stora
 import { ConversationPanel } from '@/widgets/conversation-panel/ui/ConversationPanel'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { VoiceCaptureBar } from '@/features/audio-devices/ui/VoiceCaptureBar'
-import { CHAT_COLUMN_MAX_WIDTH_CLASS } from '@/shared/lib/layout'
+import { CHAT_COLUMN_MAX_WIDTH_CLASS, PAGE_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
-import { SidebarExpandButton } from '@/widgets/app-sidebar/ui/SidebarExpandButton'
+import { SidebarCollapsedToolbar } from '@/widgets/app-sidebar/ui/SidebarCollapsedToolbar'
+import { X } from '@/shared/ui/icons'
+import { Button } from '@/shared/ui/button'
 import { BackgroundStreamHint } from '@/features/ai-chat/ui/BackgroundStreamHint'
 import { useChatRouteSync } from '@/features/chat/model/useChatRouteSync'
 import { navigateToChat } from '@/features/chat/lib/chat-route'
@@ -66,7 +69,6 @@ export function MainPage() {
     stage,
     agentBusy,
     agentPhase,
-    forceStopAgent,
     backgroundStreamChatId,
     queuedMessages,
     sendUserMessage,
@@ -82,6 +84,7 @@ export function MainPage() {
     stopAgent,
     retryLastRequest,
     regenerateAssistantMessage,
+    continueAssistantMessage,
     clearError
   } = useAiChat({
     onLiveConversationTurnComplete: () => scheduleAutoListenRef.current?.()
@@ -246,7 +249,7 @@ export function MainPage() {
       voice.setDraftPrefix(draft)
     }
     const started = await voice.start()
-    if (!started) {
+    if (!started && !useConversationStore.getState().speechError) {
       setSpeechError('Could not start microphone. Check permissions in Settings → Devices.')
     }
   }, [
@@ -262,7 +265,7 @@ export function MainPage() {
   startVoiceCaptureRef.current = startVoiceCapture
 
   const voiceBusy = voice.isBusy
-  const actionsDisabled = agentBusy || voiceBusy
+  const actionsDisabled = agentBusy || voiceBusy || !llmChatReady
   const liveConversation = useLiveConversationLoop({
     mode: chatComposerMode,
     voiceStage: stage,
@@ -285,7 +288,7 @@ export function MainPage() {
     voice.isTranscribing || (voice.isBusy && voice.backend === 'local')
 
   const showErrorBanner = Boolean(error)
-  const showSpeechError = Boolean(speechError) && !showRecording
+  const showSpeechError = Boolean(speechError) && !voice.isRecording
   const errorRetryable = error ? isErrorRetryable(error) && messages.length > 0 : false
 
   const onVoiceStop = useCallback(async () => {
@@ -315,9 +318,16 @@ export function MainPage() {
       voiceCaptureChatIdRef.current = null
     }
     setLiveVoiceUserMessageId(null)
-    forceStopAgent()
+    stopAgent({ chatId: activeChatId ?? undefined })
     setSpeechError(null)
-  }, [cancelVoiceUserMessage, forceStopAgent, liveConversation, setSpeechError, voice])
+  }, [
+    activeChatId,
+    cancelVoiceUserMessage,
+    liveConversation,
+    setSpeechError,
+    stopAgent,
+    voice
+  ])
 
   const handleStopAgent = useCallback(() => {
     stopAgentSpeechSession()
@@ -402,7 +412,7 @@ export function MainPage() {
   ])
 
   const displayMessages = useMemo((): Message[] => {
-    if (!isPendingVoiceMessageId(liveVoiceUserMessageId ?? '')) return messages
+    if (!isPendingVoiceMessageId(liveVoiceUserMessageId ?? '')) return [...messages]
     return [
       ...messages,
       {
@@ -451,8 +461,13 @@ export function MainPage() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      <header className="relative z-10 flex shrink-0 items-center gap-2 bg-transparent p-2">
-        <SidebarExpandButton />
+      <header
+        className={cn(
+          'relative z-10 flex shrink-0 items-center gap-2 bg-transparent py-2',
+          PAGE_HORIZONTAL_PADDING_CLASS
+        )}
+      >
+        <SidebarCollapsedToolbar />
         <ChatHeaderTitle
           title={activeChat?.title ?? 'New chat'}
           chat={activeChat}
@@ -489,14 +504,19 @@ export function MainPage() {
             chatScrollRef.current = api
           }}
           onRegenerateAssistantMessage={(messageId) => {
+            if (!llmChatReady) return
             void regenerateAssistantMessage(messageId)
+          }}
+          onContinueAssistantMessage={(messageId) => {
+            if (!llmChatReady) return
+            void continueAssistantMessage(messageId)
           }}
         />
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[50]">
           <div
             ref={bottomStackRef}
-            className={cn('mx-auto w-full px-4 pb-3 sm:px-6', CHAT_COLUMN_MAX_WIDTH_CLASS)}
+            className={cn('mx-auto w-full pb-3', PAGE_HORIZONTAL_PADDING_CLASS, CHAT_COLUMN_MAX_WIDTH_CLASS)}
           >
             <div className="relative">
               <ScrollToLatestButton
@@ -515,16 +535,19 @@ export function MainPage() {
             {showSpeechError && speechError && (
               <div
                 role="status"
-                className="flex items-start gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground"
-              >
-                <p className="min-w-0 flex-1 leading-snug">{speechError}</p>
-                <button
-                  type="button"
-                  className="shrink-0 cursor-pointer text-xs text-foreground/70 hover:text-foreground"
+        className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground"
+      >
+        <p className="min-w-0 flex-1 leading-snug">{speechError}</p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 self-center text-muted-foreground hover:bg-accent hover:text-foreground"
+                  aria-label="Close"
                   onClick={() => setSpeechError(null)}
                 >
-                  Dismiss
-                </button>
+                  <X className="size-4" />
+                </Button>
               </div>
             )}
 
@@ -572,15 +595,15 @@ export function MainPage() {
                 onVoiceStop={onVoiceStop}
                 voiceInteractionMode="toggle"
                 liveConversationActive={liveConversation.isLiveConversationActive}
-                placeholder={
-                  !llmChatReady
-                    ? (llmBlockedReason ?? 'Add API key in Settings…')
-                    : composerAttachments.length > 0
-                      ? 'Ask about the image…'
-                      : agentBusy
-                        ? 'Queue follow-up…'
-                        : 'Send follow-up'
-                }
+                placeholder={resolveComposerPlaceholder({
+                  llmReady: llmChatReady,
+                  blockedReason: llmBlockedReason,
+                  chatComposerMode,
+                  liveConversationActive: liveConversation.isLiveConversationActive,
+                  isListening: voice.isRecording,
+                  hasAttachments: composerAttachments.length > 0,
+                  agentBusy
+                })}
                 overlay
               />
               </div>

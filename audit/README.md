@@ -1,6 +1,14 @@
-# Lingo — аудиты чата
+# Lingo — аудиты
 
-Папка для **регрессионных аудитов** подсистемы чата (streaming, web search, UI, store).
+Папка для **регрессионных аудитов** подсистем Lingo (чат, речь, настройки, desktop).
+
+## Текущий прогон
+
+**Stabilization Pass 1 (поверхностный)** — [`active/stabilization-pass-1/`](./active/stabilization-pass-1/)
+
+- Индекс доменов: [`SUMMARY.md`](./active/stabilization-pass-1/SUMMARY.md)
+- 17 файлов по областям (агент, web search, STT, TTS, …)
+- Pass 2: глубокий аудит **по одному файлу** → фиксы → ручной QA
 
 ## Структура
 

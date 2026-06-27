@@ -59,6 +59,8 @@ export interface ChatStreamRequest {
   maxTokens?: number
   /** Retry budget when truncated. `0` = same as unlimited. Defaults to ~1.5× maxTokens when set. */
   maxTokensRetry?: number
+  /** Resume an in-progress assistant reply (prefix is excluded from `messages`). */
+  assistantContinuationPrefix?: string
 }
 
 export type PipelineSearchTargetPayload = {

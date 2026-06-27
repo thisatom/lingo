@@ -32,7 +32,7 @@ export const typography = {
   codeBlock:
     'my-2.5 overflow-hidden rounded-lg border border-border bg-[var(--md-code-bg)]',
   codeBlockHeader:
-    'flex items-center justify-between gap-2 border-b border-border/80 bg-muted/30 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground',
+    'sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-separator bg-muted px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground',
   codeBlockCopyButton:
     'inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
   /** KaTeX display — larger than body (13px), distinct card layout */
@@ -44,7 +44,8 @@ export const typography = {
   tableWrap:
     'my-2.5 w-full max-w-full overflow-x-auto rounded-lg border border-border bg-muted/15 shadow-sm',
   table: 'w-full min-w-[16rem] border-collapse text-left',
-  tableHead: 'bg-muted/45 [&_tr]:border-b [&_tr]:border-border',
+  tableHead:
+    'sticky top-0 z-10 bg-muted [&_tr]:border-b [&_tr]:border-separator',
   tableBody:
     '[&_tr]:border-b [&_tr]:border-border/70 [&_tr:nth-child(even)]:bg-muted/20 [&_tr:hover]:bg-muted/35 [&_tr:last-child]:border-0',
   tableRow: '',

@@ -1,17 +1,18 @@
+import { overlayBorderClass } from '@/shared/lib/design-surface'
 import { cn } from '@/shared/lib/utils'
 
 /** Rounded hover rows in sidebar / composer menus. */
-export const sidebarMenuRadiusClass = 'rounded-[6px]'
+export const sidebarMenuRadiusClass = 'rounded-lg'
 
 /** Hover for composer input controls (matches context button). */
 export const composerInputHoverClass =
-  'rounded-full hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground dark:hover:bg-[#303030] dark:hover:text-foreground dark:data-[state=open]:bg-[#303030] dark:data-[state=open]:text-foreground'
+  'rounded-full hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground'
 
-export const menuSurfaceBorderClass = 'border-menu-border'
+export const menuSurfaceBorderClass = overlayBorderClass
 
 export const sidebarMenuSurfaceClass = cn(
-  menuSurfaceBorderClass,
-  'bg-popover text-popover-foreground shadow-lg dark:bg-[#181818]'
+  overlayBorderClass,
+  'rounded-lg bg-popover text-popover-foreground shadow-md shadow-black/10 dark:shadow-black/35'
 )
 
 /** Menu panel inset (dropdown / select / context / command list). */
@@ -31,11 +32,26 @@ export const menuIndicatorInsetClass = 'left-[8px]'
 
 export const menuTrailingInsetClass = 'right-[3px]'
 
+/** Row padding when a trailing icon (check, chevron) sits on the right. */
+export const menuItemTrailingIconPaddingClass = 'py-[3px] pr-[24px] pl-[8px]'
+
+/** Shared absolute slot for leading check / radio indicators. */
+export const menuLeadingIndicatorClass = cn(
+  'pointer-events-none absolute top-1/2 flex size-4 -translate-y-1/2 items-center justify-center',
+  menuIndicatorInsetClass
+)
+
+/** Shared absolute slot for trailing check / chevron indicators. */
+export const menuTrailingIndicatorClass = cn(
+  'pointer-events-none absolute top-1/2 flex size-4 -translate-y-1/2 items-center justify-center',
+  menuTrailingInsetClass
+)
+
 /** Row highlight — dropdown, command palette, context menus. */
 export const menuItemHighlightClass =
-  'focus:bg-menu-hover focus:text-popover-foreground data-[highlighted]:bg-menu-hover data-[highlighted]:text-popover-foreground dark:focus:bg-[#252525] dark:data-[highlighted]:bg-[#252525] data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[disabled]:focus:bg-transparent data-[disabled]:data-[highlighted]:bg-transparent data-[disabled]:data-[highlighted]:text-inherit dark:data-[disabled]:focus:bg-transparent dark:data-[disabled]:data-[highlighted]:bg-transparent'
+  'focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[disabled]:focus:bg-transparent data-[disabled]:data-[highlighted]:bg-transparent data-[disabled]:data-[highlighted]:text-inherit'
 
-export const menuSeparatorClass = 'my-[3px] h-px bg-border'
+export const menuSeparatorClass = 'my-[3px] h-px bg-separator'
 
 export const menuLabelClass = cn(
   menuItemPaddingClass,
@@ -50,7 +66,8 @@ export const sidebarMenuItemClass = cn(
 )
 
 export const menuCheckboxItemClass = cn(
-  'relative flex min-h-7 cursor-default items-center gap-2 rounded-sm text-sm leading-normal outline-hidden select-none',
+  'relative flex min-h-7 cursor-default items-center gap-2 text-sm leading-normal outline-hidden select-none',
+  sidebarMenuRadiusClass,
   menuIndicatorItemPaddingClass,
   menuItemHighlightClass
 )
@@ -79,7 +96,7 @@ export const menuCommandItemClass = cn(
   menuItemPaddingClass,
   sidebarMenuRadiusClass,
   menuItemHighlightClass,
-  'data-[selected=true]:bg-menu-hover data-[selected=true]:text-popover-foreground dark:data-[selected=true]:bg-[#252525]'
+  'data-[selected=true]:bg-menu-hover data-[selected=true]:text-popover-foreground'
 )
 
 export const sidebarMenuSubTriggerClass = cn(
@@ -102,7 +119,7 @@ export const composerAgentPickerTriggerClass = cn(
   'inline-flex h-7 min-h-7 w-fit max-w-none min-w-0 shrink-0 cursor-pointer items-center gap-1',
   'rounded-full py-0 pl-2.5 pr-2 text-[13px] leading-none text-muted-foreground outline-none',
   composerInputHoverClass,
-  'focus-visible:bg-accent dark:focus-visible:bg-[#303030]',
+  'focus-visible:bg-accent',
   'disabled:pointer-events-none disabled:opacity-50'
 )
 
@@ -110,7 +127,7 @@ export const sidebarMenuPickerTriggerClass = cn(
   'inline-flex h-7 min-h-7 w-fit max-w-[9rem] min-w-0 shrink-0 cursor-pointer items-center gap-1',
   'rounded-full py-0 pl-2.5 pr-2 text-[13px] leading-none text-muted-foreground outline-none',
   composerInputHoverClass,
-  'focus-visible:bg-accent dark:focus-visible:bg-[#303030]',
+  'focus-visible:bg-accent',
   'disabled:pointer-events-none disabled:opacity-50'
 )
 

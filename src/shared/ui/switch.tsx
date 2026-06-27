@@ -4,16 +4,23 @@ import { cn } from '@/shared/lib/utils'
 
 function Switch({
   className,
+  size = 'default',
   ...props
-}: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+}: React.ComponentProps<typeof SwitchPrimitive.Root> & {
+  size?: 'sm' | 'default'
+}) {
   return (
     <SwitchPrimitive.Root
       data-slot="switch"
+      data-size={size}
       className={cn(
-        'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border transition-colors',
-        'border-border/60 bg-neutral-300/90 data-[state=checked]:border-transparent data-[state=checked]:bg-[#3fa266]',
-        'dark:border-border/70 dark:bg-muted-foreground/35 dark:data-[state=checked]:bg-[#3fa266]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'peer group/switch relative inline-flex shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-input transition-all outline-none',
+        'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        'aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20',
+        'data-[size=default]:h-[18.4px] data-[size=default]:w-[32px]',
+        'data-[size=sm]:h-[14px] data-[size=sm]:w-[24px]',
+        'dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',
+        'dark:bg-input/80 data-[state=unchecked]:bg-input',
         'disabled:cursor-not-allowed disabled:opacity-50',
         className
       )}
@@ -22,9 +29,12 @@ function Switch({
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
-          'pointer-events-none block size-4 translate-x-[2px] rounded-full shadow-sm transition-transform',
-          'bg-white data-[state=checked]:translate-x-[18px]',
-          'dark:bg-[#e8e8e8]'
+          'pointer-events-none block rounded-full ring-0 transition-transform',
+          'group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3',
+          'group-data-[size=default]/switch:data-[state=checked]:translate-x-[calc(100%-2px)]',
+          'group-data-[size=sm]/switch:data-[state=checked]:translate-x-[calc(100%-2px)]',
+          'group-data-[size=default]/switch:data-[state=unchecked]:translate-x-0',
+          'group-data-[size=sm]/switch:data-[state=unchecked]:translate-x-0'
         )}
       />
     </SwitchPrimitive.Root>

@@ -23,11 +23,11 @@ export function ChatComposerError({
     <div
       role="alert"
       className={cn(
-        'flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5',
+        'flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5',
         className
       )}
     >
-      <p className="min-w-0 flex-1 pt-0.5 text-sm leading-snug text-destructive">{message}</p>
+      <p className="min-w-0 flex-1 text-sm leading-snug text-destructive">{message}</p>
       <div className="flex shrink-0 items-center gap-1">
         {showRetry && (
           <Button

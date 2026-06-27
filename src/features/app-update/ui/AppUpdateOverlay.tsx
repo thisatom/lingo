@@ -2,6 +2,7 @@ import {
   getAppUpdateProgressLabel,
   isAppUpdateOverlayVisible
 } from '@/features/app-update/lib/app-update-progress-label'
+import { dialogOverlayClass, elevatedSurfaceClass } from '@/shared/lib/design-surface'
 import { Spinner } from '@/shared/ui/spinner'
 import { cn } from '@/shared/lib/utils'
 import type { AppUpdateProgress } from '@/shared/types/ipc'
@@ -19,8 +20,8 @@ export function AppUpdateOverlay({ progress, className }: AppUpdateOverlayProps)
   return (
     <div
       className={cn(
-        'fixed inset-0 z-[10000] flex items-center justify-center bg-background/75',
-        'shadow-[inset_0_0_0_1px_hsl(var(--border)/0.35)]',
+        'fixed inset-0 z-[10000] flex items-center justify-center',
+        dialogOverlayClass,
         className
       )}
       role="alertdialog"
@@ -30,7 +31,7 @@ export function AppUpdateOverlay({ progress, className }: AppUpdateOverlayProps)
       aria-labelledby="app-update-title"
       aria-describedby="app-update-desc"
     >
-      <div className="mx-4 w-full max-w-[22rem] rounded-xl border border-menu-border bg-popover px-5 py-4 shadow-lg">
+      <div className={cn('mx-4 w-full max-w-[22rem] px-5 py-4', elevatedSurfaceClass)}>
         <div className="flex items-start gap-3">
           <Spinner className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
@@ -40,7 +41,7 @@ export function AppUpdateOverlay({ progress, className }: AppUpdateOverlayProps)
             <p id="app-update-desc" className="mt-1 text-xs leading-snug text-muted-foreground">
               {label}
             </p>
-            {progress.phase === 'downloading' && progress.percent != null ? (
+            {progress.phase === 'downloading' && progress.percent != null && progress.percent > 0 ? (
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-primary transition-[width] duration-200"

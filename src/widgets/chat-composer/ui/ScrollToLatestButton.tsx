@@ -19,7 +19,7 @@ export function ScrollToLatestButton({ show, onClick, className }: ScrollToLates
       tabIndex={show ? 0 : -1}
       onClick={onClick}
       className={cn(
-        'grid size-8 shrink-0 place-items-center gap-0 rounded-full border border-menu-border bg-secondary p-0 text-foreground shadow-lg transition-opacity hover:bg-accent',
+        'grid size-8 shrink-0 place-items-center gap-0 rounded-full border border-overlay-border bg-secondary p-0 text-foreground shadow-md shadow-black/10 transition-colors hover:bg-accent hover:text-accent-foreground dark:shadow-black/35',
         !show && 'pointer-events-none opacity-0',
         className
       )}

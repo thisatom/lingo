@@ -6,6 +6,7 @@ import {
   clearAllChatPipelines,
   getChatPipeline,
   patchChatPipeline,
+  subscribeChatPipelines,
   syncPipelineUiForActiveChat
 } from './chat-pipeline-registry'
 import { setPipelineErrorForChat, setPipelineStageForChat } from './pipeline-stage'
@@ -108,5 +109,22 @@ describe('chat-pipeline-registry', () => {
     clearAllChatPipelines()
     expect(getChatPipeline('a').stage).toBe('idle')
     expect(getChatPipeline('b').stage).toBe('idle')
+  })
+
+  it('subscribeChatPipelines fires when a chat pipeline changes', () => {
+    let calls = 0
+    const unsub = subscribeChatPipelines(() => {
+      calls += 1
+    })
+
+    patchChatPipeline('chat-x', { stage: 'thinking' })
+    expect(calls).toBe(1)
+
+    clearChatPipeline('chat-x')
+    expect(calls).toBe(2)
+
+    unsub()
+    patchChatPipeline('chat-y', { stage: 'searching' })
+    expect(calls).toBe(2)
   })
 })

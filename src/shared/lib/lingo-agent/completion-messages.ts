@@ -1,7 +1,7 @@
 import type { ModelMessage } from 'ai'
 import type { ChatMessagePayload } from '@/shared/types/ipc'
 
-type CompletionMessage = {
+export type CompletionMessage = {
   role: string
   content: string | ChatMessagePayload['content']
 }
@@ -38,7 +38,26 @@ export function completionMessagesToModelMessages(
       )
 
     if (parts.length === 0) continue
-    out.push({ role, content: parts })
+
+    if (role === 'system') {
+      const text = parts
+        .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+        .map((part) => part.text)
+        .join('\n')
+      if (text) out.push({ role: 'system', content: text })
+      continue
+    }
+
+    if (role === 'user') {
+      out.push({ role: 'user', content: parts })
+      continue
+    }
+
+    const text = parts
+      .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+      .map((part) => part.text)
+      .join('\n')
+    if (text) out.push({ role: 'assistant', content: text })
   }
 
   return out

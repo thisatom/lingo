@@ -31,7 +31,7 @@ export async function warmOpenRouterConnection(): Promise<void> {
 }
 
 export const fetchOpenRouter: OpenRouterFetch = (input, init) =>
-  undiciFetch(input, {
+  undiciFetch(input as Parameters<typeof undiciFetch>[0], {
     ...init,
     dispatcher: getDispatcher()
-  }) as unknown as Promise<Response>
+  } as Parameters<typeof undiciFetch>[1]) as unknown as Promise<Response>

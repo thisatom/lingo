@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react'
 interface ResizableSidebarContextValue {
   sidebarCollapsed: boolean
   toggleSidebarPanel: () => void
+  openChatSearch: () => void
 }
 
 export const ResizableSidebarContext = createContext<ResizableSidebarContextValue | null>(

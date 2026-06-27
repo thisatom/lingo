@@ -53,4 +53,10 @@ describe('stripAssistantStreamSafeMarkup', () => {
     const partial = 'Example:\n```typescript\nconst answer = '
     expect(stripAssistantStreamSafeMarkup(partial)).toBe(partial)
   })
+
+  it('strips safety classifier prefix while streaming', () => {
+    expect(stripAssistantStreamSafeMarkup('User Safety: safe undefinedundefinedHello')).toBe(
+      'Hello'
+    )
+  })
 })

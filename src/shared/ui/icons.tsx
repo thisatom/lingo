@@ -2,6 +2,7 @@
  * App icons — VS Code Codicons (@vscode/codicons).
  * Drop-in replacements for former lucide-react imports.
  */
+import type { SVGProps } from 'react'
 import { Codicon, type CodiconProps } from '@/shared/ui/codicon'
 import { cn } from '@/shared/lib/utils'
 
@@ -37,7 +38,7 @@ export const Filter = icon('list-filter')
 export const Globe = icon('globe')
 
 /** Translate / language — stroke icon (no dedicated codicon). */
-export function Languages({ className, ...props }: IconProps) {
+export function Languages({ className, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

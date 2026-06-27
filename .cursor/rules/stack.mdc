@@ -17,7 +17,8 @@ alwaysApply: true
 ## Правила
 
 - MVP: без LangChain/LangGraph для линейного чата
-- TTS: интерфейс `TtsProvider` в `shared/api/tts/`; dev/prod провайдеры взаимозаменяемы
-- edge-tts не вызывать из renderer
+- TTS: `TtsProvider` в `shared/api/tts/`; edge-tts только main
 - OpenRouter: `docs/OPENROUTER.md`, ключи: `docs/API_KEYS.md`
+- Стабильность и clean code: `stability.mdc`, `clean-code.mdc`
+- Не угадывать intent по тексту сообщений: `no-content-heuristics.mdc`
 - Подробности: `docs/STACK.md`

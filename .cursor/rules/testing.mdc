@@ -1,0 +1,29 @@
+---
+description: Vitest — тесты на контракт, не на эвристики текста
+globs: "{**/*.test.ts,**/*.test.tsx,**/*.integration.test.ts}"
+alwaysApply: false
+---
+
+# Testing (Lingo)
+
+- Runner: **Vitest** (`npm test`).
+- Имена: `*.test.ts` unit; `*.integration.test.ts` — сценарии хода агента / store.
+
+## Что тестировать
+
+- Контракты stop/continue/queue/background stream (`features/ai-chat`).
+- IPC/stream helpers (`openrouter-chat-stream`, sanitizers).
+- Pure lib без DOM — предпочтительно.
+
+## Что не делать
+
+- Тесты, которые только проверяют «regex узнал погоду» — хрупко; см. `no-content-heuristics.mdc`.
+- Snapshot всего UI без причины.
+- Mock всего подряд — тестируй публичную функцию с минимальными deps.
+
+## После фикса бага
+
+1. Воспроизведение в тесте (regression).
+2. `npm test` green перед завершением задачи.
+
+Ключевые suites: `run-agent-turn.integration.test.ts`, `chat-agent-user-actions.test.ts`, `stream-reconnect.test.ts`.

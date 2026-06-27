@@ -8,7 +8,10 @@ import type { ChatStreamEvent } from '@/shared/types/ipc'
 import { openRouterConfig } from '@/shared/config/openrouter'
 import { openRouterHeaders } from '@/shared/lib/openrouter-headers'
 import { openaiCompatibleHeaders } from '@/shared/lib/openai-compatible-headers'
-import { completionMessagesToModelMessages } from '@/shared/lib/lingo-agent/completion-messages'
+import {
+  completionMessagesToModelMessages,
+  type CompletionMessage
+} from '@/shared/lib/lingo-agent/completion-messages'
 import { stripAssistantStreamSafeMarkup } from '@/shared/lib/strip-assistant-role-markup'
 
 export type OpenRouterFetch = (
@@ -82,8 +85,8 @@ export async function streamChatCompletionViaAiSdk(
   send: (event: ChatStreamEvent) => void
 ): Promise<AiSdkStreamResult> {
   const messages = completionMessagesToModelMessages(
-    (params.body.messages as Array<{ role: string; content: string | unknown }>) ?? []
-  ) as ModelMessage[]
+    (params.body.messages as CompletionMessage[] | undefined) ?? []
+  )
 
   if (messages.length === 0) {
     throw new Error('Model returned an empty response')
@@ -95,8 +98,7 @@ export async function streamChatCompletionViaAiSdk(
     baseURL,
     apiKey: params.apiKey.trim() || 'no-key',
     headers: providerHeaders(params.apiKey, params.customBackend),
-    fetch: createMergedBodyFetch(params.fetchImpl, mergeFields),
-    compatibility: 'compatible'
+    fetch: createMergedBodyFetch(params.fetchImpl, mergeFields)
   })
 
   const modelId = params.modelId.trim() || openRouterConfig.defaultModel
@@ -118,17 +120,20 @@ export async function streamChatCompletionViaAiSdk(
 
   for await (const part of result.fullStream) {
     if (part.type === 'reasoning-delta') {
-      const delta = part.delta
+      const delta = part.text
+      if (!delta) continue
       thinkingText += delta
       send({ type: 'thinking-delta', delta, text: thinkingText })
       continue
     }
 
     if (part.type === 'text-delta') {
-      accumulated += part.delta
+      const delta = part.text
+      if (!delta) continue
+      accumulated += delta
       send({
         type: 'text-delta',
-        delta: part.delta,
+        delta,
         text: stripAssistantStreamSafeMarkup(accumulated)
       })
     }

@@ -2,33 +2,27 @@ import * as React from 'react'
 
 import { cn } from '@/shared/lib/utils'
 
+const kbdBaseClass = cn(
+  'pointer-events-none inline-flex h-[18px] min-w-[18px] items-center justify-center',
+  'rounded-[5px] border border-overlay-border bg-secondary px-1.5',
+  'font-sans text-[10px] font-medium leading-none tracking-wide text-foreground/85',
+  'shadow-[0_1px_0_0_rgb(255_255_255_/_0.06)_inset,0_1px_2px_0_rgb(0_0_0_/_0.12)]',
+  'dark:shadow-[0_1px_0_0_rgb(255_255_255_/_0.04)_inset,0_1px_2px_0_rgb(0_0_0_/_0.35)]',
+  'select-none [&_svg:not([class*="size-"])]:size-3'
+)
+
 function Kbd({ className, ...props }: React.ComponentProps<'kbd'>) {
-  return (
-    <kbd
-      data-slot="kbd"
-      className={cn(
-        'pointer-events-none inline-flex h-4 min-w-4 items-center justify-center rounded-sm bg-muted/80 px-1 font-sans text-[10px] font-semibold leading-none text-muted-foreground select-none',
-        'dark:bg-[#252525]/90 dark:text-muted-foreground',
-        '[[data-slot=kbd-group]_&]:rounded-none',
-        '[[data-slot=kbd-group]_&:first-child]:rounded-l-[4px]',
-        '[[data-slot=kbd-group]_&:last-child]:rounded-r-[4px]',
-        '[[data-slot=kbd-group]_&:only-child]:rounded-[4px]',
-        '[&_svg:not([class*="size-"])]:size-3',
-        className
-      )}
-      {...props}
-    />
-  )
+  return <kbd data-slot="kbd" className={cn(kbdBaseClass, className)} {...props} />
 }
 
 function KbdGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="kbd-group"
-      className={cn('inline-flex items-center gap-[2px]', className)}
+      className={cn('inline-flex items-center gap-1', className)}
       {...props}
     />
   )
 }
 
-export { Kbd, KbdGroup }
+export { Kbd, KbdGroup, kbdBaseClass }

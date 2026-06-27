@@ -3,6 +3,7 @@ import { Check, Copy } from '@/shared/ui/icons'
 import { copyToClipboard } from '@/shared/lib/copy-to-clipboard'
 import { cn } from '@/shared/lib/utils'
 import { typography } from '@/shared/ui/typography'
+import { CHAT_NESTED_SCROLL_ATTR } from '@/shared/lib/chat-nested-scroll'
 import { MermaidDiagram } from '@/shared/ui/markdown/mermaid-diagram'
 import { looksLikeMermaidSource, unwrapMermaidFence } from '@/shared/lib/mermaid-detect'
 import { extractCodeLanguage, formatCodeLanguageLabel } from '@/shared/ui/markdown/markdown-utils'
@@ -86,7 +87,11 @@ export function MarkdownCodeBlock({ children, className }: MarkdownCodeBlockProp
         <span className="truncate">{label}</span>
         {copyButton}
       </div>
-      <pre ref={preRef} className={cn(typography.pre, 'p-3', className)}>
+      <pre
+        ref={preRef}
+        {...{ [CHAT_NESTED_SCROLL_ATTR]: '' }}
+        className={cn(typography.pre, 'max-h-[min(70vh,480px)] overflow-auto p-3', className)}
+      >
         {children}
       </pre>
     </div>

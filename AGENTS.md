@@ -1,95 +1,176 @@
 # Lingo — контекст для AI-агента
 
-**Lingo** — десктопное приложение (React + Electron + TypeScript) для тренировки разговорной речи на разных языках. Есть также **web preview** (`npm run dev:web` / `build:web`) с ограниченным паритетом.
+Руководство для Cursor / coding agents. Правила проекта: [`.cursor/rules/`](.cursor/rules/) (формат [awesome-cursorrules](https://github.com/PatrickJS/awesome-cursorrules)).
+
+---
+
+## Роль
+
+Ты — senior engineer в репозитории **Lingo**: React + Electron + TypeScript, FSD.  
+Цель работы: **стабильная версия** — минимальные точечные фиксы, тесты, без регрессий.
+
+---
+
+## Принципы (всегда)
+
+### 1. Clean code
+
+- Минимальный scope diff; не рефакторить «заодно».
+- Логику агента — в `features/ai-chat/lib/`, не в монолитном хуке.
+- Имена и типы на границах IPC/store; без `any` и пустых catch.
+- Подробнее: [`.cursor/rules/clean-code.mdc`](.cursor/rules/clean-code.mdc)
+
+### 2. Стабильность
+
+- Перед правкой — контракт домена; после — `npm test`.
+- Не ослаблять тесты; регрессия → новый тест.
+- Аудит: [`audit/active/stabilization-pass-1/`](audit/active/stabilization-pass-1/)
+- Подробнее: [`.cursor/rules/stability.mdc`](.cursor/rules/stability.mdc)
+
+### 3. Не угадывать intent по тексту
+
+**Запрещено** добавлять проверки содержимого сообщения или стрима агента (regex «погода», «news», «what is», factual/casual classifiers).
+
+Разрешено: **настройки UI**, **явные команды** («search the web»), **stage/flags** из store и IPC.
+
+Legacy `web-search-intent.ts` — не расширять; при рефакторе убирать keyword-intent.
+
+Подробнее: [`.cursor/rules/no-content-heuristics.mdc`](.cursor/rules/no-content-heuristics.mdc)
+
+---
 
 ## Продукт
 
-Пользователь говорит в микрофон → речь в текст (STT) → текст уходит в AI (OpenRouter или custom LLM) → ответ AI → ответ озвучивается (TTS).
-
-## Стек (текущий)
+Пользователь: микрофон → STT → AI (OpenRouter) → TTS. Тренировка разговорной речи.  
+Есть **web preview** (`npm run dev:web`) с ограниченным паритетом.
 
 | Слой | Технология |
 |------|------------|
-| UI | React, TypeScript, **shadcn/ui**, Tailwind CSS |
-| Desktop | **Electron** + **electron-vite** |
-| Окно | `@incanta/custom-electron-titlebar` (настройка в **main**) |
+| UI | React, TypeScript, shadcn/ui, Tailwind |
+| Desktop | Electron + electron-vite |
+| Окно | `@incanta/custom-electron-titlebar` (main) |
 | Архитектура UI | [Feature-Sliced Design](https://feature-sliced.design/) |
-| AI | **OpenRouter** (OpenAI-compatible); опционально custom endpoint |
-| Ключи (desktop) | Settings UI → **keytar** в main |
-| Ключи (web preview) | `localStorage` — только для dev, не production-safe |
-| TTS (dev desktop) | **edge-tts** в main |
-| STT (desktop) | Whisper ONNX в main; в renderer — Web Speech (browser backend) |
+| AI | OpenRouter; optional custom endpoint |
+| Ключи (desktop) | Settings → keytar (main) |
+| Ключи (web) | localStorage — dev only |
+| TTS (desktop dev) | edge-tts (main) |
+| STT (desktop) | Whisper in main; Web Speech in web preview |
 
-Подробности: [`docs/STACK.md`](docs/STACK.md), [`docs/UI.md`](docs/UI.md), [`docs/OPENROUTER.md`](docs/OPENROUTER.md), [`docs/API_KEYS.md`](docs/API_KEYS.md).
+Docs: [`docs/STACK.md`](docs/STACK.md), [`docs/UI.md`](docs/UI.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/FSD.md`](docs/FSD.md).
+
+---
 
 ## Структура репозитория
 
 ```
 lingo/
 ├── AGENTS.md
-├── electron/                 # main, preload
-│   └── main/                 # IPC, окна, STT/TTS, secrets, welcome flow
-├── src/                      # renderer (FSD)
+├── .cursor/rules/          # Project Rules (.mdc)
+├── electron/main/          # IPC, STT/TTS, secrets, stream proxy
+├── electron/preload/
+├── src/                    # renderer (FSD)
 │   ├── app/
-│   ├── pages/                # main, welcome, settings
+│   ├── pages/
 │   ├── widgets/
 │   ├── features/
 │   ├── entities/
 │   └── shared/
-├── index.html                # Electron renderer shell
-├── index.web.html            # Web build entry
 ├── docs/
-└── vite/                     # inject-csp и прочие Vite-плагины
+├── audit/                  # stabilization audits
+└── vite/
 ```
 
-## FSD — куда класть код
+---
 
-| Слой | Назначение в Lingo |
-|------|-------------------|
-| `app` | Провайдеры, глобальные стили, shutdown overlay |
-| `pages` | Главный диалог, welcome, настройки |
-| `widgets` | Панель чата, composer |
-| `features` | STT, AI chat, TTS, API keys, voice input |
-| `entities` | chat, settings, message |
-| `shared` | UI kit, API (`lingo`), конфиг, типы IPC |
+## FSD
 
-Импорты только **сверху вниз**. См. `docs/FSD.md`.
+| Слой | Lingo |
+|------|--------|
+| `app` | providers, global styles, gates |
+| `pages` | main, welcome, settings |
+| `widgets` | conversation panel, composer |
+| `features` | ai-chat, voice-input, TTS, keys, attachments |
+| `entities` | chat, message, settings |
+| `shared` | ui kit, lingo API, IPC types |
+
+Импорты **только сверху вниз**. См. [`.cursor/rules/fsd.mdc`](.cursor/rules/fsd.mdc).
+
+---
 
 ## Electron
 
-- **Main** (`electron/main/`): окна, titlebar, IPC, secrets, chat stream proxy, link preview, welcome probe.
-- **Preload** (`electron/preload/`): `contextBridge` → `window.lingo`.
-- **Renderer** (`src/`): React; **не** хранит API-ключи и **не** ходит в OpenRouter напрямую (кроме Web Speech для browser STT).
+| Процесс | Ответственность |
+|---------|-----------------|
+| Main | windows, titlebar, IPC, secrets, chat stream, STT/TTS |
+| Preload | `contextBridge` → `window.lingo` |
+| Renderer | React; **не** хранит ключи; **не** OpenRouter напрямую (desktop) |
 
-См. `docs/ARCHITECTURE.md`, `.cursor/rules/electron.mdc`.
+См. [`.cursor/rules/electron.mdc`](.cursor/rules/electron.mdc), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-## Пайплайн речи
+---
 
-1. **Capture** — `features/voice-capture`, `features/voice-input`
-2. **STT** — main (Whisper) или Web Speech в renderer
-3. **AI** — `features/ai-chat` → IPC `lingo:chat:stream` (desktop) / `browser-lingo` (web)
-4. **TTS** — main edge-tts (desktop) / Edge web API (web preview)
+## Чат-агент (критичный домен)
 
-См. `docs/SPEECH_PIPELINE.md`, `docs/voice-input-architecture.md`.
+| Документ | Назначение |
+|----------|------------|
+| [`docs/CHAT_AGENT.md`](docs/CHAT_AGENT.md) | Контракт поведения |
+| [`docs/CHAT_AGENT_STABILITY_PLAN.md`](docs/CHAT_AGENT_STABILITY_PLAN.md) | План стабилизации |
+| [`docs/CHAT_AGENT_MANUAL_QA.md`](docs/CHAT_AGENT_MANUAL_QA.md) | Ручной QA перед релизом |
+| [`.cursor/rules/ai-chat.mdc`](.cursor/rules/ai-chat.mdc) | Правила для кода агента |
 
-## Секреты
+Stop → `executeAgentStop`; partial + Continue; фоновый стрим без лишнего `force: true`.
 
-- Desktop: **keytar** в main; renderer не читает ключи (`readSecretKey` бросает на Electron).
-- Web preview: `src/shared/api/web-secrets.ts` (plain localStorage).
-- `.env` — dev-fallback для main: `docs/env.example.md`.
+---
 
-## Что делать агенту
+## Workflow агента
 
-1. Читать `.cursor/rules/*.mdc` и `docs/`.
-2. Соблюдать FSD и границу main vs renderer.
-3. Titlebar — только `@incanta/custom-electron-titlebar` в main.
-4. CSP для HTML — через `src/shared/config/content-security-policy.ts` + `vite/inject-csp.ts`.
-5. Минимальный дифф.
+### Перед изменением кода
+
+1. Прочитать релевантные `.cursor/rules/*.mdc` и `docs/`.
+2. Найти существующие тесты и call sites.
+3. Для ai-chat — затронутые сценарии из Manual QA.
+
+### При реализации
+
+- Соблюдать FSD и границу main vs renderer.
+- CSP: `shared/config/content-security-policy.ts` + `vite/inject-csp.ts`.
+- Titlebar только в main.
+- **Не** добавлять keyword-intent по тексту пользователя.
+
+### Перед завершением задачи
+
+1. `npm test` (минимум затронутые модули).
+2. Обновить контракт/docs, если поведение изменилось.
+3. Запись в audit-домен, если это stabilization fix.
+
+### Коммиты и PR
+
+- Коммит **только по запросу** пользователя.
+- PR: summary + test plan; для ai-chat — пункты из `CHAT_AGENT.md` checklist.
+
+---
+
+## Cursor rules — индекс
+
+| Rule | Scope |
+|------|--------|
+| `project.mdc`, `stack.mdc` | always |
+| `clean-code.mdc`, `stability.mdc`, `no-content-heuristics.mdc` | always |
+| `fsd.mdc` | `src/**` |
+| `react.mdc`, `ui.mdc` | TSX |
+| `electron.mdc` | `electron/**` |
+| `ai-chat.mdc` | agent + stream |
+| `speech-pipeline.mdc` | voice pipeline |
+| `openrouter.mdc`, `api-keys.mdc` | keys |
+| `testing.mdc` | `*.test.ts` |
+
+Полный индекс: [`.cursor/README.md`](.cursor/README.md).
+
+---
 
 ## Ссылки
 
-- [Контракт агента чата](docs/CHAT_AGENT.md)
-- [План стабилизации агента чата](docs/CHAT_AGENT_STABILITY_PLAN.md)
-- [Ручной QA агента](docs/CHAT_AGENT_MANUAL_QA.md)
+- [OpenRouter](docs/OPENROUTER.md) · [API keys](docs/API_KEYS.md)
+- [Speech pipeline](docs/SPEECH_PIPELINE.md)
+- [Stabilization audit](audit/active/stabilization-pass-1/SUMMARY.md)
 - [Feature-Sliced Design](https://feature-sliced.design/)
-- [@incanta/custom-electron-titlebar](https://www.npmjs.com/package/@incanta/custom-electron-titlebar)

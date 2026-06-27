@@ -4,7 +4,8 @@ import { practiceLanguageOptionsForSelect, translationTargetOptionsForSelect } f
 import {
   settingsSelectContentClass,
   settingsSelectItemClass,
-  settingsSelectTriggerClass
+  settingsRowSelectTriggerClass,
+  settingsRowSelectTriggerWideClass,
 } from '@/shared/lib/settings-control'
 import { LLM_MAX_TOKENS_PRESETS, llmMaxTokensSelectValue } from '@/shared/lib/llm-max-tokens'
 import { cn } from '@/shared/lib/utils'
@@ -88,7 +89,7 @@ export function AgentSettingsForm() {
             <SelectTrigger
               id="model-language"
               size="sm"
-              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+              className={settingsRowSelectTriggerClass}
             >
               <SelectValue placeholder="Select language" />
             </SelectTrigger>
@@ -117,7 +118,7 @@ export function AgentSettingsForm() {
             <SelectTrigger
               id="llm-max-tokens"
               size="sm"
-              className={cn(settingsSelectTriggerClass, 'w-[280px] min-w-0')}
+              className={settingsRowSelectTriggerWideClass}
             >
               <SelectValue />
             </SelectTrigger>
@@ -159,7 +160,8 @@ export function AgentSettingsForm() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Web search</p>
             <p className={settingsRowDescriptionClass}>
-              Allow the agent to search the web for factual or current questions when you ask.
+              When on, the agent searches the web for every message (except when you attach
+              files). When off, only explicit commands like “search the web for…” trigger lookup.
               Also toggled in the composer.
             </p>
           </div>
@@ -202,7 +204,7 @@ export function AgentSettingsForm() {
             <SelectTrigger
               id="chat-composer-mode"
               size="sm"
-              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+              className={settingsRowSelectTriggerClass}
             >
               <SelectValue />
             </SelectTrigger>
@@ -234,7 +236,7 @@ export function AgentSettingsForm() {
             <SelectTrigger
               id="translation-source-language"
               size="sm"
-              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+              className={settingsRowSelectTriggerClass}
             >
               <SelectValue />
             </SelectTrigger>
@@ -261,7 +263,7 @@ export function AgentSettingsForm() {
             <SelectTrigger
               id="translation-target-language"
               size="sm"
-              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
+              className={settingsRowSelectTriggerClass}
             >
               <SelectValue />
             </SelectTrigger>

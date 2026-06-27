@@ -40,6 +40,7 @@ export type ConversationTurnRenderProps = {
   lastReplyMessageId?: string | null
   showReplyActions?: boolean
   onRegenerateAssistantMessage?: (messageId: string) => void
+  onContinueAssistantMessage?: (messageId: string) => void
 }
 
 function userAttachmentsSignature(
@@ -63,7 +64,7 @@ function assistantMessagesSignature(messages: readonly Message[]): string {
   return messages
     .map(
       (message) =>
-        `${message.id}:${message.role}:${message.content}:${searchSourcesSignature(message.searchSources)}`
+        `${message.id}:${message.role}:${message.content}:${message.replyStatus ?? ''}:${searchSourcesSignature(message.searchSources)}`
     )
     .join('|')
 }

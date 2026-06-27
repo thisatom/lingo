@@ -8,6 +8,7 @@ import { setupLocalWebSearch } from '@/shared/lib/setup-local-web-search'
 import { ensureLingoBridge } from '@/shared/lib/lingo-bridge'
 import { installFileDropNavigationGuard } from '@/shared/lib/prevent-file-drop-navigation'
 import { initThemeFromStorage } from '@/shared/lib/theme'
+import { isBenignResizeObserverError } from '@/shared/lib/benign-resize-observer-error'
 import 'katex/dist/katex.min.css'
 import '@vscode/codicons/dist/codicon.css'
 import '@/app/styles/globals.css'
@@ -24,6 +25,21 @@ void import('@/shared/lib/image-ocr-tesseract').then(({ setupTesseractImageOcr }
 })
 initThemeFromStorage()
 registerActiveChatEffects()
+
+/** Last-resort safety net — observers defer via createDeferredResizeObserver; must not crash the renderer. */
+window.addEventListener('error', (event) => {
+  if (isBenignResizeObserverError(event.message)) {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+  const message = event.reason instanceof Error ? event.reason.message : String(event.reason ?? '')
+  if (isBenignResizeObserverError(message)) {
+    event.preventDefault()
+  }
+})
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')

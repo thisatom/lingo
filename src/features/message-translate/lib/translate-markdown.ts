@@ -18,7 +18,8 @@ function preserveEdgeWhitespace(original: string, translated: string): string {
 function collectTextNodes(tree: Root): Text[] {
   const nodes: Text[] = []
   visit(tree, 'text', (node, _index, parent) => {
-    if (parent?.type === 'code' || parent?.type === 'inlineCode') return
+    const parentType = (parent as { type?: string } | undefined)?.type
+    if (parentType === 'code' || parentType === 'inlineCode') return
     if (!node.value.trim()) return
     nodes.push(node)
   })

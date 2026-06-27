@@ -14,7 +14,11 @@ export function SettingsInput({ value, onValueChange, className, ...props }: Set
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
-    <FieldContextMenu fieldRef={inputRef} onValueChange={onValueChange}>
+    <FieldContextMenu
+      fieldRef={inputRef}
+      onValueChange={onValueChange}
+      triggerClassName="w-fit shrink-0 min-w-0"
+    >
       <Input
         ref={inputRef}
         className={cn(settingsInputClass, className)}

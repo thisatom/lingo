@@ -1,7 +1,7 @@
 import type { ChatMessagePayload } from '@/shared/types/ipc'
 import type { ChatStreamLlmSettings } from '@/shared/lib/resolve-chat-stream-llm'
 import { extractPlainTextFromPayload } from '@/shared/lib/chat-message-api'
-import { shouldForceWebSearch, shouldUseWebSearchForMessage } from '@/shared/lib/web-search-intent'
+import { shouldForceWebSearch } from '@/shared/lib/web-search-intent'
 
 import type { Message } from '@/entities/message/model/types'
 
@@ -44,7 +44,7 @@ export function resolveWebSearchForStreamTurn(
   }
   const forceWebSearch = shouldForceWebSearch(lastUserMessage)
   const webSearchForTurn =
-    request.webSearch === true && shouldUseWebSearchForMessage(lastUserMessage)
+    request.webSearch === true && lastUserMessage.trim().length > 0
   return { webSearchForTurn, forceWebSearch, blockedByAttachments: false }
 }
 
@@ -76,7 +76,5 @@ export function resolveWebSearchForChatTurn(
 ): boolean {
   if (!settings.webSearchEnabled) return false
   if (lastUserMessageHasAttachments(messages)) return false
-  const text = lastUserMessageText(messages)
-  if (!text) return false
-  return shouldUseWebSearchForMessage(text)
+  return lastUserMessageText(messages).trim().length > 0
 }

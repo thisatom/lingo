@@ -12,14 +12,14 @@ describe('isReplyActionsReady', () => {
     ).toBe(false)
   })
 
-  it('shows after stream while TTS plays', () => {
+  it('waits while agent is busy after stream (TTS, reconnect, etc.)', () => {
     expect(
       isReplyActionsReady({
         agentBusy: true,
         pipelineStreamingAnswer: false,
         stage: 'speaking'
       })
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('shows when agent is idle', () => {

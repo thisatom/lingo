@@ -7,8 +7,10 @@ import { DevicesSettingsForm } from '@/features/user-settings/ui/DevicesSettings
 import { AppearanceSettingsForm } from '@/features/user-settings/ui/AppearanceSettingsForm'
 import { UserSettingsForm } from '@/features/user-settings/ui/UserSettingsForm'
 import { settingsPageContentClass } from '@/shared/lib/settings-surface'
+import { PAGE_HORIZONTAL_PADDING_CLASS, SETTINGS_PAGE_INSET_CLASS } from '@/shared/lib/layout'
+import { cn } from '@/shared/lib/utils'
 import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
-import { SidebarExpandButton } from '@/widgets/app-sidebar/ui/SidebarExpandButton'
+import { SidebarCollapsedToolbar } from '@/widgets/app-sidebar/ui/SidebarCollapsedToolbar'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 
 export function SettingsPage() {
@@ -26,15 +28,15 @@ export function SettingsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      {sidebarCollapsed && (
-        <div className="shrink-0 px-4 py-2">
-          <SidebarExpandButton />
+      {sidebarCollapsed ? (
+        <div className={cn('flex shrink-0 items-center py-2', PAGE_HORIZONTAL_PADDING_CLASS)}>
+          <SidebarCollapsedToolbar />
         </div>
-      )}
+      ) : null}
 
-      <CustomScrollArea variant="sidebar" className="min-h-0 flex-1">
-        <div className="p-4">
-          <div className={settingsPageContentClass}>
+      <CustomScrollArea variant="settings" className="min-h-0 flex-1">
+        <div className={cn('p-3 sm:p-4', SETTINGS_PAGE_INSET_CLASS)}>
+          <div className={cn(settingsPageContentClass, 'min-w-0')}>
             {resolvedSection === 'general' && <UserSettingsForm />}
             {resolvedSection === 'appearance' && <AppearanceSettingsForm />}
             {resolvedSection === 'devices' && <DevicesSettingsForm />}

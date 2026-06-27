@@ -1,7 +1,12 @@
 import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import { Button, type ButtonProps } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TOOLTIP_SHOW_DELAY_MS
+} from '@/shared/ui/tooltip'
 
 type TooltipWrapProps = {
   label: ReactNode
@@ -10,6 +15,7 @@ type TooltipWrapProps = {
   align?: ComponentProps<typeof TooltipContent>['align']
   sideOffset?: number
   contentClassName?: string
+  delayDuration?: number
 }
 
 export function TooltipWrap({
@@ -18,10 +24,11 @@ export function TooltipWrap({
   side = 'top',
   align,
   sideOffset,
-  contentClassName
+  contentClassName,
+  delayDuration = TOOLTIP_SHOW_DELAY_MS
 }: TooltipWrapProps) {
   return (
-    <Tooltip delayDuration={240}>
+    <Tooltip delayDuration={delayDuration}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent
         side={side}
@@ -38,12 +45,12 @@ export function TooltipWrap({
 type TooltipIconButtonProps = ButtonProps & {
   tooltip: ReactNode
   children: ReactNode
-  /** Layout/position classes for the Radix trigger wrapper (e.g. absolute overlay). */
   triggerClassName?: string
   tooltipSide?: ComponentProps<typeof TooltipContent>['side']
   tooltipAlign?: ComponentProps<typeof TooltipContent>['align']
   tooltipSideOffset?: number
   tooltipClassName?: string
+  tooltipDelay?: number
 }
 
 export function TooltipIconButton({
@@ -55,6 +62,7 @@ export function TooltipIconButton({
   tooltipAlign,
   tooltipSideOffset,
   tooltipClassName,
+  tooltipDelay = 0,
   children,
   type = 'button',
   'aria-label': ariaLabelProp,
@@ -67,11 +75,7 @@ export function TooltipIconButton({
     <Button
       type={type}
       disabled={disabled}
-      className={cn(
-        className,
-        !disabled && triggerClassName,
-        disabled && 'pointer-events-none'
-      )}
+      className={cn(className, !disabled && triggerClassName, disabled && 'pointer-events-none')}
       {...props}
       aria-label={ariaLabelProp ?? ariaFallback}
     >
@@ -80,14 +84,10 @@ export function TooltipIconButton({
   )
 
   return (
-    <Tooltip delayDuration={0}>
+    <Tooltip delayDuration={tooltipDelay}>
       <TooltipTrigger asChild>
         {disabled ? (
-          <span
-            className={cn('inline-flex', triggerClassName)}
-            tabIndex={-1}
-            aria-disabled="true"
-          >
+          <span className={cn('inline-flex', triggerClassName)} tabIndex={-1} aria-disabled="true">
             {button}
           </span>
         ) : (

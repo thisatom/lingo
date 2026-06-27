@@ -13,12 +13,13 @@ const THUMB_MIN_HEIGHT_PX = 32
 const HIDE_DELAY_MS = 500
 import { CHAT_SCROLL_BOTTOM_THRESHOLD_PX } from '@/shared/lib/chat-scroll-threshold'
 import { isViewportAtBottom } from '@/shared/lib/chat-scroll-viewport'
+import { createDeferredResizeObserver } from '@/shared/lib/observe-element-resize'
 
 const AT_BOTTOM_THRESHOLD_PX = CHAT_SCROLL_BOTTOM_THRESHOLD_PX
 const EDGE_FADE_THRESHOLD_PX = 6
 const EDGE_FADE_HEIGHT_PX = 28
 
-type ScrollVariant = 'chat' | 'sidebar' | 'menu' | 'thinking'
+type ScrollVariant = 'chat' | 'sidebar' | 'menu' | 'thinking' | 'settings'
 
 const VARIANT_CONFIG: Record<
   ScrollVariant,
@@ -58,6 +59,15 @@ const VARIANT_CONFIG: Record<
   /** Nested in chat turns — must stay below sticky question headers. */
   thinking: {
     zIndex: 1,
+    thumbIdleOpacity: 0.38,
+    thumbHoverOpacity: 0.82,
+    scrollbarWidth: 5,
+    scrollbarRight: 2,
+    edgeFades: false
+  },
+  /** Settings nav + settings page scroll — no edge fades, idle scrollbar hide. */
+  settings: {
+    zIndex: 30,
     thumbIdleOpacity: 0.38,
     thumbHoverOpacity: 0.82,
     scrollbarWidth: 5,
@@ -294,11 +304,12 @@ export function CustomScrollArea({
 
     syncMetrics()
 
-    const observer = new ResizeObserver(() => {
+    const onViewportResize = () => {
       syncMetrics()
       reportAtBottom()
       updateScrollToLatestVisibility()
-    })
+    }
+    const { observer, disconnect } = createDeferredResizeObserver(onViewportResize)
     observer.observe(viewport)
     const scrollContent = viewport.querySelector('[data-chat-scroll-content]')
     if (scrollContent) {
@@ -311,7 +322,7 @@ export function CustomScrollArea({
     updateScrollToLatestVisibility()
 
     return () => {
-      observer.disconnect()
+      disconnect()
       clearScrollIdleTimer()
       if (metricsRafRef.current != null) {
         cancelAnimationFrame(metricsRafRef.current)
@@ -355,31 +366,6 @@ export function CustomScrollArea({
   useEffect(() => {
     return () => onViewportRefRef.current?.(null)
   }, [])
-
-  useEffect(() => {
-    const viewport = viewportRef.current
-    if (!viewport) return
-
-    const observer = new ResizeObserver(() => {
-      syncMetrics()
-    })
-    observer.observe(viewport)
-    const scrollContent = viewport.querySelector('[data-chat-scroll-content]')
-    if (scrollContent) {
-      observer.observe(scrollContent)
-    } else {
-      const inner = viewport.firstElementChild
-      if (inner) observer.observe(inner)
-    }
-
-    syncMetrics()
-    const frame = requestAnimationFrame(syncMetrics)
-
-    return () => {
-      cancelAnimationFrame(frame)
-      observer.disconnect()
-    }
-  }, [syncMetrics, children])
 
   const scrollToThumbPosition = useCallback(
     (clientY: number) => {
@@ -525,14 +511,14 @@ export function CustomScrollArea({
       {config.edgeFades && edgeFade.top ? (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 z-[28] bg-gradient-to-b from-sidebar via-sidebar/70 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 z-[1] bg-gradient-to-b from-sidebar via-sidebar/70 to-transparent"
           style={{ height: EDGE_FADE_HEIGHT_PX }}
         />
       ) : null}
       {config.edgeFades && edgeFade.bottom ? (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-[28] bg-gradient-to-t from-sidebar via-sidebar/70 to-transparent"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-sidebar via-sidebar/70 to-transparent"
           style={{ height: EDGE_FADE_HEIGHT_PX }}
         />
       ) : null}

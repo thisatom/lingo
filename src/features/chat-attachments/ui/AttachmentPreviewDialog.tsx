@@ -110,8 +110,7 @@ export function AttachmentPreviewDialog({
         )}
         closeButtonClassName={cn(
           'text-muted-foreground opacity-80',
-          'hover:bg-accent hover:text-foreground hover:opacity-100',
-          'dark:hover:bg-[#303030] dark:hover:text-foreground'
+          'hover:bg-accent hover:text-foreground hover:opacity-100'
         )}
       >
         <DialogHeader className="shrink-0 space-y-1 border-b border-border px-5 py-4 text-left">

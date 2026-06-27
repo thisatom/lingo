@@ -44,6 +44,8 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   artifactName: Lingo-${version}-win-setup.${ext}
+  # Silent in-app updates use `/S` after the running process exits.
+  differentialPackage: false
 
 mac:
   icon: icon.png

@@ -2,16 +2,19 @@ import { useState } from 'react'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { AppUpdateSettingsSection } from '@/features/app-update/ui/AppUpdateSettingsSection'
+import { WebDevSecretsNotice } from '@/features/manage-api-keys/ui/WebDevSecretsNotice'
 import { SettingsInput } from '@/features/user-settings/ui/SettingsInput'
 import { clearAppDataAndPersist, deleteAllChatsAndPersist } from '@/features/user-settings/lib/clear-app-data'
 import { SIDEBAR_CHAT_SORT_OPTIONS, type SidebarChatSort } from '@/shared/lib/chat-sidebar'
 import {
+  settingsRowInputClass,
+  settingsRowSelectTriggerClass,
   settingsSelectContentClass,
-  settingsSelectItemClass,
-  settingsSelectTriggerClass
+  settingsSelectItemClass
 } from '@/shared/lib/settings-control'
 import {
   settingsCardClass,
+  settingsDestructiveButtonClass,
   settingsRowClass,
   settingsRowDescriptionClass,
   settingsSubsectionTitleClass,
@@ -80,6 +83,7 @@ export function UserSettingsForm() {
   return (
     <section>
       <h2 className={settingsSectionTitleClass}>General</h2>
+      <WebDevSecretsNotice />
 
       <p className={settingsSubsectionTitleClass}>Profile</p>
       <div className={settingsCardClass}>
@@ -90,7 +94,7 @@ export function UserSettingsForm() {
           </div>
           <SettingsInput
             id="display-name"
-            className="w-[220px]"
+            className={settingsRowInputClass}
             value={displayName}
             onValueChange={setDisplayName}
             placeholder="Your name"
@@ -109,11 +113,7 @@ export function UserSettingsForm() {
             </p>
           </div>
           <Select value={sidebarChatSort} onValueChange={(value) => applyChatSort(value as SidebarChatSort)}>
-            <SelectTrigger
-              id="sidebar-chat-sort"
-              size="sm"
-              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
-            >
+            <SelectTrigger id="sidebar-chat-sort" size="sm" className={settingsRowSelectTriggerClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
@@ -140,11 +140,7 @@ export function UserSettingsForm() {
             value={sidebarShowDateGroups ? 'date' : 'flat'}
             onValueChange={(value) => setSidebarShowDateGroups(value === 'date')}
           >
-            <SelectTrigger
-              id="sidebar-chat-groups"
-              size="sm"
-              className={`${settingsSelectTriggerClass} w-[220px] min-w-0`}
-            >
+            <SelectTrigger id="sidebar-chat-groups" size="sm" className={settingsRowSelectTriggerClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper" className={cn(settingsSelectContentClass)}>
@@ -177,7 +173,7 @@ export function UserSettingsForm() {
             type="button"
             variant="destructive"
             size="xs"
-            className="h-6 px-2 text-[11px]"
+            className={settingsDestructiveButtonClass}
             onClick={() => setDeleteChatsDialogOpen(true)}
           >
             Delete
@@ -195,7 +191,7 @@ export function UserSettingsForm() {
             type="button"
             variant="destructive"
             size="xs"
-            className="h-6 px-2 text-[11px]"
+            className={settingsDestructiveButtonClass}
             onClick={() => setClearDialogOpen(true)}
           >
             Clear
@@ -212,13 +208,13 @@ export function UserSettingsForm() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row justify-end gap-2 sm:justify-end">
-            <AlertDialogCancel size="sm" className="min-w-[5.5rem]">
+            <AlertDialogCancel size="sm" className="inline-flex min-w-[5.5rem] items-center justify-center">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               size="sm"
               variant="destructive"
-              className="min-w-[5.5rem]"
+              className="inline-flex min-w-[5.5rem] items-center justify-center"
               onClick={(e) => {
                 e.preventDefault()
                 void handleDeleteAllChats()
@@ -262,13 +258,13 @@ export function UserSettingsForm() {
             />
           </div>
           <AlertDialogFooter className="flex flex-row justify-end gap-2 sm:justify-end">
-            <AlertDialogCancel size="sm" className="min-w-[5.5rem]">
+            <AlertDialogCancel size="sm" className="inline-flex min-w-[5.5rem] items-center justify-center">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               size="sm"
               variant="destructive"
-              className="min-w-[5.5rem]"
+              className="inline-flex min-w-[5.5rem] items-center justify-center"
               disabled={!canClearAppData}
               onClick={(e) => {
                 e.preventDefault()

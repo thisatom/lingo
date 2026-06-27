@@ -11,12 +11,14 @@ function user(id: string, content: string, attachments?: Message['attachments'])
 describe('resolveWebSearchForChatTurn', () => {
   const settings = { webSearchEnabled: true }
 
-  it('runs for factual questions when web search toggle is on', () => {
+  it('runs for any non-empty user message when toggle is on', () => {
     const messages = [
       user('u1', 'hi'),
       user('u2', 'What is quantum computing in simple terms?')
     ]
     expect(resolveWebSearchForChatTurn(settings, messages)).toBe(true)
+    expect(resolveWebSearchForChatTurn(settings, [user('u1', 'как у тебя дела')])).toBe(true)
+    expect(resolveWebSearchForChatTurn(settings, [user('u1', 'hi there')])).toBe(true)
   })
 
   it('skips when the current user turn has attachments', () => {
@@ -74,20 +76,13 @@ describe('resolveWebSearchForChatTurn', () => {
     expect(resolveWebSearchForChatTurn(settings, messages)).toBe(false)
   })
 
-  it('allows local web search with custom endpoint when intent matches', () => {
-    const messages = [user('u1', 'What is the weather in Paris today?')]
-    expect(resolveWebSearchForChatTurn({ webSearchEnabled: true }, messages)).toBe(true)
-  })
-
-  it('skips casual chat and local time when toggle is on', () => {
-    expect(resolveWebSearchForChatTurn(settings, [user('u1', 'который час')])).toBe(false)
-    expect(resolveWebSearchForChatTurn(settings, [user('u1', 'как у тебя дела')])).toBe(false)
-    expect(resolveWebSearchForChatTurn(settings, [user('u1', 'hi there')])).toBe(false)
-  })
-
   it('does not run when web search toggle is off', () => {
     const messages = [user('u1', 'What is the weather in Paris today?')]
     expect(resolveWebSearchForChatTurn({ webSearchEnabled: false }, messages)).toBe(false)
+  })
+
+  it('skips empty latest user message', () => {
+    expect(resolveWebSearchForChatTurn(settings, [user('u1', '   ')])).toBe(false)
   })
 })
 
@@ -121,5 +116,12 @@ describe('resolveWebSearchForStreamTurn', () => {
     )
     expect(decision.forceWebSearch).toBe(true)
     expect(decision.webSearchForTurn).toBe(false)
+  })
+
+  it('runs search for any non-empty message when toggle is on', () => {
+    const apiMessages = [{ role: 'user' as const, content: 'hello' }]
+    const decision = resolveWebSearchForStreamTurn({ webSearch: true }, apiMessages, 'hello')
+    expect(decision.webSearchForTurn).toBe(true)
+    expect(decision.forceWebSearch).toBe(false)
   })
 })

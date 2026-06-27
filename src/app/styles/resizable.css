@@ -1,0 +1,17 @@
+[data-slot='resizable-handle'] {
+  touch-action: none;
+}
+
+[data-slot='resizable-handle']::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline: -5px;
+  z-index: 1;
+}
+
+[data-slot='resizable-handle']:hover,
+[data-slot='resizable-handle']:focus-visible,
+[data-slot='resizable-handle']:active {
+  background-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+}

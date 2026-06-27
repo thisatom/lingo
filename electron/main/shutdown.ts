@@ -1,8 +1,8 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 
 /** Allow debounced chat persist + settings flush; force-close only as last resort. */
 const SHUTDOWN_TIMEOUT_MS = 22_000
-const SHUTDOWN_CHANNEL = 'lingo:app:shutdown-complete'
+export const SHUTDOWN_IPC_CHANNEL = 'lingo:app:shutdown-complete'
 
 const closeAllowed = new WeakSet<BrowserWindow>()
 
@@ -18,7 +18,7 @@ function ensureShutdownIpcHandler(): void {
   if (shutdownIpcRegistered) return
   shutdownIpcRegistered = true
 
-  ipcMain.on(SHUTDOWN_CHANNEL, (event) => {
+  ipcMain.on(SHUTDOWN_IPC_CHANNEL, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || !pendingByWindow.has(win)) return
 
@@ -59,6 +59,12 @@ function beginShutdown(mainWindow: BrowserWindow): void {
   pendingByWindow.set(mainWindow, { forceTimer })
 }
 
+export function allowWindowCloseImmediately(win: BrowserWindow): void {
+  ensureShutdownIpcHandler()
+  cancelPendingShutdown(win)
+  closeAllowed.add(win)
+}
+
 /** Intercept window close so the renderer can persist state before exit. */
 export function setupGracefulShutdown(mainWindow: BrowserWindow): void {
   ensureShutdownIpcHandler()
@@ -73,5 +79,42 @@ export function setupGracefulShutdown(mainWindow: BrowserWindow): void {
   mainWindow.on('closed', () => {
     cancelPendingShutdown(mainWindow)
     closeAllowed.delete(mainWindow)
+  })
+}
+
+/** Ask renderer to persist, resolve when shutdown-complete arrives or timeout hits. */
+export function requestRendererFlush(timeoutMs: number): Promise<void> {
+  ensureShutdownIpcHandler()
+
+  const windows = BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed())
+  if (windows.length === 0) return Promise.resolve()
+
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      ipcMain.removeListener(SHUTDOWN_IPC_CHANNEL, onComplete)
+      clearTimeout(timer)
+      resolve()
+    }
+
+    const onComplete = () => finish()
+    const timer = setTimeout(finish, timeoutMs)
+
+    ipcMain.on(SHUTDOWN_IPC_CHANNEL, onComplete)
+
+    for (const win of windows) {
+      if (win.webContents.isDestroyed()) continue
+      cancelPendingShutdown(win)
+      pendingByWindow.set(win, {
+        forceTimer: setTimeout(() => {
+          pendingByWindow.delete(win)
+          if (win.isDestroyed()) return
+          allowWindowCloseImmediately(win)
+        }, timeoutMs)
+      })
+      win.webContents.send('lingo:app:prepare-shutdown')
+    }
   })
 }

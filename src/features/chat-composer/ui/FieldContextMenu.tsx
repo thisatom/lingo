@@ -24,10 +24,17 @@ interface FieldContextMenuProps {
   children: ReactNode
   onValueChange: (value: string) => void
   fieldRef: React.RefObject<EditableFieldElement | null>
+  /** Wrapper around the trigger field (default: full-width block for composer). */
+  triggerClassName?: string
 }
 
 /** Cut / copy / paste / select-all for textarea and text inputs. */
-export function FieldContextMenu({ children, onValueChange, fieldRef }: FieldContextMenuProps) {
+export function FieldContextMenu({
+  children,
+  onValueChange,
+  fieldRef,
+  triggerClassName
+}: FieldContextMenuProps) {
   const syncingRef = useRef(false)
 
   const syncFromField = useCallback(() => {
@@ -80,7 +87,7 @@ export function FieldContextMenu({ children, onValueChange, fieldRef }: FieldCon
   return (
     <ContextMenu modal={false}>
       <ContextMenuTrigger asChild>
-        <div className="block min-w-0 w-full">{children}</div>
+        <div className={cn('block min-w-0 w-full', triggerClassName)}>{children}</div>
       </ContextMenuTrigger>
       <ContextMenuContent className={cn('w-52', sidebarMenuSurfaceClass)}>
         <ContextMenuItem className={sidebarMenuItemClass} onSelect={() => runCommand('cut')}>

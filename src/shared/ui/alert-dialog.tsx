@@ -4,7 +4,8 @@ import * as React from "react"
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
 import { dialogContentMotionClass, dialogOverlayMotionClass } from '@/shared/lib/dialog-motion'
-import { cn } from "@/shared/lib/utils"
+import { dialogOverlayClass, modalSurfaceClass } from '@/shared/lib/design-surface'
+import { cn } from '@/shared/lib/utils'
 import { Button } from "@/shared/ui/button"
 
 function AlertDialog({
@@ -37,7 +38,8 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-overlay",
+        "fixed inset-0 z-50",
+        dialogOverlayClass,
         dialogOverlayMotionClass,
         className
       )}
@@ -60,7 +62,8 @@ function AlertDialogContent({
         data-slot="alert-dialog-content"
         data-size={size}
         className={cn(
-          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-lg",
+          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 p-6 data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-lg",
+          modalSurfaceClass,
           dialogContentMotionClass,
           className
         )}

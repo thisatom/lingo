@@ -97,7 +97,7 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input> & {
   wrapperClassName?: string
-  /** `palette` — glass command dialog (42px input, #1e1e1e separator). */
+  /** `palette` — glass command dialog (42px input, separator token). */
   variant?: 'menu' | 'palette'
   showSearchIcon?: boolean
   ref?: React.Ref<HTMLInputElement>

@@ -19,27 +19,48 @@ export type ChatPipelineSnapshot = {
 }
 
 const pipelineByChatId = new Map<string, ChatPipelineSnapshot>()
+const pipelineRevisionByChatId = new Map<string, number>()
+const pipelineListeners = new Set<() => void>()
 
-function defaultSnapshot(): ChatPipelineSnapshot {
-  return {
-    stage: 'idle',
-    error: null,
-    pipelineThinkingText: '',
-    pipelineSearchTargets: [],
-    pipelineSearchActiveUrl: null,
-    pipelineStreamingAnswer: false
+function notifyPipelineListeners(): void {
+  pipelineListeners.forEach((listener) => listener())
+}
+
+function bumpPipelineRevision(chatId: string): void {
+  pipelineRevisionByChatId.set(chatId, (pipelineRevisionByChatId.get(chatId) ?? 0) + 1)
+}
+
+export function getChatPipelineRevision(chatId: string): number {
+  return pipelineRevisionByChatId.get(chatId) ?? 0
+}
+
+/** Subscribe to any per-chat pipeline snapshot change (for sidebar indicators, etc.). */
+export function subscribeChatPipelines(onStoreChange: () => void): () => void {
+  pipelineListeners.add(onStoreChange)
+  return () => {
+    pipelineListeners.delete(onStoreChange)
   }
 }
 
+const IDLE_CHAT_PIPELINE: ChatPipelineSnapshot = {
+  stage: 'idle',
+  error: null,
+  pipelineThinkingText: '',
+  pipelineSearchTargets: [],
+  pipelineSearchActiveUrl: null,
+  pipelineStreamingAnswer: false
+}
+
 export function getChatPipeline(chatId: string): ChatPipelineSnapshot {
-  return pipelineByChatId.get(chatId) ?? defaultSnapshot()
+  return pipelineByChatId.get(chatId) ?? IDLE_CHAT_PIPELINE
 }
 
 export function patchChatPipeline(
   chatId: string,
   patch: Partial<ChatPipelineSnapshot>
 ): ChatPipelineSnapshot {
-  const next = { ...getChatPipeline(chatId), ...patch }
+  const prev = pipelineByChatId.get(chatId) ?? IDLE_CHAT_PIPELINE
+  const next = { ...prev, ...patch }
   if (next.stage === 'idle') {
     next.pipelineThinkingText = ''
     next.pipelineSearchTargets = []
@@ -47,15 +68,26 @@ export function patchChatPipeline(
     next.pipelineStreamingAnswer = false
   }
   pipelineByChatId.set(chatId, next)
+  bumpPipelineRevision(chatId)
+  notifyPipelineListeners()
   return next
 }
 
 export function clearChatPipeline(chatId: string): void {
+  if (!pipelineByChatId.has(chatId) && !pipelineRevisionByChatId.has(chatId)) return
   pipelineByChatId.delete(chatId)
+  bumpPipelineRevision(chatId)
+  notifyPipelineListeners()
 }
 
 export function clearAllChatPipelines(): void {
+  if (pipelineByChatId.size === 0) return
+  const chatIds = [...pipelineByChatId.keys()]
   pipelineByChatId.clear()
+  for (const chatId of chatIds) {
+    bumpPipelineRevision(chatId)
+  }
+  notifyPipelineListeners()
 }
 
 function isOnSettingsScreen(): boolean {

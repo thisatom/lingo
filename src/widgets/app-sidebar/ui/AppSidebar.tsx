@@ -1,22 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { NewChat } from '@/shared/ui/icons'
 import { useChatsStore } from '@/entities/chat/model/store'
-import { getChatPipeline } from '@/features/ai-chat/lib/chat-pipeline-registry'
 import { useSettingsStore } from '@/entities/settings/model/store'
-import { useChatSearchHotkey } from '@/features/chat-search/model/useChatSearchHotkey'
-import { ChatSearchDialog } from '@/features/chat-search/ui/ChatSearchDialog'
 import { navigateToChat, chatRoutePath } from '@/features/chat/lib/chat-route'
 import { groupChatsByDate } from '@/shared/lib/chat-sidebar'
-import { Button } from '@/shared/ui/button'
-import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
-import { Kbd, KbdGroup } from '@/shared/ui/kbd'
-import { APP_RADIUS_8_CLASS } from '@/shared/lib/layout'
+import { SIDEBAR_INSET_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
-import {
-  isSidebarAgentStage,
-  sidebarRowHeightClass
-} from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
+import { CustomScrollArea } from '@/shared/ui/custom-scroll-area'
+import { sidebarGroupLabelClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import {
   Sidebar,
   SidebarContent,
@@ -49,9 +40,10 @@ export function AppSidebar() {
     resortChats()
   }, [sidebarChatSort, resortChats])
 
-  const [searchOpen, setSearchOpen] = useState(false)
-  const openSearch = useCallback(() => setSearchOpen(true), [])
-  useChatSearchHotkey(openSearch)
+  const handleNewChat = useCallback(() => {
+    const id = createChat()
+    navigate(chatRoutePath(id))
+  }, [createChat, navigate])
 
   const { pinnedChats, unpinnedChats } = useMemo(() => {
     const pinned = chats.filter((c) => c.pinned)
@@ -71,9 +63,6 @@ export function AppSidebar() {
       key={chat.id}
       chat={chat}
       isActive={!isSettings && chat.id === activeChatId}
-      agentActive={
-        !isSettings && isSidebarAgentStage(getChatPipeline(chat.id).stage)
-      }
       onOpen={() => navigateToChat(navigate, chat.id, selectChat)}
       onTogglePin={() => togglePinChat(chat.id)}
       onDelete={() => deleteChat(chat.id)}
@@ -81,51 +70,24 @@ export function AppSidebar() {
   )
 
   return (
-    <>
-      <Sidebar
-        collapsible="none"
-        className="flex h-full w-full min-w-0 flex-col overflow-hidden bg-sidebar"
-      >
-        {isSettings ? (
-          <SidebarContent className="min-h-0 flex-1 overflow-hidden px-2">
-            <CustomScrollArea variant="sidebar" className="h-full min-h-0">
-              <SettingsSidebarNav />
-            </CustomScrollArea>
-          </SidebarContent>
-        ) : (
-          <>
-            <SidebarHeader className="gap-2 p-2">
-              <SidebarTopActions onOpenSearch={openSearch} />
-              <Button
-                className={cn(
-                  'w-full justify-start gap-2 px-2 has-[>svg]:px-2 border-border/60 bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground',
-                  sidebarRowHeightClass,
-                  APP_RADIUS_8_CLASS
-                )}
-                size="sm"
-                variant="outline"
-                aria-label="New chat"
-                onClick={() => {
-                  const id = createChat()
-                  navigate(chatRoutePath(id))
-                }}
-              >
-                <NewChat className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate text-left">New chat</span>
-                <KbdGroup className="shrink-0" aria-hidden>
-                  <Kbd>Ctrl</Kbd>
-                  <Kbd>N</Kbd>
-                </KbdGroup>
-              </Button>
-            </SidebarHeader>
+    <Sidebar collapsible="none" className="flex h-full w-full min-w-0 flex-col overflow-hidden bg-sidebar">
+      {isSettings ? (
+        <SidebarContent className={cn('min-h-0 flex-1 overflow-hidden pt-3', SIDEBAR_INSET_CLASS)}>
+          <CustomScrollArea variant="settings" className="h-full min-h-0">
+            <SettingsSidebarNav />
+          </CustomScrollArea>
+        </SidebarContent>
+      ) : (
+        <>
+          <SidebarHeader className={cn('shrink-0 py-2', SIDEBAR_INSET_CLASS)}>
+            <SidebarTopActions onNewChat={handleNewChat} />
+          </SidebarHeader>
 
-            <SidebarContent className="min-h-0 flex-1 overflow-hidden">
-              <CustomScrollArea variant="sidebar" className="h-full min-h-0">
+          <SidebarContent className={cn('min-h-0 flex-1 overflow-hidden pb-1', SIDEBAR_INSET_CLASS)}>
+            <CustomScrollArea variant="sidebar" className="h-full min-h-0">
               {pinnedChats.length > 0 && (
-                <SidebarGroup>
-                  <SidebarGroupLabel className="text-xs text-muted-foreground">
-                    Pinned
-                  </SidebarGroupLabel>
+                <SidebarGroup className="gap-0.5 p-0">
+                  <SidebarGroupLabel className={sidebarGroupLabelClass}>Pinned</SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>{pinnedChats.map(renderChat)}</SidebarMenu>
                   </SidebarGroupContent>
@@ -134,8 +96,8 @@ export function AppSidebar() {
 
               {sidebarShowDateGroups
                 ? dateGroups.map((group) => (
-                    <SidebarGroup key={group.dateKey}>
-                      <SidebarGroupLabel className="text-xs font-normal text-muted-foreground">
+                    <SidebarGroup key={group.dateKey} className="gap-0.5 p-0">
+                      <SidebarGroupLabel className={sidebarGroupLabelClass}>
                         {group.label}
                       </SidebarGroupLabel>
                       <SidebarGroupContent>
@@ -144,21 +106,18 @@ export function AppSidebar() {
                     </SidebarGroup>
                   ))
                 : flatUnpinned.length > 0 && (
-                    <SidebarGroup>
+                    <SidebarGroup className="gap-0.5 p-0">
                       <SidebarGroupContent>
                         <SidebarMenu>{flatUnpinned.map(renderChat)}</SidebarMenu>
                       </SidebarGroupContent>
                     </SidebarGroup>
                   )}
-              </CustomScrollArea>
-            </SidebarContent>
-          </>
-        )}
+            </CustomScrollArea>
+          </SidebarContent>
+        </>
+      )}
 
-        <SidebarUserFooter />
-      </Sidebar>
-
-      {!isSettings && <ChatSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />}
-    </>
+      <SidebarUserFooter insetClassName={SIDEBAR_INSET_CLASS} />
+    </Sidebar>
   )
 }

@@ -1,3 +1,5 @@
+import { createDeferredResizeObserver } from '@/shared/lib/observe-element-resize'
+
 const CSS_VAR = '--lingo-chat-bottom-inset'
 const FALLBACK = '7rem'
 
@@ -19,10 +21,10 @@ export function bindChatBottomInset(element: HTMLElement | null): () => void {
     return () => root.style.removeProperty(CSS_VAR)
   }
 
-  const observer = new ResizeObserver(apply)
+  const { observer, disconnect } = createDeferredResizeObserver(apply)
   observer.observe(element)
   return () => {
-    observer.disconnect()
+    disconnect()
     root.style.removeProperty(CSS_VAR)
   }
 }

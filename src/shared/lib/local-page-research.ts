@@ -1,17 +1,29 @@
-import { extractTextFromHtml } from '@/shared/lib/html-to-text'
+import { extractMarkdownFromHtml } from '@/shared/lib/html-to-markdown'
 import type { LocalWebSearchResult } from '@/shared/lib/local-web-search'
 import type { LocalWebSearchProgress } from '@/shared/lib/local-web-search-progress'
 
-const MAX_PAGES_TO_FETCH = 2
+const MAX_PAGES_TO_FETCH = 3
 const MAX_HTML_BYTES = 280_000
-const PAGE_FETCH_TIMEOUT_MS = 7_000
-const MAX_CONTENT_PER_PAGE = 3200
+const PAGE_FETCH_TIMEOUT_MS = 9_000
+const MAX_CONTENT_PER_PAGE = 4200
+const MIN_USABLE_MARKDOWN = 120
 const SEARCH_USER_AGENT =
   'Mozilla/5.0 (compatible; Lingo/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 const SKIP_HOST_SUFFIXES = ['duckduckgo.com', 'open-meteo.com', 'wttr.in']
 
 const SKIP_PATH_EXT = /\.(pdf|zip|rar|7z|exe|dmg|mp4|mp3|avi|mkv)(\?|$)/i
+
+type JinaReaderPayload = {
+  title?: string
+  url?: string
+  content?: string
+  data?: {
+    title?: string
+    url?: string
+    content?: string
+  }
+}
 
 function fetchSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
   const timeout = AbortSignal.timeout(timeoutMs)
@@ -48,6 +60,26 @@ function resolveResultUrl(raw: string): string | null {
   }
 }
 
+function clipPageMarkdown(text: string): string {
+  const trimmed = text.trim()
+  if (trimmed.length <= MAX_CONTENT_PER_PAGE) return trimmed
+  return `${trimmed.slice(0, MAX_CONTENT_PER_PAGE).trim()}\n\n…`
+}
+
+function parseJinaReaderPayload(raw: string): string | null {
+  try {
+    const json = JSON.parse(raw) as JinaReaderPayload
+    const content = json.data?.content?.trim() ?? json.content?.trim()
+    if (content && content.length >= 80) return clipPageMarkdown(content)
+  } catch {
+    // plain markdown fallback
+  }
+
+  const plain = raw.trim()
+  if (plain.length >= 80) return clipPageMarkdown(plain)
+  return null
+}
+
 function shouldFetchPage(result: LocalWebSearchResult): boolean {
   const url = resolveResultUrl(result.url)
   if (!url) return false
@@ -61,6 +93,9 @@ function shouldFetchPage(result: LocalWebSearchResult): boolean {
   } catch {
     return false
   }
+
+  const pageLen = result.pageContent?.trim().length ?? 0
+  if (pageLen >= MIN_USABLE_MARKDOWN) return false
 
   const snippet = result.snippet.trim()
   if (snippet.length >= 420) return false
@@ -84,28 +119,27 @@ async function readHtmlLimited(response: Response): Promise<string> {
   return html
 }
 
+/** Jina Reader — returns article Markdown (LLM-ready). */
 async function fetchViaJinaReader(url: string, signal?: AbortSignal): Promise<string | null> {
   const readerUrl = `https://r.jina.ai/${url}`
   try {
     const response = await fetch(readerUrl, {
       headers: {
-        Accept: 'text/plain',
+        Accept: 'application/json',
+        'X-Respond-With': 'markdown',
         'User-Agent': SEARCH_USER_AGENT
       },
       signal: fetchSignal(signal, PAGE_FETCH_TIMEOUT_MS)
     })
     if (!response.ok) return null
-    const text = (await response.text()).trim()
-    if (text.length < 80) return null
-    return text.length > MAX_CONTENT_PER_PAGE
-      ? `${text.slice(0, MAX_CONTENT_PER_PAGE).trim()}…`
-      : text
+    const raw = await response.text()
+    return parseJinaReaderPayload(raw)
   } catch {
     return null
   }
 }
 
-async function fetchPageContent(url: string, signal?: AbortSignal): Promise<string | null> {
+async function fetchDirectPageMarkdown(url: string, signal?: AbortSignal): Promise<string | null> {
   throwIfAborted(signal)
   try {
     const response = await fetch(url, {
@@ -117,31 +151,39 @@ async function fetchPageContent(url: string, signal?: AbortSignal): Promise<stri
       signal: fetchSignal(signal, PAGE_FETCH_TIMEOUT_MS)
     })
 
-    if (!response.ok) return fetchViaJinaReader(url, signal)
+    if (!response.ok) return null
 
     const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
     if (contentType.includes('text/plain') && !contentType.includes('html')) {
       const plain = (await response.text()).trim()
-      return plain.length > 60
-        ? plain.slice(0, MAX_CONTENT_PER_PAGE)
-        : fetchViaJinaReader(url, signal)
+      return plain.length >= MIN_USABLE_MARKDOWN ? clipPageMarkdown(plain) : null
     }
 
     if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
-      return fetchViaJinaReader(url, signal)
+      return null
     }
 
     const html = await readHtmlLimited(response)
-    const extracted = extractTextFromHtml(html, MAX_CONTENT_PER_PAGE)
-    if (extracted.length >= 120) return extracted
-
-    return fetchViaJinaReader(url, signal)
+    const markdown = await extractMarkdownFromHtml(html, MAX_CONTENT_PER_PAGE, url)
+    return markdown.length >= MIN_USABLE_MARKDOWN ? markdown : null
   } catch {
-    return fetchViaJinaReader(url, signal)
+    return null
   }
 }
 
-/** Fetches and parses top search hits; fills `pageContent` (no links in the prompt). */
+async function fetchPageContent(url: string, signal?: AbortSignal): Promise<string | null> {
+  throwIfAborted(signal)
+
+  const fromJina = await fetchViaJinaReader(url, signal)
+  if (fromJina && fromJina.length >= MIN_USABLE_MARKDOWN) return fromJina
+
+  const fromHtml = await fetchDirectPageMarkdown(url, signal)
+  if (fromHtml && fromHtml.length >= MIN_USABLE_MARKDOWN) return fromHtml
+
+  return fromJina ?? fromHtml
+}
+
+/** Fetches top hits; fills `pageContent` with Markdown excerpts for the LLM prompt. */
 export async function enrichSearchResultsWithPageContent(
   results: LocalWebSearchResult[],
   progress?: LocalWebSearchProgress
@@ -157,17 +199,11 @@ export async function enrichSearchResultsWithPageContent(
 
   const signal = progress?.signal
 
-  const fetched = await Promise.all(
-    candidates.map(async ({ result, index, url }) => {
-      throwIfAborted(signal)
-      progress?.onVisitingUrl?.(url)
-      const pageContent = await fetchPageContent(url, signal)
-      return { index, pageContent, url }
-    })
-  )
-
   const out = [...results]
-  for (const { index, pageContent } of fetched) {
+  for (const { index, url } of candidates) {
+    throwIfAborted(signal)
+    progress?.onVisitingUrl?.(url)
+    const pageContent = await fetchPageContent(url, signal)
     if (!pageContent) continue
     out[index] = {
       ...out[index],

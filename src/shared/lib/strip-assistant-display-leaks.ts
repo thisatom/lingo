@@ -1,5 +1,5 @@
 /** Invisible / format chars models use for citation highlights (break words in UI). */
-const INVISIBLE_CHARS = /[\u200B-\u200D\uFEFF\u2060\u00AD]/g
+const INVISIBLE_CHARS = /[\u200B-\u200D\uFEFF\u2060\u00AD\u200E\u200F\u180E]/g
 
 export function stripInvisibleFormatChars(text: string): string {
   return text.replace(INVISIBLE_CHARS, '')
@@ -29,7 +29,22 @@ const TOOL_PLANNING_PREAMBLE =
 const SAFETY_RATING_BLOCK =
   /(?:^|\n)User Safety:\s*(?:safe|unsafe)\s*\nResponse Safety:\s*(?:safe|unsafe)\s*(?:\n|$)/gi
 
+/** Standalone user safety line (Nemotron-style classifiers when no bot reply yet). */
+const USER_SAFETY_LINE = /(?:^|\n)User Safety:\s*(?:safe|unsafe)\s*(?:\n|$)/gi
+
+/** Corrupted safety prefix when stream chunks were coerced from undefined. */
+const USER_SAFETY_UNDEFINED_TAIL =
+  /(?:^|\n)User Safety:\s*(?:safe|unsafe)(?:\s*undefined)+\s*/gi
+
 const AGENT_ANSWER_PREFIX = /^agent:\s*(?:#{1,6}\s*)?Answer:\s*/im
+
+/** Collapsed Windows kernel IRP major function names (often split with invisible chars). */
+const IRPMJ_COLLAPSED =
+  /\bIRPMJ?R?(READ|WRITE|CREATE|CLOSE|DEVICE_CONTROL|SHUTDOWN|QUERY_INFORMATION|SET_INFORMATION|CLEANUP|POWER|SYSTEM_CONTROL|PNP|INTERNAL_DEVICE_CONTROL)\b/gi
+
+function normalizeKernelConstantLeaks(text: string): string {
+  return text.replace(IRPMJ_COLLAPSED, (_, op: string) => `IRP_MJ_${op.toUpperCase()}`)
+}
 
 function isCitationTitleLine(line: string): boolean {
   return /^\[[^\]\n]{2,200}\]$/.test(line.trim())
@@ -98,12 +113,28 @@ function stripOrphanCitationUrls(text: string): string {
     .join('\n')
 }
 
+/** Stream-safe subset — no line-based citation cleanup (would eat split words). */
+export function stripAssistantStreamDisplayLeaks(text: string): string {
+  if (!text) return text
+
+  let s = stripInvisibleFormatChars(text)
+  s = normalizeKernelConstantLeaks(s)
+  s = s.replace(/^User Safety:\s*(?:safe|unsafe)(?:\s*undefined)*/i, '')
+  s = s.replace(USER_SAFETY_UNDEFINED_TAIL, '\n')
+  s = s.replace(USER_SAFETY_LINE, '\n')
+  s = s.replace(AGENT_ANSWER_PREFIX, '')
+  return s
+}
+
 /** Remove tool XML, citations, and citation debris from visible assistant text. */
 export function stripAssistantDisplayLeaks(text: string): string {
   if (!text) return text
 
   let s = stripInvisibleFormatChars(text)
+  s = normalizeKernelConstantLeaks(s)
   s = s.replace(SAFETY_RATING_BLOCK, '\n')
+  s = s.replace(USER_SAFETY_UNDEFINED_TAIL, '\n')
+  s = s.replace(USER_SAFETY_LINE, '\n')
   s = s.replace(AGENT_ANSWER_PREFIX, '')
   s = s.replace(TOOL_PLANNING_PREAMBLE, '\n')
   s = stripFencedToolBlocks(s)

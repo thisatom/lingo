@@ -12,7 +12,8 @@ const STAGE_LABEL: Partial<Record<PipelineStage, string>> = {
   listening: 'Listening',
   transcribing: 'Transcribing',
   thinking: 'Thinking',
-  speaking: 'Speaking'
+  speaking: 'Speaking',
+  reconnecting: 'Reconnecting'
 }
 
 interface AgentStatusProps {

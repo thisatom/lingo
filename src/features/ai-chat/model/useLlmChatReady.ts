@@ -24,6 +24,18 @@ function resolveCustomBaseUrl(
   return customApiBaseUrl.trim()
 }
 
+export function resolveOpenRouterReadyState(
+  status: Pick<SecretStatus, 'isSet'> | null,
+  loading: boolean
+): Pick<LlmChatReadyState, 'ready' | 'loading' | 'blockedReason'> {
+  const isSet = Boolean(status?.isSet)
+  return {
+    ready: isSet,
+    loading: loading && !isSet,
+    blockedReason: isSet ? null : 'Add API key in Settings…'
+  }
+}
+
 export function useLlmChatReady(): LlmChatReadyState {
   const llmBackend = useSettingsStore((s) => s.llmBackend)
   const customLlmProfileJson = useSettingsStore((s) => s.customLlmProfileJson)
@@ -72,12 +84,7 @@ export function useLlmChatReady(): LlmChatReadyState {
 
   return useMemo((): LlmChatReadyState => {
     if (llmBackend === 'openrouter') {
-      const ready = Boolean(openRouterStatus?.isSet)
-      return {
-        ready,
-        loading: openRouterLoading,
-        blockedReason: ready ? null : 'Add API key in Settings…'
-      }
+      return resolveOpenRouterReadyState(openRouterStatus, openRouterLoading)
     }
 
     if (llmBackend === 'custom') {
@@ -90,6 +97,14 @@ export function useLlmChatReady(): LlmChatReadyState {
       }
 
       const baseUrl = resolveCustomBaseUrl(customLlmProfileJson, customApiBaseUrl)
+      const parsedProfile = parseCustomLlmProfileSource(customLlmProfileJson)
+      if (customLlmProfileJson.trim() && !parsedProfile.ok) {
+        return {
+          ready: false,
+          loading: false,
+          blockedReason: `Fix custom endpoint profile: ${parsedProfile.error}`
+        }
+      }
       if (!baseUrl || !isValidCustomApiBaseUrl(baseUrl)) {
         return {
           ready: false,
@@ -99,15 +114,15 @@ export function useLlmChatReady(): LlmChatReadyState {
       }
 
       if (customEndpointRequiresApiKey(baseUrl)) {
-        const ready = Boolean(customKeyStatus?.isSet)
+        const isSet = Boolean(customKeyStatus?.isSet)
         return {
-          ready,
-          loading: customKeyLoading,
-          blockedReason: ready ? null : 'Add custom endpoint API key in Settings…'
+          ready: isSet,
+          loading: customKeyLoading && !isSet,
+          blockedReason: isSet ? null : 'Add custom endpoint API key in Settings…'
         }
       }
 
-      return { ready: true, loading: customKeyLoading, blockedReason: null }
+      return { ready: true, loading: false, blockedReason: null }
     }
 
     return { ready: false, loading: false, blockedReason: 'Configure API in Settings…' }

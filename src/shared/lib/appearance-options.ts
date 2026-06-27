@@ -4,7 +4,7 @@ export const UI_FONT_FAMILY_OPTIONS: { value: UiFontFamily; label: string; hint:
   {
     value: 'system',
     label: 'System UI',
-    hint: 'Default interface font for your platform.'
+    hint: 'Geist Sans — TrustRouter interface font.'
   },
   {
     value: 'serif',

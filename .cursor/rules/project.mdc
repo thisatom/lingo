@@ -1,39 +1,40 @@
 ---
-description: Lingo — общие правила проекта
+description: Lingo — продукт, стек, обязательные ограничения
 alwaysApply: true
 ---
 
 # Lingo
 
-Десктоп: **React + Electron + TypeScript**, архитектура UI — **FSD**.
+Десктоп: **React + Electron + TypeScript**, UI — **FSD**.  
+Web preview: `npm run dev:web` / `build:web` (ограниченный паритет).
 
-Продукт: микрофон → STT → AI (API key) → TTS. Тренировка разговорной речи на разных языках.
-
-## Сейчас
-
-Репозиторий может содержать только контекст (docs, rules, каркас папок). Не добавляй реализацию без явной просьбы пользователя.
+Продукт: микрофон → STT → AI (OpenRouter) → TTS. Тренировка разговорной речи.
 
 ## Обязательно
 
 - Имя приложения: **Lingo**
-- Окно Electron: `@incanta/custom-electron-titlebar` (настройка в **main**, не в React-корне без согласования)
-- AI: **OpenRouter**; ключи в Settings, хранение в main (**keytar**)
-- `.env` только dev-fallback, не в git
+- Titlebar: `@incanta/custom-electron-titlebar` только в **main**
+- AI: **OpenRouter**; ключи в Settings → **keytar** в main
+- `.env` — dev-fallback, не в git
 - UI: **shadcn/ui** в `shared/ui`, Tailwind — `docs/UI.md`
-- Импорты FSD: только вниз по слоям
-- Минимальный scope диффа
+- FSD: импорты только вниз по слоям
+- **Clean code + stability** — см. `clean-code.mdc`, `stability.mdc`
+- **Не угадывать intent по тексту** — см. `no-content-heuristics.mdc`
 
-## Документация
+## Перед кодом
 
-Перед кодом: `AGENTS.md`, `docs/STACK.md`, `docs/UI.md`, `docs/OPENROUTER.md`, `docs/API_KEYS.md`, `docs/ARCHITECTURE.md`, `docs/FSD.md`.
+`AGENTS.md`, `docs/STACK.md`, `docs/ARCHITECTURE.md`, `docs/FSD.md`, доменные docs.
 
 ## Стек AI / TTS
 
 | Слой | Инструмент |
 |------|------------|
-| Диалог, streaming, история | Vercel AI SDK или OpenAI SDK + store |
-| Сложные сценарии | LangGraph (позже) |
+| Диалог, streaming | Vercel AI SDK / OpenAI SDK + store |
+| Сложные сценарии позже | LangGraph |
 | TTS dev | edge-tts (main) |
 | TTS prod | Azure Speech |
 | AI API | OpenRouter |
-| Ключи | Settings + main secure storage (смена в runtime) |
+
+## Не добавлять без запроса
+
+LangChain/LangGraph, новые npm-зависимости, regex-intent по содержимому сообщений.

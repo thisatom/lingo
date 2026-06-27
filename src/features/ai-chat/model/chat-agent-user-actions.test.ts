@@ -4,8 +4,11 @@ import { useMessageQueueStore } from '@/entities/message-queue/model/store'
 import { useConversationStore } from '@/entities/conversation/model/store'
 import { setAgentStreamSession } from '@/features/ai-chat/lib/agent-stream-session'
 import { setPipelineStageForChat } from '@/features/ai-chat/lib/pipeline-stage'
+import { setAgentStreamSession } from '@/features/ai-chat/lib/agent-stream-session'
 import {
   commitVoiceUserMessageAction,
+  continueAssistantMessageAction,
+  sendQueuedMessageNowAction,
   sendUserMessageAction,
   updateVoiceUserMessageAction
 } from '@/features/ai-chat/model/chat-agent-user-actions'
@@ -22,6 +25,7 @@ function createDeps(overrides: Partial<ChatAgentUserActionsDeps> = {}): ChatAgen
     updateMessageContent: vi.fn(),
     stopAgent: vi.fn(),
     runAssistantReply: vi.fn(async () => true),
+    runAssistantContinuation: vi.fn(async () => true),
     enqueueUserMessage: vi.fn(),
     setBlurAnimateMessageId: vi.fn(),
     setError: vi.fn(),
@@ -127,6 +131,92 @@ describe('chat-agent-user-actions', () => {
     await commitVoiceUserMessageAction(deps, 'voice-1', chatId)
 
     expect(deps.runAssistantReply).toHaveBeenCalledWith(chatId)
+  })
+
+  it('sendQueuedMessageNowAction blocks when another chat is streaming', async () => {
+    const otherChatId = 'other-stream-chat'
+    useChatsStore.setState({
+      chats: [
+        {
+          id: chatId,
+          title: 'Test',
+          messages: [],
+          createdAt: 0,
+          updatedAt: 0
+        },
+        {
+          id: otherChatId,
+          title: 'Other',
+          messages: [],
+          createdAt: 0,
+          updatedAt: 0
+        }
+      ],
+      activeChatId: chatId
+    })
+    setAgentStreamSession(otherChatId, true)
+    useMessageQueueStore.getState().enqueue(chatId, 'Queued follow-up')
+    const queueItemId = useMessageQueueStore.getState().getQueue(chatId)[0]!.id
+    const deps = createDeps()
+
+    await sendQueuedMessageNowAction(deps, queueItemId)
+
+    expect(deps.setError).toHaveBeenCalled()
+    expect(deps.stopAgent).not.toHaveBeenCalled()
+    expect(deps.runAssistantReply).not.toHaveBeenCalled()
+    expect(useMessageQueueStore.getState().getQueue(chatId)).toHaveLength(1)
+  })
+
+  it('sendQueuedMessageNowAction uses scoped stop, not force', async () => {
+    setPipelineStageForChat(chatId, 'idle')
+    useMessageQueueStore.getState().enqueue(chatId, 'Queued follow-up')
+    const queueItemId = useMessageQueueStore.getState().getQueue(chatId)[0]!.id
+    const deps = createDeps()
+
+    await sendQueuedMessageNowAction(deps, queueItemId)
+
+    expect(deps.stopAgent).toHaveBeenCalledWith({ chatId })
+    expect(deps.runAssistantReply).toHaveBeenCalledWith(chatId)
+  })
+
+  it('continueAssistantMessageAction resumes in place with stored prefix', async () => {
+    setPipelineStageForChat(chatId, 'idle')
+    useChatsStore.setState({
+      chats: [
+        {
+          id: chatId,
+          title: 'Test',
+          messages: [
+            {
+              id: 'u1',
+              role: 'user',
+              content: 'Tell me a story',
+              createdAt: 0
+            },
+            {
+              id: 'a1',
+              role: 'assistant',
+              content: 'Once upon a time',
+              createdAt: 1,
+              replyStatus: 'interrupted'
+            }
+          ],
+          createdAt: 0,
+          updatedAt: 0
+        }
+      ],
+      activeChatId: chatId
+    })
+    const deps = createDeps()
+
+    await continueAssistantMessageAction(deps, 'a1')
+
+    expect(deps.stopAgent).toHaveBeenCalledWith({ chatId })
+    expect(deps.runAssistantContinuation).toHaveBeenCalledWith(
+      chatId,
+      'a1',
+      'Once upon a time'
+    )
   })
 
   it('sendUserMessageAction creates the first chat when none exist', async () => {

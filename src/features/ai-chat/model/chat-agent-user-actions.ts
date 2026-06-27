@@ -5,6 +5,7 @@ import { useConversationStore } from '@/entities/conversation/model/store'
 import type { MessageAttachment } from '@/entities/message/model/attachment'
 import type { AgentStopOptions } from '@/features/ai-chat/lib/chat-agent-stop'
 import { findTurnTailRemoveId } from '@/features/ai-chat/lib/agent-turn-cleanup'
+import { canContinueAssistantReply } from '@/features/ai-chat/lib/assistant-continuation'
 import {
   getOtherChatStreamBlocking,
   OTHER_CHAT_STREAM_MESSAGE,
@@ -38,6 +39,11 @@ export type ChatAgentUserActionsDeps = {
   updateMessageContent: ReturnType<typeof useChatsStore.getState>['updateMessageContent']
   stopAgent: (options?: AgentStopOptions) => void
   runAssistantReply: (chatId: string) => Promise<boolean>
+  runAssistantContinuation: (
+    chatId: string,
+    assistantMessageId: string,
+    prefix: string
+  ) => Promise<boolean>
   enqueueUserMessage: (content: string, chatId: string, attachments?: MessageAttachment[]) => void
   setBlurAnimateMessageId: (id: string | null) => void
   setError: (error: string | null, targetChatId?: string) => void
@@ -101,8 +107,13 @@ export async function sendQueuedMessageNowAction(
   const item = useMessageQueueStore.getState().getQueue(chatId).find((m) => m.id === queueItemId)
   if (!item) return
 
+  if (getOtherChatStreamBlocking(chatId)) {
+    deps.setError(OTHER_CHAT_STREAM_MESSAGE, chatId)
+    return
+  }
+
   useMessageQueueStore.getState().remove(chatId, queueItemId)
-  deps.stopAgent({ force: true })
+  deps.stopAgent({ chatId })
   useConversationStore.getState().setSpeechError(null)
   deps.addMessage(
     {
@@ -319,6 +330,28 @@ export async function regenerateAssistantMessageAction(
   await deps.runAssistantReply(chatId)
 }
 
+export async function continueAssistantMessageAction(
+  deps: ChatAgentUserActionsDeps,
+  messageId: string
+): Promise<void> {
+  const chat = useChatsStore.getState().getActiveChat()
+  const message = chat?.messages.find((m) => m.id === messageId)
+  if (!chat || !message || message.role !== 'assistant') return
+  if (!canContinueAssistantReply(message)) return
+
+  const chatId = chat.id
+  if (getOtherChatStreamBlocking(chatId)) {
+    deps.setError(OTHER_CHAT_STREAM_MESSAGE, chatId)
+    return
+  }
+
+  deps.stopAgent({ chatId })
+  deps.setBlurAnimateMessageId(null)
+  deps.setError(null, chatId)
+  requestChatFollowBottom()
+  await deps.runAssistantContinuation(chatId, messageId, message.content)
+}
+
 export async function retryLastRequestAction(deps: ChatAgentUserActionsDeps): Promise<void> {
   const chat = useChatsStore.getState().getActiveChat()
   if (!chat || chat.messages.length === 0) return
@@ -339,6 +372,10 @@ export async function retryLastRequestAction(deps: ChatAgentUserActionsDeps): Pr
   }
 
   if (last.role === 'assistant' || last.role === 'thinking') {
+    if (last.role === 'assistant' && canContinueAssistantReply(last)) {
+      await continueAssistantMessageAction(deps, last.id)
+      return
+    }
     await regenerateAssistantMessageAction(deps, last.id)
   }
 }

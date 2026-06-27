@@ -3,6 +3,7 @@ import { getChatHeaderDisplayTitle } from '@/shared/lib/chat-header-title'
 import type { ChatContextUsageDetails } from '@/shared/lib/chat-context-usage'
 import { ContextUsageDetails } from '@/features/chat-context/ui/ContextUsageDetails'
 import { ContextUsageRing } from '@/features/chat-context/ui/ContextUsageRing'
+import { iconButtonHoverClass } from '@/shared/lib/design-surface'
 import { sidebarMenuSurfaceClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { cn } from '@/shared/lib/utils'
 import {
@@ -55,8 +56,9 @@ export function ChatHeaderTitle({
       <HoverCardTrigger asChild>
         <h1
           className={cn(
-            'inline-flex max-w-full min-w-0 cursor-pointer truncate rounded-md px-2 py-1',
-            'text-[13px] font-normal leading-[1.5] text-muted-foreground transition-colors hover:bg-chat-header-hover hover:text-foreground',
+            'inline-flex max-w-full min-w-0 cursor-pointer truncate px-2 py-1',
+            'text-[13px] font-normal leading-[1.5] text-muted-foreground',
+            iconButtonHoverClass,
             'outline-none focus-visible:ring-1 focus-visible:ring-ring'
           )}
         >

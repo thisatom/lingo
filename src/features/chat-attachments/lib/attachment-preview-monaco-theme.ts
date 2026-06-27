@@ -8,9 +8,9 @@ function readCssColor(variable: string, fallback: string): string {
 }
 
 export function defineAttachmentPreviewMonacoTheme(monaco: Monaco, isDark: boolean): void {
-  const background = readCssColor('--background', isDark ? '#121212' : '#f5f5f5')
-  const foreground = readCssColor('--foreground', isDark ? '#e4e4e4' : '#171717')
-  const muted = readCssColor('--muted', isDark ? '#1f1f1f' : '#f0f0f0')
+  const background = readCssColor('--background', isDark ? '#141414' : '#f5f5f5')
+  const foreground = readCssColor('--foreground', isDark ? '#ececec' : '#171717')
+  const muted = readCssColor('--muted', isDark ? '#1c1c1c' : '#f0f0f0')
   const border = readCssColor('--border', isDark ? '#242424' : '#d6d6d6')
 
   monaco.editor.defineTheme(ATTACHMENT_PREVIEW_MONACO_THEME, {
@@ -23,7 +23,7 @@ export function defineAttachmentPreviewMonacoTheme(monaco: Monaco, isDark: boole
       'editorGutter.background': background,
       'editorLineNumber.foreground': isDark ? '#6b6b6b' : '#737373',
       'editorLineNumber.activeForeground': foreground,
-      'editor.selectionBackground': isDark ? '#264f78' : '#add6ff',
+      'editor.selectionBackground': isDark ? '#264f78' : '#c8deff',
       'editor.inactiveSelectionBackground': isDark ? '#3a3d41' : '#e5ebf1',
       'editorWidget.background': background,
       'editorWidget.border': border,

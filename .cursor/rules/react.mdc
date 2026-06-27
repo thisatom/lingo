@@ -1,21 +1,32 @@
 ---
-description: React UI в renderer
+description: React UI в renderer — чистые компоненты, FSD
 globs: src/**/*.tsx
 alwaysApply: false
 ---
 
 # React (renderer)
 
-- Только функциональные компоненты и хуки
-- Логика записи/AI/TTS — в `features/*/model`, не в `pages`
-- Страницы (`pages`) собирают widgets и features, без тяжёлой бизнес-логики
-- UI kit: **shadcn/ui** (`@/shared/ui`), стили — **Tailwind** — см. `docs/UI.md`, `.cursor/rules/ui.mdc`
+- Функциональные компоненты и хуки; бизнес-логика в `features/*/model`, не в `pages`.
+- Страницы собирают widgets/features; без тяжёлой логики в JSX.
+- UI: **shadcn/ui** (`@/shared/ui`), Tailwind — `docs/UI.md`, `ui.mdc`.
 
-## Состояние диалога
+## Состояние
 
-- Сообщения пользователя и ассистента — `entities/message`, `entities/conversation`
-- Статусы пайплайна: `idle` | `listening` | `transcribing` | `thinking` | `speaking` | `error`
+- Сообщения: `entities/message`, `entities/chat`
+- Pipeline UI: `chat-pipeline-registry`, не дублировать busy в локальном state без нужды
 
-## Доступ к Electron
+## Electron
 
-Только через preload: `window.lingo`, не прямой `electron` import.
+Только `window.lingo` (preload); не `import electron` в renderer.
+
+## UI-стабильность
+
+- Мемо на hot paths (`ConversationTurn`, tail vs history) — не ломать без проверки scroll/virtualizer
+- Не скрывать/показывать actions по **содержимому** текста — по `agentBusy`, `replyStatus`, stage
+
+## Стиль
+
+- `cn()` для классов; не inline styles без причины
+- Доступность: кнопки Stop/Speak с понятными `aria-label`
+
+См. `clean-code.mdc`, `stability.mdc`.
