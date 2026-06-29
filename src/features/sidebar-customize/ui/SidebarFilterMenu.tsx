@@ -84,9 +84,10 @@ export function SidebarFilterMenu() {
             <Button
               type="button"
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               className={cn(
                 sidebarChromeIconButtonClass,
+                'size-[30px]',
                 menuOpen && 'bg-sidebar-accent text-sidebar-accent-foreground'
               )}
               aria-label="Filter chats"

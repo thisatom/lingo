@@ -46,9 +46,13 @@ function joinDirectives(parts: string[]): string {
   return parts.join('; ')
 }
 
-/** Vite HMR + @vitejs/plugin-react preamble need inline scripts in dev only. */
-function devScriptSrc(base: string[]): string {
-  return directive('script-src', [...base, "'unsafe-eval'", "'unsafe-inline'"])
+/** Vite React Refresh preamble needs inline scripts in dev; HMR client needs unsafe-eval unless disabled. */
+function devScriptSrc(base: string[], options: { allowEval?: boolean } = {}): string {
+  const sources = [...base, "'unsafe-inline'"]
+  if (options.allowEval !== false) {
+    sources.push("'unsafe-eval'")
+  }
+  return directive('script-src', sources)
 }
 
 function devConnectSrc(base: string[]): string {
@@ -56,7 +60,8 @@ function devConnectSrc(base: string[]): string {
 }
 
 /** Desktop renderer — AI/STT/TTS go through main IPC; renderer only needs Web Speech + assets. */
-function electronMainCsp(mode: CspMode): string {
+function electronMainCsp(mode: CspMode, options: { viteHmr?: boolean } = {}): string {
+  const allowViteEval = mode === 'development' && options.viteHmr !== false
   const connect =
     mode === 'development'
       ? devConnectSrc(["'self'", ...GOOGLE_SPEECH])
@@ -64,7 +69,9 @@ function electronMainCsp(mode: CspMode): string {
 
   return joinDirectives([
     directive('default-src', ["'self'"]),
-    mode === 'development' ? devScriptSrc(["'self'"]) : directive('script-src', ["'self'"]),
+    mode === 'development'
+      ? devScriptSrc(["'self'"], { allowEval: allowViteEval })
+      : directive('script-src', ["'self'"]),
     directive('worker-src', ["'self'", 'blob:']),
     directive('style-src', ["'self'", "'unsafe-inline'"]),
     directive('font-src', ["'self'", 'data:']),
@@ -110,14 +117,20 @@ export function resolveCspProfileFromHtmlPath(filename: string): CspProfile | nu
 export function buildContentSecurityPolicy(
   profile: CspProfile,
   mode: CspMode,
-  options: { websearchOrigin?: string | null } = {}
+  options: { websearchOrigin?: string | null; viteHmr?: boolean } = {}
 ): string {
   switch (profile) {
     case 'electron-main':
-      return electronMainCsp(mode)
+      return electronMainCsp(mode, { viteHmr: options.viteHmr })
     case 'web-main':
       return webMainCsp(mode, options.websearchOrigin ?? null)
     default:
-      return electronMainCsp(mode)
+      return electronMainCsp(mode, { viteHmr: options.viteHmr })
   }
 }
+
+/** Static fallback for `index.html` when the Vite CSP plugin does not run. */
+export const ELECTRON_RENDERER_CSP_FALLBACK = buildContentSecurityPolicy(
+  'electron-main',
+  'production'
+)

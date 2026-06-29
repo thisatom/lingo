@@ -2,8 +2,8 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <!-- CSP filled by vite/inject-csp (dev: HMR; prod: no openrouter in renderer — IPC only) -->
-    <meta http-equiv="Content-Security-Policy" content="" />
+    <!-- CSP: vite/inject-csp overwrites at dev/build; fallback = electron production policy -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; connect-src 'self' https://www.google.com https://*.google.com https://speech.googleapis.com wss://www.google.com wss://*.google.com; media-src 'self' blob: data: file:" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#121212" />
     <meta name="msapplication-TileColor" content="#121212" />
@@ -23,8 +23,8 @@
       }
       html:not(.dark) body,
       html:not(.dark) #root {
-        background-color: #f5f5f5;
-        color: #171717;
+        background-color: #f4f4f5;
+        color: #18181b;
       }
       #root {
         min-height: 100%;
@@ -36,7 +36,7 @@
         background: #121212;
       }
       html:not(.dark) #app-splash {
-        background: #f5f5f5;
+        background: #f4f4f5;
       }
       #app-splash.app-splash--hide {
         opacity: 0;

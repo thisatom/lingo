@@ -51,13 +51,13 @@ export function ChatHeaderTitle({
   const detailTitle = title.trim() === '' || title.trim() === 'New chat' ? null : title.trim()
 
   return (
-    <div className="min-w-0 flex-1">
+    <div className="min-w-0 flex-1 overflow-hidden">
     <HoverCard openDelay={200} closeDelay={80}>
       <HoverCardTrigger asChild>
         <h1
           className={cn(
-            'inline-flex max-w-full min-w-0 cursor-pointer truncate px-2 py-1',
-            'text-[13px] font-normal leading-[1.5] text-muted-foreground',
+            'inline-flex h-[30px] max-w-full min-w-0 cursor-pointer items-center truncate px-2',
+            'text-[13px] font-normal leading-none text-muted-foreground',
             iconButtonHoverClass,
             'outline-none focus-visible:ring-1 focus-visible:ring-ring'
           )}

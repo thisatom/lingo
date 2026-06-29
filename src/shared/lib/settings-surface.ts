@@ -1,11 +1,8 @@
 import { elevatedCardClass } from '@/shared/lib/design-surface'
 import { cn } from '@/shared/lib/utils'
 
-import { SETTINGS_PAGE_INSET_CLASS } from '@/shared/lib/layout'
-
 export const settingsPageContentClass = cn(
-  'mx-auto w-full min-w-0 max-w-[760px] pt-2 pb-6',
-  SETTINGS_PAGE_INSET_CLASS
+  'mx-auto w-full min-w-0 max-w-[760px] pt-2 pb-6'
 )
 
 export const settingsSectionTitleClass = 'mb-3 px-1 text-sm font-semibold text-foreground'

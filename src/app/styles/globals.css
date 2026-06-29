@@ -75,38 +75,38 @@
   --color-overlay: var(--overlay);
 }
 
-/* Light theme — same structure as dark (TrustRouter-aligned neutrals). */
+/* Light theme — TrustRouter-style depth stack (mirrors dark layering). */
 :root {
-  --tr-bg-main: #ececec;
-  --tr-bg-2: #f3f3f3;
-  --tr-bg-3: #e3e3e3;
-  --tr-bg-item: #fafafa;
-  --tr-border: #d2d2d2;
-  --tr-separator: #dddddd;
-  --tr-hover: #e5e5e5;
-  --tr-overlay-border: #c4c4c4;
-  --tr-switch-off: #c8c8c8;
+  --tr-bg-main: #e8e8ec;
+  --tr-bg-2: #f3f3f5;
+  --tr-bg-3: #dddee6;
+  --tr-bg-item: #ffffff;
+  --tr-border: #d0d0d8;
+  --tr-separator: #dcdce3;
+  --tr-hover: #d6d7e0;
+  --tr-overlay-border: #c4c5cf;
+  --tr-switch-off: #c8c9d2;
   --tr-switch-on: #3fa266;
   --tr-switch-handle: #ffffff;
-  --tr-accent: #5b8def;
-  --tr-accent-hover: #6e9bf5;
+  --tr-accent: #4f7fe8;
+  --tr-accent-hover: #5b8def;
 
   --radius: 0.625rem;
   --lingo-titlebar-height: env(titlebar-area-height, 32px);
 
   --background: var(--tr-bg-main);
-  --foreground: #1a1a1a;
+  --foreground: #18181b;
   --card: var(--tr-bg-item);
-  --card-foreground: #1a1a1a;
+  --card-foreground: #18181b;
   --primary: var(--tr-accent);
   --primary-foreground: #ffffff;
   --secondary: var(--tr-bg-3);
-  --secondary-foreground: #1a1a1a;
-  --muted: var(--tr-bg-item);
-  --muted-foreground: #5c5c5c;
+  --secondary-foreground: #18181b;
+  --muted: var(--tr-bg-3);
+  --muted-foreground: #5c5c66;
   --accent: var(--tr-hover);
-  --accent-foreground: #1a1a1a;
-  --destructive: #e54d4d;
+  --accent-foreground: #18181b;
+  --destructive: #dc2626;
   --border: var(--tr-border);
   --input: var(--tr-bg-item);
   --ring: var(--tr-accent);
@@ -114,56 +114,57 @@
   --overlay-border: var(--tr-overlay-border);
   --switch-handle: var(--tr-switch-handle);
 
-  --chat-user: var(--tr-hover);
+  --chat-user: #e2e3ea;
   --chat-composer: var(--tr-bg-item);
-  --chat-assistant: var(--tr-bg-3);
-  --popover: var(--tr-bg-2);
-  --popover-foreground: #1a1a1a;
-  --tooltip: var(--tr-bg-2);
-  --tooltip-foreground: #404040;
+  --chat-assistant: #f6f6f8;
+  --popover: var(--tr-bg-item);
+  --popover-foreground: #18181b;
+  --tooltip: var(--tr-bg-item);
+  --tooltip-foreground: #52525b;
   --menu-hover: var(--tr-hover);
   --menu-border: var(--tr-overlay-border);
-  --chat-header-hover: var(--tr-hover);
-  --chat-message-border: var(--tr-border);
-  --chat-message-border-hover: #bcbcbc;
+  --chat-header-hover: var(--tr-bg-3);
+  --chat-message-border: #ccced8;
+  --chat-message-border-hover: #b4b6c2;
   --surface-raised: var(--tr-bg-item);
   --surface-overlay: var(--tr-bg-2);
   --overlay: rgb(0 0 0 / 0.32);
-  --command-palette-surface: rgb(255 255 255 / 0.82);
-  --command-palette-border: #d6d6d6;
-  --command-palette-separator: #e5e5e5;
-  --command-palette-overlay: rgb(0 0 0 / 0.32);
-  --command-palette-item-hover: var(--menu-hover);
+  --command-palette-surface: var(--popover);
+  --command-palette-border: var(--border);
+  --command-palette-separator: var(--separator);
+  --command-palette-overlay: rgb(0 0 0 / 0.28);
+  --command-palette-item-hover: var(--accent);
+  --command-palette-shadow: 0 16px 48px rgb(0 0 0 / 0.14);
 
   --sidebar: var(--tr-bg-2);
-  --sidebar-foreground: #1a1a1a;
+  --sidebar-foreground: #18181b;
   --sidebar-primary: var(--tr-accent);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--tr-hover);
-  --sidebar-accent-foreground: #1a1a1a;
+  --sidebar-accent-foreground: #18181b;
   --sidebar-border: var(--tr-border);
   --sidebar-ring: var(--tr-accent);
 
-  --scrollbar-thumb: #c4c4c4;
-  --scrollbar-thumb-hover: #a8a8a8;
+  --scrollbar-thumb: #b4b4be;
+  --scrollbar-thumb-hover: #9494a0;
   --kbd-divider: var(--tr-border);
   --titlebar-border: var(--tr-border);
 
-  --md-code-bg: #f0f0f0;
-  --md-code-fg: #1a1a1a;
-  --md-code-comment: #6b6b6b;
-  --md-code-keyword: #8250df;
-  --md-code-string: #0a6f31;
-  --md-code-number: #0550ae;
-  --md-code-title: #953800;
-  --md-code-variable: #24292f;
-  --md-code-meta: #57606a;
-  --md-code-tag: #116329;
-  --md-code-attr: #0550ae;
+  --md-code-bg: #ececef;
+  --md-code-fg: #18181b;
+  --md-code-comment: #6b6b76;
+  --md-code-keyword: #7c3aed;
+  --md-code-string: #15803d;
+  --md-code-number: #1d4ed8;
+  --md-code-title: #b45309;
+  --md-code-variable: #18181b;
+  --md-code-meta: #64748b;
+  --md-code-tag: #15803d;
+  --md-code-attr: #1d4ed8;
   --md-code-link: var(--tr-accent);
 
-  /** Reasoning copy — always a dark/dim tone (not answer `foreground`). */
-  --thinking-foreground: #2e2e2e;
+  /** Reasoning copy — dimmer than answer text in both themes. */
+  --thinking-foreground: #5c5c66;
 }
 
 /* Dark theme (TrustRouter-aligned) */
@@ -231,11 +232,12 @@
   --kbd-divider: var(--tr-bg-2);
   --titlebar-border: var(--tr-border);
   --overlay: rgb(0 0 0 / 0.55);
-  --command-palette-surface: rgb(30 30 30 / 0.8);
-  --command-palette-border: #313131;
-  --command-palette-separator: #1e1e1e;
-  --command-palette-overlay: rgb(0 0 0 / 0.42);
-  --command-palette-item-hover: #282828;
+  --command-palette-surface: var(--popover);
+  --command-palette-border: var(--border);
+  --command-palette-separator: var(--border);
+  --command-palette-overlay: rgb(0 0 0 / 0.5);
+  --command-palette-item-hover: var(--accent);
+  --command-palette-shadow: 0 20px 56px rgb(0 0 0 / 0.45);
 
   --md-code-bg: #161616;
   --md-code-fg: #d4d4d4;
@@ -456,48 +458,54 @@
   fill: var(--primary-foreground) !important;
 }
 
-/* Codicons: align font icons with former lucide size-* classes */
+/* Codicons: pixel-snapped sizes for crisp rendering at small dimensions */
+.codicon {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
 .codicon.size-2\.5 {
-  font-size: 0.625rem;
-  width: 0.625rem;
-  height: 0.625rem;
-  line-height: 0.625rem;
+  font-size: 10px;
+  width: 10px;
+  height: 10px;
+  line-height: 10px;
 }
 .codicon.size-3 {
-  font-size: 0.75rem;
-  width: 0.75rem;
-  height: 0.75rem;
-  line-height: 0.75rem;
+  font-size: 12px;
+  width: 12px;
+  height: 12px;
+  line-height: 12px;
 }
 .codicon.size-3\.5 {
-  font-size: 0.875rem;
-  width: 0.875rem;
-  height: 0.875rem;
-  line-height: 0.875rem;
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
 }
 .codicon.size-4 {
-  font-size: 1rem;
-  width: 1rem;
-  height: 1rem;
-  line-height: 1rem;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
 }
 .codicon.size-5 {
-  font-size: 1.25rem;
-  width: 1.25rem;
-  height: 1.25rem;
-  line-height: 1.25rem;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
 }
 .codicon.size-6 {
-  font-size: 1.5rem;
-  width: 1.5rem;
-  height: 1.5rem;
-  line-height: 1.5rem;
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
 }
 .codicon.size-7 {
-  font-size: 1.75rem;
-  width: 1.75rem;
-  height: 1.75rem;
-  line-height: 1.75rem;
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
 }
 
 /* Sonner toasts — bordered popover surface */

@@ -22,9 +22,10 @@ import {
 interface ChatHeaderMenuProps {
   chatId: string | null
   messages: readonly Message[]
+  className?: string
 }
 
-export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {
+export function ChatHeaderMenu({ chatId, messages, className }: ChatHeaderMenuProps) {
   const navigate = useNavigate()
   const forkChat = useChatsStore((s) => s.forkChat)
 
@@ -52,7 +53,10 @@ export function ChatHeaderMenu({ chatId, messages }: ChatHeaderMenuProps) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+          className={cn(
+            'size-6 shrink-0 text-muted-foreground hover:text-foreground',
+            className
+          )}
           aria-label="Chat options"
         >
           <MoreHorizontal className="size-4 shrink-0" />

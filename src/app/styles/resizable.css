@@ -1,5 +1,17 @@
 [data-slot='resizable-handle'] {
   touch-action: none;
+  cursor: col-resize;
+  /* Layout width stays 1px — hover highlight is painted in ::after without shifting panels. */
+  width: 1px;
+  min-width: 1px;
+  max-width: 1px;
+  position: relative;
+  z-index: 30;
+  background-color: var(--border);
+}
+
+[data-slot='resizable-handle'][aria-orientation='horizontal'] {
+  cursor: row-resize;
 }
 
 [data-slot='resizable-handle']::before {
@@ -8,10 +20,55 @@
   inset-block: 0;
   inset-inline: -5px;
   z-index: 1;
+  cursor: col-resize;
 }
 
-[data-slot='resizable-handle']:hover,
-[data-slot='resizable-handle']:focus-visible,
-[data-slot='resizable-handle']:active {
+[data-slot='resizable-handle'][aria-orientation='horizontal']::before {
+  cursor: row-resize;
+}
+
+[data-slot='resizable-handle']::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  z-index: 2;
+  width: 2px;
+  pointer-events: none;
+  transform: translateX(-50%);
+  background-color: transparent;
+  transition: background-color 120ms ease-out;
+}
+
+[data-slot='resizable-handle']:hover::after,
+[data-slot='resizable-handle'][data-separator='active']::after,
+[data-slot='resizable-handle']:focus-visible::after {
   background-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot='resizable-panel-group'][data-sidebar-width-reset='true'] > [data-panel]:first-child {
+    transition: flex-basis 200ms ease-out, flex-grow 200ms ease-out, width 200ms ease-out;
+  }
+}
+
+[data-slot='resizable-panel-group'][data-sidebar-collapsed='true'] [data-slot='resizable-handle'],
+[data-slot='resizable-panel-group'][data-sidebar-collapsed='true'] [data-separator] {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  border: 0 !important;
+}
+
+[data-slot='resizable-panel-group'][data-sidebar-collapsed='true'] > [data-panel]:first-child {
+  flex: 0 0 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
 }

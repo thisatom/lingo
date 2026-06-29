@@ -38,14 +38,33 @@ function TooltipProvider({
       if (document.visibilityState === 'hidden') dismissAllTooltips()
     }
 
+    let leaveTimer: ReturnType<typeof setTimeout> | undefined
+    const onPointerMove = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('[data-slot="tooltip-trigger"]')) {
+        if (leaveTimer) clearTimeout(leaveTimer)
+        return
+      }
+      if (target.closest('[data-slot="tooltip-content"]')) {
+        if (leaveTimer) clearTimeout(leaveTimer)
+        return
+      }
+      if (leaveTimer) clearTimeout(leaveTimer)
+      leaveTimer = setTimeout(() => dismissAllTooltips(), 100)
+    }
+
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown)
     document.addEventListener('visibilitychange', onVisibility)
+    document.addEventListener('pointermove', onPointerMove)
 
     return () => {
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('visibilitychange', onVisibility)
+      document.removeEventListener('pointermove', onPointerMove)
+      if (leaveTimer) clearTimeout(leaveTimer)
     }
   }, [])
 
@@ -85,6 +104,10 @@ function Tooltip({
     if (!open) return
     return registerTooltipDismissHandler(() => setOpen(false))
   }, [open, setOpen])
+
+  React.useEffect(() => {
+    return () => setOpen(false)
+  }, [setOpen])
 
   return (
     <TooltipPrimitive.Root

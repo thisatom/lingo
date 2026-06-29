@@ -15,9 +15,9 @@ const TITLEBAR_THEMES: Record<ResolvedTheme, TitlebarColors> = {
     overlayHeight: 32
   },
   light: {
-    background: '#ebebeb',
-    foreground: '#171717',
-    itemHover: '#e8e8e8',
+    background: '#fafafa',
+    foreground: '#18181b',
+    itemHover: '#ececef',
     overlayHeight: 32
   }
 }

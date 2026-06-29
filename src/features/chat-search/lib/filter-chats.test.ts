@@ -50,4 +50,11 @@ describe('filterChatsByQuery', () => {
   it('filters by assistant message content', () => {
     expect(filterChatsByQuery(chats, 'alps')).toEqual([chats[1]])
   })
+
+  it('excludes archived chats unless the query mentions archive', () => {
+    const archived = [{ ...chats[0], id: 'chat-3', archived: true, title: 'Old notes' }]
+    expect(filterChatsByQuery([...chats, ...archived], '')).toHaveLength(2)
+    expect(filterChatsByQuery([...chats, ...archived], 'old')).toHaveLength(0)
+    expect(filterChatsByQuery([...chats, ...archived], 'archive old')).toHaveLength(1)
+  })
 })

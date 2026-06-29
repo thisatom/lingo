@@ -4,7 +4,8 @@ import {
   translationTargetOptionsForSelect
 } from '@/shared/config/practice-languages'
 import { cn } from '@/shared/lib/utils'
-import { Check, ChevronDown, Languages, Loader2Icon } from '@/shared/ui/icons'
+import { Check, ChevronDown, Languages } from '@/shared/ui/icons'
+import { Spinner } from '@/shared/ui/spinner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,7 +74,7 @@ export function ReplyTranslateMenu({
         onClick={() => void onToggle()}
       >
         {loading ? (
-          <Loader2Icon className="size-3.5 animate-spin" />
+          <Spinner size="sm" />
         ) : (
           <Languages className="size-3.5" />
         )}

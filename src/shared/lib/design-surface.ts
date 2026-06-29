@@ -3,9 +3,9 @@ import { cn } from '@/shared/lib/utils'
 /** Single 1px edge — no ring+border stacking. */
 export const overlayBorderClass = 'border border-overlay-border'
 
-export const panelShadowSmClass = 'shadow-sm shadow-black/5 dark:shadow-black/25'
+export const panelShadowSmClass = 'shadow-sm shadow-black/8 dark:shadow-black/25'
 export const panelShadowMdClass = 'shadow-md shadow-black/10 dark:shadow-black/35'
-export const panelShadowLgClass = 'shadow-lg shadow-black/15 dark:shadow-black/45'
+export const panelShadowLgClass = 'shadow-lg shadow-black/12 dark:shadow-black/45'
 
 /** Popover, dropdown, tooltip, hover card. */
 export const elevatedSurfaceClass = cn(

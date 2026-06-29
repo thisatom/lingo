@@ -86,7 +86,9 @@ export default defineConfig({
     server: {
       port: 5173,
       host: '127.0.0.1',
-      strictPort: false
+      strictPort: false,
+      // Strict CSP (no unsafe-eval) — full page reload instead of HMR eval.
+      hmr: false
     },
     build: {
       rollupOptions: {

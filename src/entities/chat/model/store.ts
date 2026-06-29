@@ -54,6 +54,8 @@ interface ChatsState {
   deleteAllChats: () => string
   renameChat: (id: string, title: string) => void
   togglePinChat: (id: string) => void
+  archiveChat: (id: string) => void
+  unarchiveChat: (id: string) => void
   setChatHasError: (id: string, hasError: boolean) => void
   setChatUnreadReply: (id: string, hasUnreadReply: boolean) => void
   /** Mark unread when the user is not viewing this chat on the main screen. */
@@ -206,12 +208,13 @@ export const useChatsStore = create<ChatsState>()(
         if (!source) return get().createChat()
 
         const now = Date.now()
+        const baseTitle = source.title.replace(/ \(fork\)$/, '').trim()
         const forked: Chat = {
           id: `chat-${now}-${Math.random().toString(36).slice(2, 8)}`,
           title:
-            source.title.trim() === '' || source.title === 'New chat'
-              ? 'New chat'
-              : `${source.title} (fork)`,
+            baseTitle === '' || baseTitle === 'New chat'
+              ? 'New chat (fork)'
+              : `${baseTitle} (fork)`,
           messages: source.messages.map((message) => ({
             ...message,
             id: newMessageId(),
@@ -395,6 +398,35 @@ export const useChatsStore = create<ChatsState>()(
         set((state) => ({
           chats: withSortedChats(
             state.chats.map((c) => (c.id === id ? { ...c, pinned: !c.pinned } : c))
+          )
+        }))
+      },
+
+      archiveChat: (id) => {
+        const prevActive = get().activeChatId
+        set((state) => {
+          const chats = withSortedChats(
+            state.chats.map((c) =>
+              c.id === id ? { ...c, archived: true, pinned: false, updatedAt: Date.now() } : c
+            )
+          )
+          let activeChatId = state.activeChatId
+          if (activeChatId === id) {
+            activeChatId = chats.find((c) => !c.archived)?.id ?? null
+          }
+          return { chats, activeChatId }
+        })
+        if (get().activeChatId !== prevActive) {
+          notifyActiveChatChange()
+        }
+      },
+
+      unarchiveChat: (id) => {
+        set((state) => ({
+          chats: withSortedChats(
+            state.chats.map((c) =>
+              c.id === id ? { ...c, archived: false, updatedAt: Date.now() } : c
+            )
           )
         }))
       },

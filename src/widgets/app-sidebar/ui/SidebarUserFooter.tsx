@@ -21,11 +21,14 @@ export function SidebarUserFooter({ insetClassName }: { insetClassName?: string 
     <SidebarFooter className={cn('shrink-0 py-2', insetClassName)}>
       <div className={cn('flex min-w-0 items-center gap-2 rounded-lg py-1', APP_RADIUS_8_CLASS)}>
         <Avatar className="size-8 shrink-0" aria-hidden>
-          <AvatarFallback className="bg-muted text-xs font-medium text-foreground">{initials}</AvatarFallback>
+          <AvatarFallback className="bg-secondary text-xs font-medium text-secondary-foreground">
+            {initials}
+          </AvatarFallback>
         </Avatar>
         <p className="min-w-0 flex-1 truncate text-sm leading-normal text-sidebar-foreground">{displayName}</p>
-        {!isSettings && <SidebarFilterMenu />}
-        <TooltipWrap label="Settings">
+        <div className="flex shrink-0 items-center gap-0.5">
+          {!isSettings && <SidebarFilterMenu />}
+          <TooltipWrap label="Settings">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -41,6 +44,7 @@ export function SidebarUserFooter({ insetClassName }: { insetClassName?: string 
             </Link>
           </Button>
         </TooltipWrap>
+        </div>
       </div>
     </SidebarFooter>
   )

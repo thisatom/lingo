@@ -27,6 +27,11 @@ export async function installAppUpdate(): Promise<{ ok: boolean; error?: string 
   return getUpdater().downloadAndInstall()
 }
 
+export async function openAppReleasesPage(): Promise<void> {
+  if (!isUpdaterAvailable()) return
+  await getUpdater().openReleasesPage()
+}
+
 export function subscribeToAppUpdateAvailable(handler: (info: AppUpdateInfo) => void): () => void {
   if (!isUpdaterAvailable()) return () => {}
   return getUpdater().onUpdateAvailable(handler)

@@ -30,9 +30,13 @@ export function injectContentSecurityPolicy(): Plugin {
         const profile = resolveCspProfileFromHtmlPath(ctx.filename ?? ctx.path)
         if (!profile) return html
 
-        const mode: CspMode = ctx.server ? 'development' : 'production'
+        const mode: CspMode =
+          ctx.server != null || process.env.NODE_ENV === 'development'
+            ? 'development'
+            : 'production'
         const policy = buildContentSecurityPolicy(profile, mode, {
-          websearchOrigin: profile === 'web-main' ? parseWebsearchOrigin() : null
+          websearchOrigin: profile === 'web-main' ? parseWebsearchOrigin() : null,
+          viteHmr: profile === 'electron-main' ? false : undefined
         })
 
         const escaped = policy.replace(/"/g, '&quot;')

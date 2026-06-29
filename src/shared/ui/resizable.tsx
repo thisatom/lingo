@@ -2,10 +2,35 @@ import * as ResizablePrimitive from 'react-resizable-panels'
 
 import { cn } from '@/shared/lib/utils'
 
-function ResizablePanelGroup({ className, ...props }: ResizablePrimitive.GroupProps) {
+/** Swallow InvalidStateError when the library captures on a detached separator. */
+function patchPointerCapture(): void {
+  if (typeof Element === 'undefined') return
+  const proto = Element.prototype as Element & { __lingoPointerCapturePatched?: boolean }
+  if (proto.__lingoPointerCapturePatched) return
+
+  const nativeSet = proto.setPointerCapture
+  proto.setPointerCapture = function setPointerCaptureSafe(this: Element, pointerId: number) {
+    try {
+      nativeSet.call(this, pointerId)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'InvalidStateError') return
+      throw error
+    }
+  }
+  proto.__lingoPointerCapturePatched = true
+}
+
+patchPointerCapture()
+
+function ResizablePanelGroup({
+  className,
+  disableCursor = true,
+  ...props
+}: ResizablePrimitive.GroupProps) {
   return (
     <ResizablePrimitive.Group
       data-slot="resizable-panel-group"
+      disableCursor={disableCursor}
       className={cn('flex h-full w-full aria-[orientation=vertical]:flex-col', className)}
       {...props}
     />
@@ -24,18 +49,23 @@ function ResizablePanel({ className, ...props }: ResizablePrimitive.PanelProps) 
 
 function ResizableHandle({
   className,
-  disabled,
+  onDoubleClickReset,
   ...props
-}: ResizablePrimitive.SeparatorProps) {
+}: ResizablePrimitive.SeparatorProps & {
+  /** Double-click: expand hidden sidebar or restore default width. */
+  onDoubleClickReset?: () => void
+}) {
   return (
     <ResizablePrimitive.Separator
       data-slot="resizable-handle"
-      disabled={disabled}
+      disableDoubleClick
+      onDoubleClick={(event) => {
+        event.preventDefault()
+        onDoubleClickReset?.()
+      }}
       className={cn(
-        'relative z-20 w-px shrink-0 bg-border transition-colors duration-150',
-        'cursor-col-resize aria-[orientation=vertical]:cursor-row-resize',
+        'relative z-30 w-px min-w-px max-w-px shrink-0 bg-border',
         'focus-visible:outline-none',
-        disabled && 'pointer-events-none opacity-0',
         className
       )}
       {...props}

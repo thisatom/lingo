@@ -2,8 +2,13 @@ import { createContext, useContext } from 'react'
 
 interface ResizableSidebarContextValue {
   sidebarCollapsed: boolean
+  /** Current expanded sidebar width in pixels. */
+  sidebarWidthPx: number
+  /** False on settings routes — sidebar cannot be hidden. */
+  sidebarHideEnabled: boolean
   toggleSidebarPanel: () => void
   openChatSearch: () => void
+  openSettingsSearch: () => void
 }
 
 export const ResizableSidebarContext = createContext<ResizableSidebarContextValue | null>(

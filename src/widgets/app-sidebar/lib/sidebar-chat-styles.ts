@@ -24,9 +24,12 @@ export const sidebarAgentDotSizePx = 2
 
 export const sidebarChatRowRadiusClass = APP_RADIUS_8_CLASS
 
-/** Date / section labels — align with top chrome column. */
-export const sidebarGroupLabelClass =
-  'flex h-[30px] min-h-[30px] items-center px-0 text-xs font-normal text-muted-foreground'
+/** Date / section labels — sticky, full sidebar width; text uses {@link SIDEBAR_INSET_CLASS}. */
+export const sidebarGroupLabelClass = cn(
+  'sticky top-0 z-20 flex h-[30px] min-h-[30px] w-full items-center bg-sidebar px-0',
+  'rounded-none !rounded-none text-xs font-normal text-muted-foreground',
+  'transition-[box-shadow] duration-200 ease-out'
+)
 
 /** Shared fade for long chat titles — reserve right edge for row actions. */
 export const sidebarTextFadeClass = cn(
@@ -40,34 +43,84 @@ export const sidebarNavLabelClass = 'min-w-0 truncate'
 /** Wrapper for chat title + hover scrim. */
 export const sidebarChatTitleFadeClass = 'relative min-w-0 flex-1'
 
-/** Scrim over title when row actions are visible — match row hover/active fill, not page bg. */
-export const sidebarChatTitleScrimClass =
-  'pointer-events-none absolute inset-y-0 right-0 z-0 w-12 bg-gradient-to-l from-accent from-30% to-transparent opacity-0 transition-opacity duration-100 group-hover/chat:opacity-100 group-data-[active=true]/chat:from-sidebar-accent'
-
-/** Pin / delete: keep hit area, no hover background (pin only). */
-export const sidebarRowActionNoHoverBgClass =
-  'hover:bg-transparent active:bg-transparent dark:hover:bg-transparent dark:active:bg-transparent data-[state=open]:bg-transparent'
-
-/** Delete action — transparent; row hover supplies background. */
-export const sidebarChatDeleteButtonClass = cn(
-  'relative z-[2] rounded-lg border-0 bg-transparent text-muted-foreground/55 opacity-0 shadow-none',
-  'transition-[opacity,color] duration-100',
-  'group-hover/chat:pointer-events-auto group-hover/chat:opacity-100',
-  'hover:!bg-transparent hover:!text-foreground active:!bg-transparent',
-  'focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:text-foreground'
-)
-
 /** List row height for chats, settings nav, and primary sidebar actions. */
 export const sidebarRowHeightClass = 'h-[30px] min-h-[30px]'
 
 /** Row action hit target — matches 30px row height. */
 export const sidebarRowActionSizeClass = 'size-[30px] shrink-0'
 
+/** Scrim over title — soft fade into row actions. */
+export const sidebarChatTitleScrimClass =
+  'pointer-events-none absolute inset-y-0 right-0 z-0 w-8 bg-gradient-to-l from-accent/90 from-20% to-transparent opacity-0 transition-opacity duration-200 ease-out group-hover/chat:opacity-100 group-data-[active=true]/chat:from-sidebar-accent/90'
+
+/** Width reserved for archive + delete row actions (2 × 30px). */
+export const sidebarChatRowActionsPaddingClass = 'pr-[60px]'
+
+/** Right action strip — shadow + buttons fade in together on row hover. */
+export const sidebarChatRowActionsPanelClass = cn(
+  'pointer-events-none absolute inset-y-0 right-0 z-[1] w-[60px]',
+  'opacity-0 transition-opacity duration-200 ease-out',
+  'group-hover/chat:pointer-events-auto group-hover/chat:opacity-100',
+  'focus-within:pointer-events-auto focus-within:opacity-100'
+)
+
+/** Gradient shadow before archive / delete buttons. */
+export const sidebarChatRowActionsShadowClass = cn(
+  'pointer-events-none absolute inset-y-0 right-0 w-[60px]',
+  'bg-gradient-to-l from-accent from-40% via-accent/70 via-70% to-transparent',
+  'group-data-[active=true]/chat:from-sidebar-accent group-data-[active=true]/chat:via-sidebar-accent/70'
+)
+
+export const sidebarChatRowActionClass = cn(
+  sidebarRowActionSizeClass,
+  'relative z-[2] rounded-lg border-0 shadow-none text-muted-foreground/55',
+  'transition-[color,background-color,filter] duration-200 ease-out',
+  'hover:!bg-accent hover:!text-foreground active:!bg-accent',
+  'group-data-[active=true]/chat:hover:!bg-sidebar-accent group-data-[active=true]/chat:active:!bg-sidebar-accent',
+  'focus-visible:text-foreground focus-visible:!bg-accent',
+  'group-data-[active=true]/chat:focus-visible:!bg-sidebar-accent'
+)
+
+/** Archive / delete — solid row fill on the action strip. */
+export const sidebarChatInlineActionClass = cn(
+  sidebarChatRowActionClass,
+  '!bg-accent !text-foreground/80',
+  'group-data-[active=true]/chat:!bg-sidebar-accent group-data-[active=true]/chat:!text-sidebar-accent-foreground',
+  'hover:!brightness-[0.97] group-data-[active=true]/chat:hover:!brightness-[0.97]'
+)
+
+/** Pin stays visible when pinned; hover fill still matches row. */
+export const sidebarChatPinActionClass = cn(
+  sidebarChatRowActionClass,
+  'pointer-events-none opacity-0',
+  'group-hover/chat:pointer-events-auto group-hover/chat:opacity-100',
+  'focus-visible:pointer-events-auto focus-visible:opacity-100',
+  'hover:!bg-accent group-data-[active=true]/chat:hover:!bg-sidebar-accent'
+)
+
+/** Pinned chat — white pin, optically centered in the 30px column. */
+export const sidebarChatPinPinnedClass = cn(
+  'pointer-events-auto opacity-100',
+  '!text-white hover:!text-white focus-visible:!text-white',
+  '[text-shadow:0_0_1px_rgba(0,0,0,0.45)] dark:[text-shadow:none]',
+  'group-data-[active=true]/chat:hover:!bg-sidebar-accent/80'
+)
+
+export const sidebarChatPinIconClass =
+  'size-3.5 shrink-0 text-white [text-shadow:0_0_1px_rgba(0,0,0,0.45)] dark:[text-shadow:none]'
+
+/** Delete / archive — same as row actions. */
+export const sidebarChatDeleteButtonClass = sidebarChatInlineActionClass
+
 /** Icon column for settings nav and other sidebar rows without a status dot. */
 export const sidebarNavIconColumnClass = cn(
   sidebarRowActionSizeClass,
-  'flex items-center justify-center [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:opacity-70'
+  'flex items-center justify-center',
+  '[&_.codicon]:!translate-y-0 [&_.codicon]:size-4 [&_.codicon]:shrink-0 [&_.codicon]:opacity-70'
 )
+
+/** Back / nav row icon — snap to cap-height without codicon nudge. */
+export const sidebarBackIconClass = 'size-4 shrink-0 opacity-70 !translate-y-0'
 
 export const sidebarChatDotClass = 'bg-muted-foreground/70'
 

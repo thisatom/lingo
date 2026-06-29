@@ -7,13 +7,14 @@ export type CodiconProps = Omit<ComponentProps<'span'>, 'children'> & {
   name: CodiconName
 }
 
-/** VS Code codicon (icon font). Use `className="size-4"` etc. for sizing. */
+/** VS Code codicon (icon font). Pixel-snapped sizes: see globals.css `.codicon.size-*`. */
 export function Codicon({ name, className, ...props }: CodiconProps) {
   return (
     <span
       className={cn(
         `codicon codicon-${name}`,
-        'inline-flex shrink-0 items-center justify-center text-current leading-none',
+        'inline-flex shrink-0 items-center justify-center overflow-hidden text-current leading-none',
+        'translate-y-px will-change-transform [-webkit-font-smoothing:antialiased] [text-rendering:geometricPrecision]',
         className
       )}
       aria-hidden

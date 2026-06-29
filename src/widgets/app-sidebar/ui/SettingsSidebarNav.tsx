@@ -14,11 +14,12 @@ import {
   sidebarChatRowRadiusClass,
   sidebarChatTextClass,
   sidebarNavIconColumnClass,
+  sidebarBackIconClass,
   sidebarRowHeightClass,
   sidebarNavLabelClass
 } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 
-const navIconClass = 'size-4 shrink-0 opacity-70'
+const navIconClass = cn('size-4 shrink-0 opacity-70 !translate-y-0')
 
 const iconBySection: Record<SettingsSectionId, ReactNode> = {
   general: <Settings className={navIconClass} />,
@@ -33,7 +34,7 @@ const sectionById = new Map(SETTINGS_SECTIONS.map((section) => [section.id, sect
 
 const sidebarNavButtonClass = cn(
   sidebarRowHeightClass,
-  'flex w-full items-center gap-1.5 !px-0 !py-0',
+  'flex w-full items-center gap-0 !px-0 !py-0',
   sidebarChatTextClass,
   'rounded-lg bg-transparent hover:bg-transparent active:bg-transparent',
   sidebarChatActiveTextClass
@@ -54,7 +55,7 @@ export function SettingsSidebarNav() {
       >
         <SidebarMenuButton className={sidebarNavButtonClass} onClick={() => navigate('/')}>
           <span className={sidebarNavIconColumnClass}>
-            <ArrowLeft className={navIconClass} />
+            <ArrowLeft className={sidebarBackIconClass} />
           </span>
           <span className={sidebarNavLabelClass}>Back</span>
         </SidebarMenuButton>

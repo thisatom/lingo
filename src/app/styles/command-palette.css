@@ -1,12 +1,84 @@
-/* Glass command palette (chat search) — backdrop blur on semi-transparent surface */
+/* Command palette — solid surface, fast motion (no glass blur) */
 
 .lingo-command-palette-surface {
   border-color: var(--command-palette-border);
   background: var(--command-palette-surface);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+  box-shadow: var(--command-palette-shadow);
 }
 
 .lingo-command-palette-surface [cmdk-item] {
-  min-height: 30px;
+  min-height: 34px;
+}
+
+.lingo-command-palette-surface [cmdk-group-heading] {
+  letter-spacing: 0.04em;
+}
+
+@keyframes lingo-command-palette-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lingo-command-palette-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes lingo-command-palette-in {
+  from {
+    opacity: 0;
+    translate: -50% calc(-50% + 4px);
+    scale: 0.99;
+  }
+  to {
+    opacity: 1;
+    translate: -50% -50%;
+    scale: 1;
+  }
+}
+
+@keyframes lingo-command-palette-out {
+  from {
+    opacity: 1;
+    translate: -50% -50%;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    translate: -50% calc(-50% + 2px);
+    scale: 0.995;
+  }
+}
+
+.lingo-command-palette-overlay[data-state='open'] {
+  animation: lingo-command-palette-overlay-in 90ms ease-out both;
+}
+
+.lingo-command-palette-overlay[data-state='closed'] {
+  animation: lingo-command-palette-overlay-out 70ms ease-in both;
+}
+
+.lingo-command-palette-surface.lingo-dialog-content[data-state='open'] {
+  animation: lingo-command-palette-in 110ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.lingo-command-palette-surface.lingo-dialog-content[data-state='closed'] {
+  animation: lingo-command-palette-out 80ms ease-in both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lingo-command-palette-overlay[data-state='open'],
+  .lingo-command-palette-overlay[data-state='closed'],
+  .lingo-command-palette-surface.lingo-dialog-content[data-state='open'],
+  .lingo-command-palette-surface.lingo-dialog-content[data-state='closed'] {
+    animation: none;
+  }
 }

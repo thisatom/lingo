@@ -5,6 +5,7 @@ import { registerIpcHandlers } from './ipc'
 import { warmOpenRouterConnection } from './openrouter-fetch'
 import { shutdownSttWorker, warmSttWorker } from './stt'
 import { loadEnvBootstrap, warmSecretsCache } from './secrets'
+import { setupRendererContentSecurityPolicy } from './content-security-policy'
 import { setupSingleInstanceApp, setupTitlebarOnce } from './window-manager'
 import { focusMainWindow, launchDesktopWindows } from './welcome-flow'
 
@@ -16,6 +17,7 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
 } else {
   app.whenReady().then(async () => {
     applyDockIcon()
+    setupRendererContentSecurityPolicy(app.isPackaged)
 
     const allowMedia = (permission: string) =>
       permission === 'media' || permission === 'microphone' || permission === 'audioCapture'

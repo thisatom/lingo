@@ -26,8 +26,7 @@ import { ChatComposer } from '@/widgets/chat-composer/ui/ChatComposer'
 import { resolveComposerPlaceholder } from '@/widgets/chat-composer/lib/composer-placeholder'
 import { ChatComposerError } from '@/widgets/chat-composer/ui/ChatComposerError'
 import { ScrollToLatestButton } from '@/widgets/chat-composer/ui/ScrollToLatestButton'
-import { ChatHeaderMenu } from '@/widgets/chat-header/ui/ChatHeaderMenu'
-import { ChatHeaderTitle } from '@/widgets/chat-header/ui/ChatHeaderTitle'
+import { ChatMainHeader } from '@/widgets/chat-header/ui/ChatMainHeader'
 import {
   flushChatScrollPositions,
   requestChatFollowBottom
@@ -36,9 +35,8 @@ import { flushChatPersistDebounce } from '@/entities/chat/lib/chat-persist-stora
 import { ConversationPanel } from '@/widgets/conversation-panel/ui/ConversationPanel'
 import type { EditSpeechTarget } from '@/widgets/conversation-panel/lib/edit-speech-target'
 import { VoiceCaptureBar } from '@/features/audio-devices/ui/VoiceCaptureBar'
-import { CHAT_COLUMN_MAX_WIDTH_CLASS, PAGE_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
+import { CHAT_COLUMN_MAX_WIDTH_CLASS, CHAT_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
 import { cn } from '@/shared/lib/utils'
-import { SidebarCollapsedToolbar } from '@/widgets/app-sidebar/ui/SidebarCollapsedToolbar'
 import { X } from '@/shared/ui/icons'
 import { Button } from '@/shared/ui/button'
 import { BackgroundStreamHint } from '@/features/ai-chat/ui/BackgroundStreamHint'
@@ -461,23 +459,16 @@ export function MainPage() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      <header
-        className={cn(
-          'relative z-10 flex shrink-0 items-center gap-2 bg-transparent py-2',
-          PAGE_HORIZONTAL_PADDING_CLASS
-        )}
-      >
-        <SidebarCollapsedToolbar />
-        <ChatHeaderTitle
-          title={activeChat?.title ?? 'New chat'}
-          chat={activeChat}
-          messageCount={messages.length}
-          modelId={activeModelId}
-          contextUsage={contextUsage}
-          contextPercent={contextUsage?.percent ?? 0}
-        />
-        <ChatHeaderMenu chatId={activeChatId} messages={messages} />
-      </header>
+      <ChatMainHeader
+        title={activeChat?.title ?? 'New chat'}
+        chat={activeChat}
+        messageCount={messages.length}
+        modelId={activeModelId}
+        contextUsage={contextUsage}
+        contextPercent={contextUsage?.percent ?? 0}
+        activeChatId={activeChatId}
+        messages={messages}
+      />
 
       <div className="relative min-h-0 flex-1">
         <ConversationPanel
@@ -516,7 +507,7 @@ export function MainPage() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[50]">
           <div
             ref={bottomStackRef}
-            className={cn('mx-auto w-full pb-3', PAGE_HORIZONTAL_PADDING_CLASS, CHAT_COLUMN_MAX_WIDTH_CLASS)}
+            className={cn('mx-auto w-full pb-2', CHAT_HORIZONTAL_PADDING_CLASS, CHAT_COLUMN_MAX_WIDTH_CLASS)}
           >
             <div className="relative">
               <ScrollToLatestButton

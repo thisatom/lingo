@@ -30,13 +30,25 @@ export const confirmActionDialogFooterLabelClass = cn(
   'cursor-pointer select-none text-[13px] leading-none text-muted-foreground'
 )
 
-export const confirmActionDialogCloseClass = cn(
-  'mt-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full',
+/** Shared circular close control — dialogs, toasts, compact surfaces. */
+export const surfaceCloseButtonClass = cn(
+  'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full',
   'text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
   'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
 )
 
-export const confirmActionDialogHeaderClass = 'flex items-start gap-2 px-4 pt-2.5 pb-2'
+/** Close in a title row — optically aligns with the first line of text. */
+export const surfaceCloseButtonTitleRowClass = cn(surfaceCloseButtonClass, 'mt-0.5')
+
+export const confirmActionDialogCloseClass = surfaceCloseButtonTitleRowClass
+
+/** Title row with trailing close — matches confirm / rename / toast headers. */
+export const surfaceTitleRowClass = 'flex items-start gap-2'
+
+export const confirmActionDialogHeaderClass = cn(
+  surfaceTitleRowClass,
+  'px-4 pt-2.5 pb-2'
+)
 
 export const confirmActionDialogCancelClass = cn(
   'inline-flex !h-[21px] min-h-[21px] min-w-0 items-center justify-center border-0 bg-transparent px-2.5 py-0 text-[13px] font-normal leading-none text-muted-foreground',

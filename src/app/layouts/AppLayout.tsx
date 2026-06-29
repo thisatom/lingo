@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Outlet } from 'react-router-dom'
-import { useDefaultLayout, usePanelRef } from 'react-resizable-panels'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useChatsStore } from '@/entities/chat/model/store'
+import { useSidebarPanel } from '@/app/layouts/hooks/use-sidebar-panel'
+import { sidebarWidthCss, sidebarPanelConstraintCss } from '@/app/layouts/lib/sidebar-layout-storage'
 import { ResizableSidebarContext } from '@/app/context/resizable-sidebar-context'
 import { AppStartupOverlay } from '@/app/ui/AppStartupOverlay'
 import { AppSidebar } from '@/widgets/app-sidebar/ui/AppSidebar'
@@ -11,18 +12,16 @@ import { useWindowTitle } from '@/app/hooks/use-window-title'
 import { useNewChatHotkey } from '@/features/chat/model/useNewChatHotkey'
 import { useChatSearchHotkey } from '@/features/chat-search/model/useChatSearchHotkey'
 import { ChatSearchDialog } from '@/features/chat-search/ui/ChatSearchDialog'
+import { useSettingsSearchHotkey } from '@/features/settings-search/model/useSettingsSearchHotkey'
+import { SettingsSearchDialog } from '@/features/settings-search/ui/SettingsSearchDialog'
 import { useAppReady } from '@/shared/lib/hooks/use-app-ready'
 import { useIsMobile } from '@/shared/lib/hooks/use-mobile'
-import {
-  SIDEBAR_PANEL_COLLAPSE_THRESHOLD_PERCENT,
-  SIDEBAR_PANEL_MIN_SIZE
-} from '@/shared/lib/layout'
+import { SIDEBAR_PANEL_MAX_WIDTH_PX } from '@/shared/lib/layout'
+import { ChatSidebarChromeButtons } from '@/widgets/chat-header/ui/ChatSidebarChromeButtons'
+import { SettingsSidebarChromeButtons } from '@/widgets/chat-header/ui/SettingsSidebarChromeButtons'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/shared/ui/resizable'
 import { SidebarInset, SidebarProvider } from '@/shared/ui/sidebar'
 import { TooltipProvider, TOOLTIP_SHOW_DELAY_MS, TOOLTIP_SKIP_DELAY_MS } from '@/shared/ui/tooltip'
-import { shouldCollapseSidebarOnResize } from '@/app/layouts/lib/sidebar-panel-resize'
-
-const LAYOUT_PANEL_IDS = ['sidebar', 'main'] as const
 
 export function AppLayout() {
   useThemeSync()
@@ -30,28 +29,31 @@ export function AppLayout() {
   useWindowTitle()
   useNewChatHotkey()
   const appReady = useAppReady()
+  const location = useLocation()
+  const isSettingsRoute = location.pathname.startsWith('/settings')
+  const sidebarHideEnabled = true
   const reconcileActiveChat = useChatsStore((s) => s.reconcileActiveChat)
-  const sidebarPanelRef = usePanelRef()
-  const prevSidebarSizeRef = useRef<number | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [chatSearchOpen, setChatSearchOpen] = useState(false)
+  const [settingsSearchOpen, setSettingsSearchOpen] = useState(false)
   const isMobile = useIsMobile()
 
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: 'lingo-main-layout',
-    panelIds: [...LAYOUT_PANEL_IDS]
-  })
+  const {
+    sidebarPanelRef,
+    sidebarCollapsed,
+    sidebarWidthPx,
+    sidebarPanelMinSizePx,
+    sidebarWidthResetting,
+    initialSidebarWidthPx,
+    toggleSidebarPanel,
+    handleLayoutChanged,
+    handleSeparatorDoubleClick,
+    handleSidebarPanelResize
+  } = useSidebarPanel({ appReady, isMobile, sidebarHideEnabled })
 
-  const openChatSearch = useCallback(() => setSearchOpen(true), [])
-  useChatSearchHotkey(openChatSearch)
-
-  useEffect(() => {
-    if (!isMobile) return
-    const panel = sidebarPanelRef.current
-    if (!panel || panel.isCollapsed()) return
-    panel.collapse()
-    setSidebarCollapsed(true)
-  }, [isMobile, sidebarPanelRef])
+  const openChatSearch = useCallback(() => setChatSearchOpen(true), [])
+  const openSettingsSearch = useCallback(() => setSettingsSearchOpen(true), [])
+  useChatSearchHotkey(openChatSearch, !isSettingsRoute)
+  useSettingsSearchHotkey(openSettingsSearch, isSettingsRoute)
 
   useEffect(() => {
     if (useChatsStore.persist.hasHydrated()) {
@@ -63,44 +65,26 @@ export function AppLayout() {
     })
   }, [reconcileActiveChat])
 
-  const syncSidebarCollapsed = useCallback(() => {
-    const panel = sidebarPanelRef.current
-    setSidebarCollapsed(panel?.isCollapsed() ?? false)
-  }, [sidebarPanelRef])
+  const showSidebarHandle =
+    !isMobile && (!sidebarHideEnabled || !sidebarCollapsed)
 
-  const toggleSidebarPanel = useCallback(() => {
-    const panel = sidebarPanelRef.current
-    if (!panel) return
-    if (panel.isCollapsed()) {
-      prevSidebarSizeRef.current = 0
-      panel.expand()
-    } else {
-      prevSidebarSizeRef.current = panel.getSize().asPercentage
-      panel.collapse()
-    }
-    syncSidebarCollapsed()
-  }, [sidebarPanelRef, syncSidebarCollapsed])
-
-  const handleSidebarResize = useCallback(
-    (panelSize: { asPercentage: number }) => {
-      const panel = sidebarPanelRef.current
-      const previousSize = prevSidebarSizeRef.current
-      prevSidebarSizeRef.current = panelSize.asPercentage
-
-      if (
-        panel &&
-        !panel.isCollapsed() &&
-        shouldCollapseSidebarOnResize(
-          panelSize.asPercentage,
-          previousSize,
-          SIDEBAR_PANEL_COLLAPSE_THRESHOLD_PERCENT
-        )
-      ) {
-        panel.collapse()
-      }
-      syncSidebarCollapsed()
-    },
-    [sidebarPanelRef, syncSidebarCollapsed]
+  const sidebarContextValue = useMemo(
+    () => ({
+      sidebarCollapsed,
+      sidebarWidthPx,
+      sidebarHideEnabled,
+      toggleSidebarPanel,
+      openChatSearch,
+      openSettingsSearch
+    }),
+    [
+      sidebarCollapsed,
+      sidebarWidthPx,
+      sidebarHideEnabled,
+      toggleSidebarPanel,
+      openChatSearch,
+      openSettingsSearch
+    ]
   )
 
   return (
@@ -109,45 +93,46 @@ export function AppLayout() {
         open
         className="!min-h-0 h-full min-h-0 w-full overflow-hidden bg-transparent"
       >
-        <ResizableSidebarContext.Provider
-          value={{ sidebarCollapsed, toggleSidebarPanel, openChatSearch }}
-        >
+        <ResizableSidebarContext.Provider value={sidebarContextValue}>
           <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
             {!appReady && <AppStartupOverlay />}
+            {appReady && !isMobile ? (
+              isSettingsRoute ? <SettingsSidebarChromeButtons /> : <ChatSidebarChromeButtons />
+            ) : null}
             <ResizablePanelGroup
               id="lingo-main-layout"
               orientation="horizontal"
+              disabled={sidebarHideEnabled && sidebarCollapsed}
               className="h-full min-h-0 flex-1 overflow-hidden"
-              defaultLayout={defaultLayout}
-              onLayoutChanged={onLayoutChanged}
+              data-sidebar-collapsed={sidebarCollapsed ? 'true' : undefined}
+              data-sidebar-width-reset={sidebarWidthResetting ? 'true' : undefined}
+              onLayoutChanged={handleLayoutChanged}
             >
               <ResizablePanel
                 id="sidebar"
                 panelRef={sidebarPanelRef}
-                collapsible
-                collapsedSize="0%"
-                defaultSize="22%"
-                minSize={isMobile ? '0%' : SIDEBAR_PANEL_MIN_SIZE}
-                maxSize={isMobile ? '85%' : '40%'}
-                className="overflow-hidden bg-sidebar"
-                onResize={handleSidebarResize}
+                defaultSize={sidebarWidthCss(initialSidebarWidthPx)}
+                minSize={sidebarPanelConstraintCss(sidebarPanelMinSizePx)}
+                maxSize={isMobile ? '85%' : sidebarWidthCss(SIDEBAR_PANEL_MAX_WIDTH_PX)}
+                groupResizeBehavior="preserve-pixel-size"
+                onResize={handleSidebarPanelResize}
+                className="overflow-hidden bg-sidebar [contain:layout] data-[sidebar-collapsed=true]:min-w-0 data-[sidebar-collapsed=true]:max-w-0 data-[sidebar-collapsed=true]:border-0"
+                data-sidebar-collapsed={sidebarCollapsed ? 'true' : undefined}
               >
                 <AppSidebar />
               </ResizablePanel>
-              <ResizableHandle disabled={sidebarCollapsed} />
-              <ResizablePanel
-                id="main"
-                defaultSize="78%"
-                minSize="35%"
-                className="overflow-hidden"
-              >
+              {showSidebarHandle ? (
+                <ResizableHandle onDoubleClickReset={handleSeparatorDoubleClick} />
+              ) : null}
+              <ResizablePanel id="main" minSize="35%" className="overflow-hidden">
                 <SidebarInset className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
                   {appReady ? <Outlet /> : null}
                 </SidebarInset>
               </ResizablePanel>
             </ResizablePanelGroup>
           </div>
-          <ChatSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+          <ChatSearchDialog open={chatSearchOpen} onOpenChange={setChatSearchOpen} />
+          <SettingsSearchDialog open={settingsSearchOpen} onOpenChange={setSettingsSearchOpen} />
         </ResizableSidebarContext.Provider>
       </SidebarProvider>
     </TooltipProvider>

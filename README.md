@@ -2,7 +2,7 @@
 
 **Lingo** is a desktop app for practicing conversational speech in different languages. Speak or type, get a streaming AI reply, and hear it read aloud.
 
-**Current version:** 0.1.7 · **Windows, macOS, Linux**
+**Current version:** 0.1.8 · **Windows, macOS, Linux**
 
 > **Web preview** (`npm run dev:web`) is for UI development only — limited parity, no OS keychain, no Whisper/edge-tts in main.
 
@@ -108,7 +108,7 @@ Use **npm** (not `pnpm`) for the first install. Do **not** pass `--ignore-script
 
 ### Release builds (CI)
 
-Push a tag `v*` (e.g. `v0.1.7`) to run [`.github/workflows/release.yml`](.github/workflows/release.yml): tests, then Windows/Linux/macOS artifacts attached to a GitHub Release.
+Push a tag `v*` (e.g. `v0.1.8`) to run [`.github/workflows/release.yml`](.github/workflows/release.yml): tests, then Windows/Linux/macOS artifacts attached to a GitHub Release.
 
 - **Windows:** `npm run dist:win` → `release/Lingo-<version>-win-setup.exe`
 - **Linux on Windows:** use CI release for AppImage/deb; local cross-build is limited

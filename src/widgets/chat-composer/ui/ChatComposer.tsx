@@ -12,7 +12,7 @@ import { useComposerPaste } from '@/features/chat-attachments/model/useComposerP
 import { useNativeComposerDrop } from '@/features/chat-attachments/model/useNativeComposerDrop'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { VoiceRecordButton, type VoiceInteractionMode } from '@/features/voice-capture/ui/VoiceRecordButton'
-import { PAGE_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
+import { CHAT_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
 import { composerInputHoverClass } from '@/shared/lib/sidebar-filter-menu-styles'
 import { CHAT_MODE_LABELS, composerToolbarIconClass } from '@/widgets/chat-composer/lib/composer-toolbar'
 import {
@@ -234,7 +234,7 @@ export function ChatComposer({
 
   return (
     <div
-      className={cn('w-full shrink-0', !overlay && cn(PAGE_HORIZONTAL_PADDING_CLASS, 'pb-4 pt-2'))}
+      className={cn('w-full shrink-0', !overlay && cn(CHAT_HORIZONTAL_PADDING_CLASS, 'pb-3 pt-1.5'))}
       data-composer-root
     >
       <div

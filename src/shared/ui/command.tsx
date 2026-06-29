@@ -134,7 +134,7 @@ function CommandInput({
 function CommandPaletteInput(
   props: Omit<React.ComponentProps<typeof CommandInput>, 'variant'>
 ) {
-  return <CommandInput variant="palette" showSearchIcon={false} {...props} />
+  return <CommandInput variant="palette" showSearchIcon {...props} />
 }
 
 function CommandList({
@@ -146,15 +146,15 @@ function CommandList({
 }) {
   if (variant === 'palette') {
     return (
-      <CommandPrimitive.List
-        data-slot="command-list"
-        className={cn(
-          commandPaletteListClass,
-          'overflow-x-hidden overflow-y-auto p-1',
-          className
-        )}
-        {...props}
-      />
+      <div className={cn(commandPaletteListClass, className)}>
+        <CustomScrollArea variant="palette" className="absolute inset-0 min-h-0">
+          <CommandPrimitive.List
+            data-slot="command-list"
+            className="overflow-x-hidden overflow-y-visible p-1 pb-2"
+            {...props}
+          />
+        </CustomScrollArea>
+      </div>
     )
   }
 
@@ -278,3 +278,5 @@ export {
   CommandShortcut,
   CommandSeparator
 }
+
+export { CommandPaletteFooter } from '@/shared/ui/command-palette-footer'

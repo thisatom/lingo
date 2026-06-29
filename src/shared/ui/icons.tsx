@@ -13,7 +13,9 @@ function icon(name: string) {
   return Icon
 }
 
-export const Add = icon('add')
+export const Archive = icon('archive')
+export const GitBranch = icon('git-branch')
+export const CircleFilled = icon('circle-filled')
 export const ArrowDown = icon('arrow-down')
 export const ArrowLeft = icon('arrow-left')
 export const ArrowRight = icon('arrow-right')

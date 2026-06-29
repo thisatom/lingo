@@ -1,8 +1,10 @@
+import { Pin } from '@/shared/ui/icons'
 import {
   sidebarChatDotClass,
   sidebarChatDotErrorClass,
   sidebarChatDotSizeClass,
   sidebarChatUnreadDotClass,
+  sidebarChatPinIconClass,
   sidebarRowActionSizeClass
 } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
 import { cn } from '@/shared/lib/utils'
@@ -15,7 +17,7 @@ interface ChatSidebarIndicatorProps {
   agentActive: boolean
 }
 
-/** Status dot or agent animation — pin control lives in {@link ChatListItem} (no nested buttons). */
+/** Status dot, pin icon, or agent animation — pin control lives in {@link ChatListItem}. */
 export function ChatSidebarIndicator({
   pinned,
   hasError,
@@ -26,20 +28,18 @@ export function ChatSidebarIndicator({
 
   return (
     <span
-      className={cn(
-        'flex shrink-0 items-center justify-center',
-        sidebarRowActionSizeClass
-      )}
+      className={cn('flex shrink-0 items-center justify-center', sidebarRowActionSizeClass)}
     >
       {agentActive ? (
         <span className="flex items-center justify-center transition-opacity group-hover/chat:opacity-0">
           <AgentClusterDots />
         </span>
+      ) : pinned ? (
+        <Pin className={sidebarChatPinIconClass} aria-hidden />
       ) : (
         <span
           className={cn(
-            'rounded-full transition-opacity',
-            !pinned && !showUnreadDot && !hasError && 'group-hover/chat:opacity-0',
+            'rounded-full transition-opacity group-hover/chat:opacity-0',
             sidebarChatDotSizeClass,
             hasError
               ? sidebarChatDotErrorClass

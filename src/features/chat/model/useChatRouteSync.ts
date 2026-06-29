@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { lingoToast } from '@/shared/ui/lingo-toast'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { chatRoutePath } from '@/features/chat/lib/chat-route'
 import { parseChatIdFromInput } from '@/features/chat/lib/parse-chat-id'
 
-/** Applies `/#/c/:chatId` to `activeChatId` (one-way: URL → store). */
+/** Keeps `/#/c/:chatId` and `activeChatId` in sync (both directions). */
 export function useChatRouteSync(): void {
   const navigate = useNavigate()
+  const location = useLocation()
   const { chatId: routeChatIdRaw } = useParams<{ chatId?: string }>()
   const activeChatId = useChatsStore((s) => s.activeChatId)
   const chats = useChatsStore((s) => s.chats)
@@ -15,6 +16,7 @@ export function useChatRouteSync(): void {
   const reconcileActiveChat = useChatsStore((s) => s.reconcileActiveChat)
   const [hydrated, setHydrated] = useState(() => useChatsStore.persist.hasHydrated())
   const warnedMissingRef = useRef<string | null>(null)
+  const syncingFromRouteRef = useRef(false)
 
   useEffect(() => {
     if (hydrated) return
@@ -32,13 +34,16 @@ export function useChatRouteSync(): void {
     const exists = chats.some((chat) => chat.id === routeChatId)
     if (exists) {
       warnedMissingRef.current = null
-      if (activeChatId !== routeChatId) selectChat(routeChatId)
+      if (activeChatId !== routeChatId) {
+        syncingFromRouteRef.current = true
+        selectChat(routeChatId)
+      }
       return
     }
 
     if (warnedMissingRef.current !== routeChatId) {
       warnedMissingRef.current = routeChatId
-      toast.error('Chat not found', {
+      lingoToast.error('Chat not found', {
         description: 'This chat is not in your history on this device.'
       })
     }
@@ -51,4 +56,18 @@ export function useChatRouteSync(): void {
 
     navigate('/', { replace: true })
   }, [hydrated, routeChatId, chats, activeChatId, selectChat, navigate, reconcileActiveChat])
+
+  useEffect(() => {
+    if (!hydrated || !activeChatId) return
+    if (syncingFromRouteRef.current) {
+      syncingFromRouteRef.current = false
+      return
+    }
+    if (routeChatId === activeChatId) return
+
+    const target = chatRoutePath(activeChatId)
+    if (location.pathname !== target) {
+      navigate(target)
+    }
+  }, [hydrated, activeChatId, routeChatId, location.pathname, navigate])
 }

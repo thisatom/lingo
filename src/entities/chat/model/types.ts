@@ -11,4 +11,6 @@ export interface Chat {
   hasError?: boolean
   /** Assistant reply finished while this chat was in the background (sidebar blue dot). */
   hasUnreadReply?: boolean
+  /** Hidden from the main sidebar list — shown in Archive view. */
+  archived?: boolean
 }

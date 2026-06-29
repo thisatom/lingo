@@ -1,39 +1,49 @@
-import { toast } from 'sonner'
+import { formatReleasePreview, formatUpdateTitle } from '@/features/app-update/lib/app-update-format'
+import { lingoToast } from '@/shared/ui/lingo-toast'
 import type { AppUpdateInfo } from '@/shared/types/ipc'
 
 export const APP_UPDATE_TOAST_ID = 'lingo-app-update'
 
-const APP_UPDATE_TOAST_DURATION_MS = 10_000
+const APP_UPDATE_TOAST_DURATION_MS = 12_000
 
 export function showAppUpdateAvailableToast(
-  _update: AppUpdateInfo,
+  update: AppUpdateInfo,
   onInstall: () => void
 ): void {
-  toast.info('There is an available update.', {
+  const title = formatUpdateTitle(update)
+  const preview = formatReleasePreview(update.body, 120)
+
+  lingoToast.info('Update available', {
     id: APP_UPDATE_TOAST_ID,
     duration: APP_UPDATE_TOAST_DURATION_MS,
-    closeButton: true,
+    description: `${title} is ready. ${preview}`,
     action: {
-      label: 'Download Update',
+      label: 'Install now',
       onClick: onInstall
     },
     cancel: {
       label: 'Later',
-      onClick: () => toast.dismiss(APP_UPDATE_TOAST_ID)
+      onClick: () => lingoToast.dismiss(APP_UPDATE_TOAST_ID)
     }
   })
 }
 
 export function showAppUpdateStartedToast(update: AppUpdateInfo): void {
-  const label = update.name?.trim() || `Lingo v${update.version}`
-
-  toast('Installing update', {
+  lingoToast.loading('Installing update', {
     id: APP_UPDATE_TOAST_ID,
-    description: `${label} — download in progress.`,
-    duration: 12_000
+    description: `${formatUpdateTitle(update)} — preparing download.`,
+    duration: 20_000
+  })
+}
+
+export function showAppUpdateFailedToast(message: string): void {
+  lingoToast.error('Update failed', {
+    id: APP_UPDATE_TOAST_ID,
+    description: message,
+    duration: 14_000
   })
 }
 
 export function dismissAppUpdateToast(): void {
-  toast.dismiss(APP_UPDATE_TOAST_ID)
+  lingoToast.dismiss(APP_UPDATE_TOAST_ID)
 }

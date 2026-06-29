@@ -17,11 +17,17 @@ describe('content-security-policy', () => {
     expect(csp).toContain('speech.googleapis.com')
   })
 
-  it('electron dev allows vite HMR and react preamble', () => {
-    const csp = buildContentSecurityPolicy('electron-main', 'development')
-    expect(csp).toContain('unsafe-eval')
+  it('electron dev uses strict script-src when vite HMR is disabled', () => {
+    const csp = buildContentSecurityPolicy('electron-main', 'development', { viteHmr: false })
+    expect(csp).not.toContain('unsafe-eval')
     expect(csp).toContain('unsafe-inline')
     expect(csp).toContain('ws://localhost:*')
+  })
+
+  it('electron dev allows unsafe-eval when vite HMR is enabled', () => {
+    const csp = buildContentSecurityPolicy('electron-main', 'development', { viteHmr: true })
+    expect(csp).toContain('unsafe-eval')
+    expect(csp).toContain('unsafe-inline')
   })
 
   it('electron prod blocks unsafe script sources', () => {

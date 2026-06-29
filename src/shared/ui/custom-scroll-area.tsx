@@ -8,6 +8,11 @@ import {
   type ReactNode
 } from 'react'
 import { cn } from '@/shared/lib/utils'
+import {
+  SIDEBAR_SCROLL_FADE_HEIGHT_PX,
+  sidebarScrollFadeBottomClass,
+  sidebarScrollFadeTopClass
+} from '@/shared/lib/sidebar-scroll-chrome'
 
 const THUMB_MIN_HEIGHT_PX = 32
 const HIDE_DELAY_MS = 500
@@ -18,8 +23,9 @@ import { createDeferredResizeObserver } from '@/shared/lib/observe-element-resiz
 const AT_BOTTOM_THRESHOLD_PX = CHAT_SCROLL_BOTTOM_THRESHOLD_PX
 const EDGE_FADE_THRESHOLD_PX = 6
 const EDGE_FADE_HEIGHT_PX = 28
+const SIDEBAR_SCROLLBAR_LANE_PX = 10
 
-type ScrollVariant = 'chat' | 'sidebar' | 'menu' | 'thinking' | 'settings'
+type ScrollVariant = 'chat' | 'sidebar' | 'menu' | 'thinking' | 'settings' | 'palette'
 
 const VARIANT_CONFIG: Record<
   ScrollVariant,
@@ -29,24 +35,32 @@ const VARIANT_CONFIG: Record<
     thumbHoverOpacity: number
     scrollbarWidth: number
     scrollbarRight: number
+    viewportPaddingRight?: number
     edgeFades: boolean
+    edgeFadeHeightPx?: number
+    /** When false, scrollbar shows only on scroll or right-edge hover. */
+    revealOnContainerHover?: boolean
+    /** When true, keep the thumb visible whenever the list can scroll. */
+    alwaysShowScrollbar?: boolean
   }
 > = {
   chat: {
     zIndex: 40,
     thumbIdleOpacity: 1,
     thumbHoverOpacity: 1,
-    scrollbarWidth: 8,
-    scrollbarRight: 3,
+    scrollbarWidth: 5,
+    scrollbarRight: 2,
     edgeFades: false
   },
   sidebar: {
-    zIndex: 30,
-    thumbIdleOpacity: 0.38,
+    zIndex: 40,
+    thumbIdleOpacity: 0.72,
     thumbHoverOpacity: 0.82,
-    scrollbarWidth: 8,
-    scrollbarRight: 3,
-    edgeFades: true
+    scrollbarWidth: 5,
+    scrollbarRight: 2,
+    edgeFades: true,
+    edgeFadeHeightPx: SIDEBAR_SCROLL_FADE_HEIGHT_PX,
+    revealOnContainerHover: false
   },
   menu: {
     zIndex: 50,
@@ -65,14 +79,24 @@ const VARIANT_CONFIG: Record<
     scrollbarRight: 2,
     edgeFades: false
   },
-  /** Settings nav + settings page scroll — no edge fades, idle scrollbar hide. */
+  /** Settings nav + settings page scroll — same scrollbar behavior as agent chat. */
   settings: {
-    zIndex: 30,
-    thumbIdleOpacity: 0.38,
-    thumbHoverOpacity: 0.82,
+    zIndex: 40,
+    thumbIdleOpacity: 1,
+    thumbHoverOpacity: 1,
     scrollbarWidth: 5,
     scrollbarRight: 2,
     edgeFades: false
+  },
+  /** Command palette list — custom thumb, no chat bottom fade. */
+  palette: {
+    zIndex: 50,
+    thumbIdleOpacity: 0.72,
+    thumbHoverOpacity: 0.82,
+    scrollbarWidth: 5,
+    scrollbarRight: 4,
+    edgeFades: false,
+    alwaysShowScrollbar: true
   }
 }
 
@@ -149,7 +173,7 @@ export function CustomScrollArea({
     thumbTop: 0,
     canScroll: false
   })
-  const [scrollbarVisible, setScrollbarVisible] = useState(false)
+  const [scrollbarVisible, setScrollbarVisible] = useState(config.alwaysShowScrollbar === true)
   const [thumbHovered, setThumbHovered] = useState(false)
   const [edgeFade, setEdgeFade] = useState({ top: false, bottom: false })
 
@@ -157,13 +181,18 @@ export function CustomScrollArea({
   const isThinking = variant === 'thinking'
   const isNestedPanel = isMenu || isThinking
   const isChat = variant === 'chat'
+  const isSidebar = variant === 'sidebar'
+  const isPalette = variant === 'palette'
+  const revealOnContainerHover = config.revealOnContainerHover !== false
+  const alwaysShowScrollbar = config.alwaysShowScrollbar === true
+  const edgeFadeHeightPx = config.edgeFadeHeightPx ?? EDGE_FADE_HEIGHT_PX
 
   const thumbOpacity =
-    !metrics.canScroll || (!scrollbarVisible && !thumbHovered)
+    !metrics.canScroll || (!scrollbarVisible && !thumbHovered && !alwaysShowScrollbar)
       ? 0
       : thumbHovered
         ? config.thumbHoverOpacity
-        : isNestedPanel && !scrollbarVisible
+        : isNestedPanel && !scrollbarVisible && !alwaysShowScrollbar
           ? 0.35
           : config.thumbIdleOpacity
 
@@ -197,7 +226,7 @@ export function CustomScrollArea({
         ? prev
         : next
     )
-    if (isNestedPanel && next.canScroll) {
+    if ((isNestedPanel || alwaysShowScrollbar) && next.canScroll) {
       setScrollbarVisible(true)
     }
     syncEdgeFade()
@@ -270,6 +299,12 @@ export function CustomScrollArea({
       onShowScrollToLatestChange(true)
     }
   }, [clearScrollIdleTimer, isChat, onShowScrollToLatestChange, readAtBottom])
+
+  useLayoutEffect(() => {
+    if (!isPalette) return
+    const frame = requestAnimationFrame(() => syncMetrics())
+    return () => cancelAnimationFrame(frame)
+  }, [isPalette, children, syncMetrics])
 
   useLayoutEffect(() => {
     if (!isChat || scrollSessionKey == null) return
@@ -400,7 +435,11 @@ export function CustomScrollArea({
         startY: event.clientY,
         startScrollTop: viewport.scrollTop
       }
-      event.currentTarget.setPointerCapture(event.pointerId)
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        // Thumb may be removed mid-gesture; ignore InvalidStateError.
+      }
     },
     [metrics.canScroll, revealScrollbar]
   )
@@ -428,8 +467,12 @@ export function CustomScrollArea({
   const onThumbPointerUp = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       dragRef.current = null
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId)
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+      } catch {
+        // ignore
       }
       scheduleHideScrollbar()
     },
@@ -464,33 +507,36 @@ export function CustomScrollArea({
       ref={rootRef}
       className={cn(
         'relative min-h-0',
-        isNestedPanel ? cn('overflow-hidden', className) : cn('h-full min-h-0', className)
+        isNestedPanel || isPalette
+          ? cn('overflow-hidden', className)
+          : cn('h-full min-h-0', className)
       )}
-      onMouseEnter={revealScrollbar}
-      onMouseLeave={isNestedPanel ? undefined : scheduleHideScrollbar}
+      onMouseEnter={revealOnContainerHover ? revealScrollbar : undefined}
+      onMouseLeave={revealOnContainerHover ? scheduleHideScrollbar : undefined}
     >
       <div
         ref={viewportRef}
+        data-scroll-viewport=""
         className={cn(
           'min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          isNestedPanel ? cn(className) : 'h-full min-h-0'
+          isNestedPanel || isPalette ? 'h-full min-h-0' : 'h-full min-h-0'
         )}
+        style={
+          config.viewportPaddingRight
+            ? { paddingRight: config.viewportPaddingRight }
+            : undefined
+        }
         onScroll={handleViewportScroll}
       >
         {children}
       </div>
 
-      {metrics.canScroll ? (
+      {metrics.canScroll && (scrollbarVisible || alwaysShowScrollbar) ? (
         <div
           role="scrollbar"
           aria-orientation="vertical"
           aria-hidden={!scrollbarVisible}
-          className={cn(
-            'absolute top-0 bottom-0 transition-opacity duration-200',
-            scrollbarVisible
-              ? 'pointer-events-auto opacity-100'
-              : 'pointer-events-none opacity-0'
-          )}
+          className="pointer-events-auto absolute top-0 bottom-0 opacity-100"
           style={{ ...trackStyle, zIndex: config.zIndex }}
           onPointerDown={onTrackPointerDown}
         >
@@ -508,18 +554,46 @@ export function CustomScrollArea({
         </div>
       ) : null}
 
-      {config.edgeFades && edgeFade.top ? (
+      {isSidebar && metrics.canScroll ? (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 z-[1] bg-gradient-to-b from-sidebar via-sidebar/70 to-transparent"
-          style={{ height: EDGE_FADE_HEIGHT_PX }}
+          className="absolute top-0 bottom-0 z-[39]"
+          style={{ right: 0, width: SIDEBAR_SCROLLBAR_LANE_PX }}
+          onMouseEnter={revealScrollbar}
+          onMouseLeave={scheduleHideScrollbar}
         />
       ) : null}
-      {config.edgeFades && edgeFade.bottom ? (
+
+      {isSidebar && config.edgeFades ? (
+        <>
+          <div
+            aria-hidden
+            className={cn(sidebarScrollFadeTopClass, edgeFade.top ? 'opacity-100' : 'opacity-0')}
+            style={{ height: edgeFadeHeightPx }}
+          />
+          <div
+            aria-hidden
+            className={cn(
+              sidebarScrollFadeBottomClass,
+              edgeFade.bottom ? 'opacity-100' : 'opacity-0'
+            )}
+            style={{ height: edgeFadeHeightPx }}
+          />
+        </>
+      ) : null}
+
+      {config.edgeFades && !isSidebar && edgeFade.top ? (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-sidebar via-sidebar/70 to-transparent"
-          style={{ height: EDGE_FADE_HEIGHT_PX }}
+          className="pointer-events-none absolute inset-x-0 top-0 z-[1] bg-gradient-to-b from-sidebar via-sidebar/60 to-transparent"
+          style={{ height: edgeFadeHeightPx }}
+        />
+      ) : null}
+      {config.edgeFades && !isSidebar && edgeFade.bottom ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-sidebar via-sidebar/60 to-transparent"
+          style={{ height: edgeFadeHeightPx }}
         />
       ) : null}
 

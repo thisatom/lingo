@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
+import {
+  formatDownloadSize,
+  formatReleasePreview,
+  formatUpdateTitle
+} from '@/features/app-update/lib/app-update-format'
 import { isElectronApp } from '@/shared/lib/lingo'
 import {
   checkAppUpdate,
   getAppVersion,
   installAppUpdate,
   isUpdaterAvailable,
+  openAppReleasesPage,
   subscribeToAppUpdateProgress
 } from '@/shared/lib/updater'
 import {
@@ -17,27 +23,48 @@ import {
 } from '@/shared/lib/settings-surface'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
-import type { AppUpdateProgress } from '@/shared/types/ipc'
+import { AppUpdateProgressSteps } from '@/features/app-update/ui/AppUpdateProgressSteps'
+import type { AppUpdateInfo, AppUpdateProgress } from '@/shared/types/ipc'
 
 type UpdateStatus = 'loading' | 'current' | 'available' | 'updating' | 'error'
 
-function statusLabel(status: UpdateStatus, version: string | null, progress: AppUpdateProgress | null): string {
+function statusPillClass(status: UpdateStatus): string {
+  switch (status) {
+    case 'current':
+      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    case 'available':
+    case 'updating':
+      return 'bg-primary/10 text-primary'
+    case 'error':
+      return 'bg-destructive/10 text-destructive'
+    default:
+      return 'bg-muted text-muted-foreground'
+  }
+}
+
+function statusLabel(
+  status: UpdateStatus,
+  update: AppUpdateInfo | null,
+  currentVersion: string | null,
+  progress: AppUpdateProgress | null
+): string {
   switch (status) {
     case 'loading':
       return 'Checking for updates…'
     case 'current':
-      return version ? `Version ${version} · Up to date` : 'Up to date'
+      return currentVersion ? `Up to date · v${currentVersion}` : 'Up to date'
     case 'available':
-      return version ? `Version ${version} · Update ready` : 'Update ready'
+      return update ? `v${update.version} available` : 'Update available'
     case 'updating':
-      if (progress?.phase === 'downloading' && progress.percent != null) {
+      if (progress?.phase === 'downloading' && progress.percent != null && progress.percent > 0) {
         return `Downloading… ${progress.percent}%`
       }
-      if (progress?.phase === 'installing') return 'Installing update…'
+      if (progress?.phase === 'installing') return 'Installing…'
       if (progress?.phase === 'restarting') return 'Restarting…'
+      if (progress?.phase === 'checking') return 'Preparing…'
       return 'Installing update…'
     case 'error':
-      return 'Could not check for updates'
+      return 'Update failed'
     default:
       return ''
   }
@@ -46,7 +73,7 @@ function statusLabel(status: UpdateStatus, version: string | null, progress: App
 export function AppUpdateSettingsSection() {
   const desktop = isElectronApp() && isUpdaterAvailable()
   const [currentVersion, setCurrentVersion] = useState<string | null>(null)
-  const [remoteVersion, setRemoteVersion] = useState<string | null>(null)
+  const [pendingUpdate, setPendingUpdate] = useState<AppUpdateInfo | null>(null)
   const [status, setStatus] = useState<UpdateStatus>('loading')
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<AppUpdateProgress | null>(null)
@@ -55,7 +82,7 @@ export function AppUpdateSettingsSection() {
     if (!desktop) return
     setStatus('loading')
     setError(null)
-    setRemoteVersion(null)
+    setPendingUpdate(null)
     try {
       const result = await checkAppUpdate()
       if (!result) return
@@ -66,7 +93,7 @@ export function AppUpdateSettingsSection() {
         return
       }
       if (result.update) {
-        setRemoteVersion(result.update.version)
+        setPendingUpdate(result.update)
         setStatus('available')
       } else {
         setStatus('current')
@@ -74,6 +101,17 @@ export function AppUpdateSettingsSection() {
     } catch (err) {
       setStatus('error')
       setError(err instanceof Error ? err.message : 'Update check failed')
+    }
+  }, [desktop])
+
+  const runInstall = useCallback(async () => {
+    if (!desktop) return
+    setStatus('updating')
+    setError(null)
+    const result = await installAppUpdate()
+    if (result && !result.ok) {
+      setStatus('error')
+      setError(result.error ?? 'Update failed')
     }
   }, [desktop])
 
@@ -86,7 +124,13 @@ export function AppUpdateSettingsSection() {
   useEffect(() => {
     if (!desktop) return
     return subscribeToAppUpdateProgress((next) => {
-      setProgress(next.phase === 'idle' ? null : next)
+      if (next.phase === 'idle') {
+        setProgress(null)
+        return
+      }
+
+      setProgress(next)
+
       if (
         next.phase === 'checking' ||
         next.phase === 'downloading' ||
@@ -94,24 +138,21 @@ export function AppUpdateSettingsSection() {
         next.phase === 'restarting'
       ) {
         setStatus('updating')
+        setError(null)
       }
+
       if (next.phase === 'failed') {
         setStatus('error')
         setError(next.message ?? 'Update failed')
+        setProgress(null)
       }
     })
   }, [desktop])
 
   if (!desktop) return null
 
-  const pillClass =
-    status === 'current'
-      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-      : status === 'available' || status === 'updating'
-        ? 'bg-primary/10 text-primary'
-        : status === 'error'
-          ? 'bg-destructive/10 text-destructive'
-          : 'bg-muted text-muted-foreground'
+  const isUpdating = status === 'updating'
+  const canInstall = status === 'available' || (status === 'error' && pendingUpdate != null)
 
   return (
     <>
@@ -121,37 +162,57 @@ export function AppUpdateSettingsSection() {
           <div className={settingsRowTextWrapClass}>
             <p className={settingsRowTitleClass}>Lingo desktop</p>
             <p className={settingsRowDescriptionClass}>
-              Check for updates manually; install when you are ready.
+              Updates download from GitHub Releases and install when you confirm.
             </p>
+
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span
                 className={cn(
                   'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                  pillClass
+                  statusPillClass(status)
                 )}
               >
-                {statusLabel(status, remoteVersion ?? currentVersion, progress)}
+                {statusLabel(status, pendingUpdate, currentVersion, progress)}
               </span>
-              {currentVersion && status !== 'updating' ? (
+              {currentVersion && !isUpdating ? (
+                <span className="text-[11px] text-muted-foreground">Installed v{currentVersion}</span>
+              ) : null}
+              {pendingUpdate && status === 'available' ? (
                 <span className="text-[11px] text-muted-foreground">
-                  Installed v{currentVersion}
+                  {formatDownloadSize(pendingUpdate.downloadSize) ?? 'Installer ready'}
                 </span>
               ) : null}
             </div>
-            {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
+
+            {isUpdating && progress ? (
+              <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-3">
+                <AppUpdateProgressSteps phase={progress.phase} />
+              </div>
+            ) : null}
+
+            {pendingUpdate && status === 'available' ? (
+              <div className="mt-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+                <p className="text-xs font-medium text-foreground">
+                  {formatUpdateTitle(pendingUpdate)}
+                </p>
+                <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-muted-foreground">
+                  {formatReleasePreview(pendingUpdate.body)}
+                </p>
+              </div>
+            ) : null}
+
+            {error ? <p className="mt-2 text-xs leading-snug text-destructive">{error}</p> : null}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {status === 'available' || (status === 'error' && remoteVersion) ? (
+
+          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+            {canInstall ? (
               <Button
                 type="button"
                 variant="default"
                 size="xs"
                 className="h-6 shrink-0 px-2 text-[11px]"
-                onClick={() => {
-                  setStatus('updating')
-                  setError(null)
-                  void installAppUpdate()
-                }}
+                disabled={isUpdating}
+                onClick={() => void runInstall()}
               >
                 Install update
               </Button>
@@ -161,10 +222,20 @@ export function AppUpdateSettingsSection() {
               variant="outline"
               size="xs"
               className="h-6 shrink-0 px-2 text-[11px]"
-              disabled={status === 'loading' || status === 'updating'}
+              disabled={status === 'loading' || isUpdating}
               onClick={() => void runCheck()}
             >
               Check now
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="h-6 shrink-0 px-2 text-[11px] text-muted-foreground"
+              disabled={isUpdating}
+              onClick={() => void openAppReleasesPage()}
+            >
+              Releases
             </Button>
           </div>
         </div>

@@ -201,21 +201,24 @@ export async function downloadAndInstallUpdate(): Promise<{ ok: boolean; error?:
     if (!cachedCheck?.update) {
       const check = await checkForAppUpdate()
       if (!check.update) {
-        emitAppUpdateProgress({ phase: 'idle' })
-        return { ok: false, error: check.error ?? 'No update available' }
+        const message = check.error ?? 'No update available'
+        emitAppUpdateProgress({ phase: 'failed', message })
+        return { ok: false, error: message }
       }
     }
 
     const update = cachedCheck?.update
     if (!update) {
-      emitAppUpdateProgress({ phase: 'idle' })
-      return { ok: false, error: 'No update available' }
+      const message = 'No update available'
+      emitAppUpdateProgress({ phase: 'failed', message })
+      return { ok: false, error: message }
     }
 
     if (!app.isPackaged) {
       await shell.openExternal(update.htmlUrl || RELEASES_PAGE)
-      emitAppUpdateProgress({ phase: 'idle' })
-      return { ok: false, error: 'Install updates from a packaged build of Lingo.' }
+      const message = 'Install updates from a packaged build of Lingo.'
+      emitAppUpdateProgress({ phase: 'failed', message })
+      return { ok: false, error: message }
     }
 
     if (!update.downloadUrl) {
@@ -242,6 +245,11 @@ export async function downloadAndInstallUpdate(): Promise<{ ok: boolean; error?:
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Download failed'
       emitAppUpdateProgress({ phase: 'failed', message })
+      try {
+        if (existsSync(installerPath)) unlinkSync(installerPath)
+      } catch {
+        // ignore cleanup errors
+      }
       return { ok: false, error: message }
     }
 

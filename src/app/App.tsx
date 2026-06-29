@@ -11,7 +11,7 @@ export function App() {
     <div className="app-shell">
       <AppShutdownSaver />
       <AppUpdateGate />
-      <Toaster position="bottom-right" closeButton />
+      <Toaster position="bottom-right" />
       <HashRouter>
         <Routes>
           <Route element={<AppLayout />}>

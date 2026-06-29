@@ -17,13 +17,13 @@ import {
 } from '@/entities/conversation/model/store'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { CONVERSATION_DENSITY_GAP_CLASS } from '@/shared/lib/appearance'
-import { CHAT_COLUMN_MAX_WIDTH_CLASS, PAGE_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
+import { CHAT_COLUMN_MAX_WIDTH_CLASS, CHAT_HORIZONTAL_PADDING_CLASS } from '@/shared/lib/layout'
 import {
   CHAT_SCROLL_AGENT_BUSY_THRESHOLD_PX,
   CHAT_SCROLL_BOTTOM_THRESHOLD_PX
 } from '@/shared/lib/chat-scroll-threshold'
 import { wheelScrollsChatNestedTarget } from '@/shared/lib/chat-nested-scroll'
-import { CHAT_BOTTOM_INSET } from '@/widgets/conversation-panel/lib/chat-layout'
+import { CHAT_BOTTOM_INSET, CHAT_CONTENT_TOP_PADDING_CLASS, CHAT_SCROLL_BOTTOM_EXTRA_PX } from '@/widgets/conversation-panel/lib/chat-layout'
 import { shouldDismissUserMessageEdit } from '@/widgets/conversation-panel/lib/user-message-edit-dismiss'
 import {
   applyScrollTop,
@@ -1015,12 +1015,12 @@ export function ConversationPanel({
         onViewportScroll={handleViewportScroll}
       >
         <div
-          className={cn('mx-auto pt-[18px]', PAGE_HORIZONTAL_PADDING_CLASS, CHAT_COLUMN_MAX_WIDTH_CLASS)}
+          className={cn('mx-auto', CHAT_CONTENT_TOP_PADDING_CLASS, CHAT_HORIZONTAL_PADDING_CLASS, CHAT_COLUMN_MAX_WIDTH_CLASS)}
         >
           <div
             data-chat-scroll-content
             className={cn('relative select-none', turns.length > 0 && conversationGapClass)}
-            style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + 18px)` }}
+            style={{ paddingBottom: `calc(${CHAT_BOTTOM_INSET} + ${CHAT_SCROLL_BOTTOM_EXTRA_PX}px)` }}
           >
             <LoadEarlierTurnsButton
               remaining={virtualizedActive ? 0 : earlierTurnsRemaining}
