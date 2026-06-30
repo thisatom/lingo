@@ -230,7 +230,7 @@ export function CustomScrollArea({
       setScrollbarVisible(true)
     }
     syncEdgeFade()
-  }, [isNestedPanel, syncEdgeFade])
+  }, [isNestedPanel, alwaysShowScrollbar, syncEdgeFade])
 
   const scheduleSyncMetrics = useCallback(() => {
     if (metricsRafRef.current != null) return
@@ -301,10 +301,10 @@ export function CustomScrollArea({
   }, [clearScrollIdleTimer, isChat, onShowScrollToLatestChange, readAtBottom])
 
   useLayoutEffect(() => {
-    if (!isPalette) return
+    if (!isNestedPanel && !isPalette) return
     const frame = requestAnimationFrame(() => syncMetrics())
     return () => cancelAnimationFrame(frame)
-  }, [isPalette, children, syncMetrics])
+  }, [isNestedPanel, isPalette, children, syncMetrics])
 
   useLayoutEffect(() => {
     if (!isChat || scrollSessionKey == null) return
@@ -531,12 +531,17 @@ export function CustomScrollArea({
         {children}
       </div>
 
-      {metrics.canScroll && (scrollbarVisible || alwaysShowScrollbar) ? (
+      {metrics.canScroll ? (
         <div
           role="scrollbar"
           aria-orientation="vertical"
-          aria-hidden={!scrollbarVisible}
-          className="pointer-events-auto absolute top-0 bottom-0 opacity-100"
+          aria-hidden={!scrollbarVisible && !alwaysShowScrollbar}
+          className={cn(
+            'absolute top-0 bottom-0 transition-opacity duration-200',
+            scrollbarVisible || alwaysShowScrollbar
+              ? 'pointer-events-auto opacity-100'
+              : 'pointer-events-none opacity-0'
+          )}
           style={{ ...trackStyle, zIndex: config.zIndex }}
           onPointerDown={onTrackPointerDown}
         >
