@@ -23,6 +23,8 @@ import { ComposerAgentMenuSelect } from '@/widgets/chat-composer/ui/ComposerAgen
 import { ComposerAttachmentsPanel } from '@/widgets/chat-composer/ui/ComposerAttachmentsPanel'
 import { ChatMessageQueue } from '@/widgets/chat-composer/ui/ChatMessageQueue'
 import { ComposerTextareaContextMenu } from '@/features/chat-composer/ui/ComposerTextareaContextMenu'
+import { shortcutTooltipFor } from '@/features/keyboard-shortcuts/ui/ShortcutKeys'
+import { matchesShortcut } from '@/shared/lib/keyboard-shortcuts/match'
 import { mergeOpenRouterModelIds } from '@/shared/lib/openrouter-models'
 import { isElectronApp } from '@/shared/lib/lingo'
 import { createDeferredResizeObserver } from '@/shared/lib/observe-element-resize'
@@ -186,8 +188,12 @@ export function ChatComposer({
   )
   const speechListening = Boolean(isListening && onVoiceStop)
   const showAgentStop = Boolean(showStop && !speechListening)
-  const sendTooltip = agentBusy && canSend ? 'Send follow-up (queued)' : 'Send'
+  const sendTooltip =
+    agentBusy && canSend
+      ? shortcutTooltipFor('sendMessage', 'Send follow-up (queued)')
+      : shortcutTooltipFor('sendMessage', 'Send')
   const micLabel = voiceMicLabel(chatComposerMode, liveConversationActive, Boolean(isListening))
+  const micTooltip = shortcutTooltipFor('voiceInput', micLabel)
 
   useComposerPaste({
     textareaRef,
@@ -309,7 +315,7 @@ export function ChatComposer({
               onDrop={onComposerTextareaDrop}
               onKeyDown={(e) => {
                 if (disabled) return
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (matchesShortcut(e.nativeEvent, 'sendMessage')) {
                   e.preventDefault()
                   if (canSend) onSend()
                 }
@@ -411,8 +417,8 @@ export function ChatComposer({
                   size="iconSm"
                   className="shrink-0 rounded-full animate-pulse"
                   disabled={disabled}
-                  tooltip="Stop recording"
-                  aria-label="Stop recording"
+                  tooltip={micTooltip}
+                  aria-label={micLabel}
                   onClick={onVoiceStop}
                 >
                   <Square className="size-3.5 fill-current" strokeWidth={0} />
@@ -426,6 +432,7 @@ export function ChatComposer({
                   disabled={voiceDisabled}
                   label={micLabel}
                   highlight={liveConversationActive && chatComposerMode === 'conversation'}
+                  tooltip={micTooltip}
                   onPress={onVoicePress}
                   onRelease={onVoiceStop ?? onVoiceRelease ?? (() => undefined)}
                   className={cn(
@@ -443,7 +450,7 @@ export function ChatComposer({
               <TooltipIconButton
                 size="iconSm"
                 className="shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/80"
-                tooltip="Stop"
+                tooltip={shortcutTooltipFor('stopAgent', 'Stop')}
                 onClick={onStop}
               >
                 <Square className="size-3.5 fill-current" strokeWidth={0} />

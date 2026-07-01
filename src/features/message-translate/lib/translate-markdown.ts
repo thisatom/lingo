@@ -28,7 +28,7 @@ function collectTextNodes(tree: Root): Text[] {
 
 async function translateMarkdownProse(
   prose: string,
-  translateText: (text: string) => Promise<string>
+  translateTexts: (texts: string[]) => Promise<string[]>
 ): Promise<string> {
   const trimmed = prose.trim()
   if (!trimmed) return prose
@@ -37,14 +37,15 @@ async function translateMarkdownProse(
   const textNodes = collectTextNodes(tree)
   if (textNodes.length === 0) return prose
 
-  await Promise.all(
-    textNodes.map(async (node) => {
-      const source = node.value.trim()
-      if (!source) return
-      const translated = await translateText(source)
-      node.value = preserveEdgeWhitespace(node.value, translated)
-    })
-  )
+  const sources = textNodes.map((node) => node.value.trim())
+  const translated = await translateTexts(sources)
+
+  for (let index = 0; index < textNodes.length; index += 1) {
+    const node = textNodes[index]
+    const next = translated[index]
+    if (typeof next !== 'string' || !next.trim()) continue
+    node.value = preserveEdgeWhitespace(node.value, next)
+  }
 
   const rendered = unified()
     .use(remarkGfm)
@@ -77,7 +78,7 @@ function serializeSegment(segment: MarkdownSegment): string {
 /** Translate visible text only; code, math, links structure, and markdown syntax stay intact. */
 export async function translateMarkdownPreservingStructure(
   markdown: string,
-  translateText: (text: string) => Promise<string>
+  translateTexts: (texts: string[]) => Promise<string[]>
 ): Promise<string> {
   const segments = segmentMarkdown(markdown)
   const parts: string[] = []
@@ -87,7 +88,7 @@ export async function translateMarkdownPreservingStructure(
       parts.push(serializeSegment(segment))
       continue
     }
-    parts.push(await translateMarkdownProse(segment.content, translateText))
+    parts.push(await translateMarkdownProse(segment.content, translateTexts))
   }
 
   return parts.join('')

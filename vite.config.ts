@@ -59,7 +59,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
-    open: '/'
+    open: '/',
+    // Strict CSP (no unsafe-eval) — full page reload instead of HMR eval.
+    hmr: false
   },
   preview: {
     port: 4173,

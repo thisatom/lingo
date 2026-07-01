@@ -89,25 +89,18 @@ export const sidebarChatInlineActionClass = cn(
   'hover:!brightness-[0.97] group-data-[active=true]/chat:hover:!brightness-[0.97]'
 )
 
-/** Pin stays visible when pinned; hover fill still matches row. */
+/** Pin stays visible when pinned; default icon matches row actions, light on hover. */
 export const sidebarChatPinActionClass = cn(
   sidebarChatRowActionClass,
   'pointer-events-none opacity-0',
   'group-hover/chat:pointer-events-auto group-hover/chat:opacity-100',
-  'focus-visible:pointer-events-auto focus-visible:opacity-100',
-  'hover:!bg-accent group-data-[active=true]/chat:hover:!bg-sidebar-accent'
+  'focus-visible:pointer-events-auto focus-visible:opacity-100'
 )
 
-/** Pinned chat — white pin, optically centered in the 30px column. */
-export const sidebarChatPinPinnedClass = cn(
-  'pointer-events-auto opacity-100',
-  '!text-white hover:!text-white focus-visible:!text-white',
-  '[text-shadow:0_0_1px_rgba(0,0,0,0.45)] dark:[text-shadow:none]',
-  'group-data-[active=true]/chat:hover:!bg-sidebar-accent/80'
-)
+/** Pinned chat — keep pin visible; same muted default as other row actions. */
+export const sidebarChatPinPinnedClass = 'pointer-events-auto opacity-100'
 
-export const sidebarChatPinIconClass =
-  'size-3.5 shrink-0 text-white [text-shadow:0_0_1px_rgba(0,0,0,0.45)] dark:[text-shadow:none]'
+export const sidebarChatPinIconClass = 'size-3.5 shrink-0 text-current'
 
 /** Delete / archive — same as row actions. */
 export const sidebarChatDeleteButtonClass = sidebarChatInlineActionClass

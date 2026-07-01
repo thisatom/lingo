@@ -299,12 +299,12 @@ export function UserMessage({
           prompt={content}
           chatId={chatId}
           className="block min-w-0 w-full"
-          activateDisabled={disabled && !showStop}
-          onActivate={showStop ? undefined : onEnterEdit}
+          activateDisabled={disabled}
+          onActivate={onEnterEdit}
         >
           <MessageBodyClamp bodyClassName="pr-8">
             {content.trim() ? (
-              <MarkdownContent content={content} variant="user" />
+              <MarkdownContent content={content.trim()} variant="user" />
             ) : voiceCaptureLabel ? (
               <p className={userMessageFilesOnlyClass}>
                 {voiceCaptureLabel === 'transcribing' ? 'Transcribing…' : 'Listening…'}

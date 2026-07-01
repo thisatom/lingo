@@ -1,60 +1,27 @@
-/** Match by physical key (`KeyboardEvent.code`), layout-independent. */
+/** @deprecated Import from `@/shared/lib/keyboard-shortcuts/match` instead. */
+export {
+  hasPrimaryModifier,
+  isArchiveChatShortcut,
+  isChatSearchShortcut,
+  isComposerModeConversationShortcut,
+  isComposerModeTextShortcut,
+  isNewChatShortcut,
+  isNewWindowShortcut,
+  isOpenSettingsShortcut,
+  isSettingsSearchShortcut,
+  isSidebarToggleShortcut,
+  isStopAgentShortcut,
+  isVoiceInputShortcut,
+  matchPhysicalKey,
+  matchesShortcut
+} from '@/shared/lib/keyboard-shortcuts/match'
 
-export function matchPhysicalKey(event: KeyboardEvent, code: string): boolean {
-  return event.code === code
-}
-
-export function hasPrimaryModifier(event: KeyboardEvent): boolean {
-  return event.ctrlKey || event.metaKey
-}
-
-export function isNewChatShortcut(event: KeyboardEvent): boolean {
-  return (
-    matchPhysicalKey(event, 'KeyN') &&
-    hasPrimaryModifier(event) &&
-    !event.altKey &&
-    !event.shiftKey
-  )
-}
-
-export function isNewWindowShortcut(event: KeyboardEvent): boolean {
-  return (
-    matchPhysicalKey(event, 'KeyN') &&
-    hasPrimaryModifier(event) &&
-    event.shiftKey &&
-    !event.altKey
-  )
-}
-
-export function isChatSearchShortcut(event: KeyboardEvent): boolean {
-  return (
-    matchPhysicalKey(event, 'KeyK') &&
-    hasPrimaryModifier(event) &&
-    !event.altKey &&
-    !event.shiftKey
-  )
-}
-
-export function isSidebarToggleShortcut(event: KeyboardEvent): boolean {
-  return matchPhysicalKey(event, 'KeyB') && hasPrimaryModifier(event)
-}
-
-export function isComposerModeTextShortcut(event: KeyboardEvent): boolean {
-  return (
-    event.ctrlKey &&
-    event.shiftKey &&
-    !event.altKey &&
-    !event.metaKey &&
-    matchPhysicalKey(event, 'KeyT')
-  )
-}
-
-export function isComposerModeConversationShortcut(event: KeyboardEvent): boolean {
-  return (
-    event.ctrlKey &&
-    event.shiftKey &&
-    !event.altKey &&
-    !event.metaKey &&
-    matchPhysicalKey(event, 'KeyV')
-  )
-}
+export {
+  bindingFromKeyboardEvent,
+  bindingToDisplayKeys,
+  bindingsEqual,
+  findShortcutConflict,
+  getAllResolvedShortcuts,
+  getResolvedShortcut,
+  resolveShortcutDefinition
+} from '@/shared/lib/keyboard-shortcuts/resolve'

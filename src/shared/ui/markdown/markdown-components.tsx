@@ -113,3 +113,13 @@ export const compactMarkdownComponents: Components = {
     <h4 className="mb-1 mt-2.5 text-sm font-medium text-foreground first:mt-0">{children}</h4>
   )
 }
+
+/** User questions — single-line friendly, no extra paragraph spacing. */
+export const userMarkdownComponents: Components = {
+  ...agentMarkdownComponents,
+  p: ({ children }) => (
+    <p className="text-[13px] leading-5 text-foreground [overflow-wrap:anywhere] [word-break:break-word]">
+      {children}
+    </p>
+  )
+}

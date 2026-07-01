@@ -9,6 +9,10 @@ const SETTINGS_SECTION_META: Record<
     description: 'Profile, display name, and defaults',
     keywords: ['profile', 'name', 'user', 'account', 'language']
   },
+  shortcuts: {
+    description: 'Keyboard shortcuts and hotkeys',
+    keywords: ['keyboard', 'hotkey', 'shortcut', 'ctrl', 'keybinding']
+  },
   appearance: {
     description: 'Theme, density, and visual preferences',
     keywords: ['theme', 'dark', 'light', 'density', 'ui', 'color']

@@ -10,7 +10,8 @@ import {
   parseDroppedFilePaths,
   parseStreamChannel,
   parseTtsSynthesizeRequest,
-  parseTranslateTextRequest
+  parseTranslateTextRequest,
+  parseTranslateTextBatchRequest
 } from '../../src/shared/types/ipc-schemas'
 import { readDroppedFilePaths } from './read-dropped-files'
 import { completeChat, validateOpenRouterKey } from './chat'
@@ -22,7 +23,7 @@ import { resolveAppIconPath } from './icon'
 import { fetchLinkPreview } from './link-preview'
 import { transcribeAudio } from './stt'
 import { synthesizeSpeech } from './tts'
-import { translateText } from './translate'
+import { translateText, translateTextBatch } from './translate'
 import { applyWindowTheme } from './window-theme'
 import {
   checkForAppUpdate,
@@ -151,6 +152,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('lingo:translate:text', (_e, request: unknown) => {
     try {
       return translateText(parseTranslateTextRequest(request))
+    } catch (error) {
+      rejectInvalidPayload(error)
+    }
+  })
+
+  ipcMain.handle('lingo:translate:texts', (_e, request: unknown) => {
+    try {
+      return translateTextBatch(parseTranslateTextBatchRequest(request))
     } catch (error) {
       rejectInvalidPayload(error)
     }

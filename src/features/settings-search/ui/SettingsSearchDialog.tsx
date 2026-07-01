@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   ColorMode,
   Cpu,
+  Keyboard,
   Mic,
   Settings,
   Volume2,
@@ -37,6 +38,7 @@ const navIconClass = 'size-4 shrink-0 !translate-y-0'
 
 const iconBySection: Record<SettingsSectionId, ReactNode> = {
   general: <Settings className={navIconClass} />,
+  shortcuts: <Keyboard className={navIconClass} />,
   appearance: <ColorMode className={navIconClass} />,
   devices: <Mic className={navIconClass} />,
   speech: <Volume2 className={navIconClass} />,

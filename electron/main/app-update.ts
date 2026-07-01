@@ -3,7 +3,6 @@ import {
   createWriteStream,
   existsSync,
   mkdirSync,
-  statSync,
   unlinkSync
 } from 'node:fs'
 import { join } from 'node:path'
@@ -14,7 +13,21 @@ import { pickAssetForPlatform } from './app-update-assets'
 import { installDownloadedUpdate } from './app-update-install'
 import { emitAppUpdateProgress } from './app-update-progress'
 import { flushThenExitForUpdate } from './app-update-quit'
+import {
+  cleanupStagingAfterInstallStarted,
+  clearUpdateState,
+  consumePendingUpdateNotice,
+  ensureUpdateStagingDir,
+  markUpdateDownloadReady,
+  markUpdateInstalling,
+  readUpdateState,
+  recoverIncompleteUpdateOnStartup,
+  verifyDownloadedFile,
+  writeUpdateState
+} from './app-update-staging'
 import type { GitHubRelease } from './app-update-types'
+
+export { consumePendingUpdateNotice, recoverIncompleteUpdateOnStartup }
 
 const GITHUB_OWNER = 'thisatom'
 const GITHUB_REPO = 'lingo'
@@ -175,16 +188,14 @@ async function downloadAsset(
     createWriteStream(destination)
   )
 
-  if (!existsSync(destination)) {
-    throw new Error('Download failed (file missing)')
-  }
+  verifyDownloadedFile(destination, total > 0 ? total : (knownTotal ?? null))
+}
 
-  const size = statSync(destination).size
-  if (size <= 0) {
-    throw new Error('Download failed (empty file)')
-  }
-  if (total > 0 && size < total * 0.95) {
-    throw new Error('Download failed (incomplete file)')
+function removeInstallerAt(path: string): void {
+  try {
+    if (existsSync(path)) unlinkSync(path)
+  } catch {
+    // ignore cleanup errors
   }
 }
 
@@ -227,9 +238,17 @@ export async function downloadAndInstallUpdate(): Promise<{ ok: boolean; error?:
     }
 
     const fileName = update.downloadName ?? `lingo-update-${update.version}`
-    const tempDir = join(app.getPath('temp'), 'lingo-updates')
-    mkdirSync(tempDir, { recursive: true })
-    const installerPath = join(tempDir, fileName)
+    const stagingDir = ensureUpdateStagingDir()
+    const installerPath = join(stagingDir, fileName)
+
+    writeUpdateState({
+      phase: 'downloading',
+      version: update.version,
+      installerPath,
+      fileName,
+      expectedSize: update.downloadSize,
+      updatedAt: new Date().toISOString()
+    })
 
     emitAppUpdateProgress({ phase: 'downloading', version: update.version, percent: 0 })
 
@@ -245,18 +264,36 @@ export async function downloadAndInstallUpdate(): Promise<{ ok: boolean; error?:
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Download failed'
       emitAppUpdateProgress({ phase: 'failed', message })
-      try {
-        if (existsSync(installerPath)) unlinkSync(installerPath)
-      } catch {
-        // ignore cleanup errors
-      }
+      clearUpdateState()
+      removeInstallerAt(installerPath)
       return { ok: false, error: message }
     }
 
+    markUpdateDownloadReady({
+      version: update.version,
+      installerPath,
+      fileName,
+      expectedSize: update.downloadSize
+    })
+
     emitAppUpdateProgress({ phase: 'installing', version: update.version })
 
+    const persisted = readUpdateState()
+    if (persisted) {
+      markUpdateInstalling(persisted)
+    }
+
     try {
-      await installDownloadedUpdate(installerPath, fileName)
+      const installResult = await installDownloadedUpdate(installerPath, fileName)
+      cleanupStagingAfterInstallStarted(installerPath)
+
+      if (installResult.manualHandoff) {
+        await shell.openPath(stagingDir)
+        const message =
+          'Update downloaded to the Lingo updates folder. Install the package from there, then restart Lingo.'
+        emitAppUpdateProgress({ phase: 'failed', message })
+        return { ok: false, error: message }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not install update'
       emitAppUpdateProgress({ phase: 'failed', message })
@@ -281,17 +318,4 @@ export async function backgroundUpdateCheck(
   if (!app.isPackaged) return
   const result = await checkForAppUpdate()
   if (result.update) sendAvailable(result.update)
-}
-
-/** Cleared after first read — kept for IPC compatibility. */
-export function consumePendingUpdateNotice(): null {
-  const filePath = join(app.getPath('userData'), 'pending-update.json')
-  if (existsSync(filePath)) {
-    try {
-      unlinkSync(filePath)
-    } catch {
-      // ignore
-    }
-  }
-  return null
 }

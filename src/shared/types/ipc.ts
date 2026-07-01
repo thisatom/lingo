@@ -131,6 +131,19 @@ export interface TranslateTextResponse {
   detectedLanguage?: string
 }
 
+export interface TranslateTextBatchRequest {
+  texts: string[]
+  /** ISO code or `auto`. */
+  from?: string
+  /** Target ISO code. */
+  to: string
+}
+
+export interface TranslateTextBatchResponse {
+  texts: string[]
+  detectedLanguage?: string
+}
+
 import type { ResolvedTheme } from './app-theme'
 
 export type { ResolvedTheme } from './app-theme'
@@ -235,6 +248,7 @@ export interface LingoApi {
   }
   translate?: {
     text: (request: TranslateTextRequest) => Promise<TranslateTextResponse>
+    texts: (request: TranslateTextBatchRequest) => Promise<TranslateTextBatchResponse>
   }
   link: {
     preview: (url: string) => Promise<LinkPreviewResponse>

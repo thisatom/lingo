@@ -1,9 +1,10 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import { WEB_SEARCH_TOOL_NAME } from '@/shared/lib/lingo-agent/web-search-constants'
 import { performLocalWebSearch, type LocalWebSearchResult } from '@/shared/lib/local-web-search'
 import { formatLocalWebSearchBlock } from '@/shared/lib/web-search-messages'
 
-export const WEB_SEARCH_TOOL_NAME = 'web_search' as const
+export { WEB_SEARCH_TOOL_NAME }
 
 export type WebSearchToolCallbacks = {
   onInitialResults?: (results: LocalWebSearchResult[]) => void

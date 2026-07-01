@@ -10,6 +10,11 @@ describe('stream-config', () => {
     expect(isAiSdkStreamEnabled()).toBe(false)
   })
 
+  it('uses legacy SSE on web renderer (strict CSP)', () => {
+    vi.stubEnv('VITE_LINGO_PLATFORM', 'web')
+    expect(isAiSdkStreamEnabled()).toBe(false)
+  })
+
   it('honors LINGO_AI_SDK_STREAM=1 in tests', () => {
     vi.stubEnv('LINGO_AI_SDK_STREAM', '1')
     expect(isAiSdkStreamEnabled()).toBe(true)

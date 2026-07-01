@@ -17,15 +17,6 @@ import '@/app/styles/markdown-math.css'
 import '@/app/styles/markdown-mermaid.css'
 import '@/app/styles/thinking-markdown.css'
 
-ensureLingoBridge()
-installFileDropNavigationGuard()
-setupLocalWebSearch()
-void import('@/shared/lib/image-ocr-tesseract').then(({ setupTesseractImageOcr }) => {
-  setupTesseractImageOcr()
-})
-initThemeFromStorage()
-registerActiveChatEffects()
-
 /** Last-resort safety net — observers defer via createDeferredResizeObserver; must not crash the renderer. */
 window.addEventListener('error', (event) => {
   if (isBenignResizeObserverError(event.message)) {
@@ -41,14 +32,27 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 })
 
-const root = document.getElementById('root')
-if (!root) throw new Error('Root element not found')
+async function bootstrap() {
+  await ensureLingoBridge()
+  installFileDropNavigationGuard()
+  setupLocalWebSearch()
+  void import('@/shared/lib/image-ocr-tesseract').then(({ setupTesseractImageOcr }) => {
+    setupTesseractImageOcr()
+  })
+  initThemeFromStorage()
+  registerActiveChatEffects()
 
-createRoot(root).render(
-  <StrictMode>
-    <AppErrorBoundary>
-      <HtmlSplashGate />
-      <App />
-    </AppErrorBoundary>
-  </StrictMode>
-)
+  const root = document.getElementById('root')
+  if (!root) throw new Error('Root element not found')
+
+  createRoot(root).render(
+    <StrictMode>
+      <AppErrorBoundary>
+        <HtmlSplashGate />
+        <App />
+      </AppErrorBoundary>
+    </StrictMode>
+  )
+}
+
+void bootstrap()

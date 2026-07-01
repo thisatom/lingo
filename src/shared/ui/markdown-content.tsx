@@ -15,7 +15,8 @@ import { cn } from '@/shared/lib/utils'
 import { KaTeXBlock } from '@/shared/ui/katex-block'
 import {
   agentMarkdownComponents,
-  compactMarkdownComponents
+  compactMarkdownComponents,
+  userMarkdownComponents
 } from '@/shared/ui/markdown/markdown-components'
 import { typographyProseClass } from '@/shared/ui/typography'
 
@@ -25,8 +26,8 @@ const rehypePlugins: PluggableList = [[rehypeHighlight, { plainText: ['plaintext
 
 const proseVariantClass = {
   agent: cn(typographyProseClass, 'markdown-prose'),
-  /** User questions — same typography as agent, without assistant leak stripping. */
-  user: cn(typographyProseClass, 'markdown-prose'),
+  /** User questions — tight single-line layout in message bubbles. */
+  user: cn(typographyProseClass, 'markdown-prose [&>*:first-child]:mt-0 [&>*:last-child]:mb-0'),
   compact: cn(
     'markdown-prose max-w-none text-sm leading-relaxed text-foreground',
     '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0'
@@ -116,7 +117,11 @@ function MarkdownContentInner({
   }, [parsedSource, resolvedVariant, streamingParse])
   const segments = useMemo(() => segmentMarkdown(displaySource), [displaySource])
   const components =
-    resolvedVariant === 'compact' ? compactMarkdownComponents : agentMarkdownComponents
+    resolvedVariant === 'compact'
+      ? compactMarkdownComponents
+      : resolvedVariant === 'user'
+        ? userMarkdownComponents
+        : agentMarkdownComponents
 
   return (
     <div

@@ -41,7 +41,7 @@ export function useReplyTranslation(content: string) {
   const translate = useCallback(async () => {
     if (!content.trim()) return
 
-    if (!isLingoAvailable() || !getLingo().translate) {
+    if (!isLingoAvailable() || !getLingo().translate?.text || !getLingo().translate?.texts) {
       setError('Translation is unavailable.')
       return
     }
@@ -49,13 +49,15 @@ export function useReplyTranslation(content: string) {
     setLoading(true)
     setError(null)
     try {
-      const translated = await translateMarkdownPreservingStructure(content, async (text) => {
-        const result = await getLingo().translate!.text({
-          text,
+      const translateApi = getLingo().translate!
+      const translated = await translateMarkdownPreservingStructure(content, async (texts) => {
+        if (texts.length === 0) return []
+        const result = await translateApi.texts({
+          texts,
           from: fromLang,
           to: toLang
         })
-        return result.text
+        return result.texts
       })
       setTranslatedText(translated)
       setView('translated')
@@ -64,8 +66,8 @@ export function useReplyTranslation(content: string) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Translation failed'
       setError(
-        msg.includes('TRANSLATE_FAILED')
-          ? 'Could not translate this reply. Try again.'
+        msg.includes('TRANSLATE_FAILED') || msg.includes('TRANSLATE_')
+          ? 'Could not translate this reply. Check your connection and try again.'
           : msg
       )
     } finally {

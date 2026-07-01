@@ -1,4 +1,5 @@
 import { app, BrowserWindow, session } from 'electron'
+import { recoverIncompleteUpdateOnStartup } from './app-update'
 import { registerDevToolsShortcut, unregisterDevToolsShortcut } from './devtools'
 import { applyDockIcon } from './icon'
 import { registerIpcHandlers } from './ipc'
@@ -33,6 +34,7 @@ if (!setupSingleInstanceApp(focusMainWindow)) {
     setupTitlebarOnce()
     registerDevToolsShortcut()
     registerIpcHandlers()
+    recoverIncompleteUpdateOnStartup()
 
     void launchDesktopWindows()
 

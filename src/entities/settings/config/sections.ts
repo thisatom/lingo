@@ -1,4 +1,11 @@
-export type SettingsSectionId = 'general' | 'appearance' | 'devices' | 'speech' | 'agent' | 'api'
+export type SettingsSectionId =
+  | 'general'
+  | 'shortcuts'
+  | 'appearance'
+  | 'devices'
+  | 'speech'
+  | 'agent'
+  | 'api'
 
 export interface SettingsSection {
   id: SettingsSectionId
@@ -8,7 +15,7 @@ export interface SettingsSection {
 
 /** Sidebar groups — visual spacing is applied between groups. */
 export const SETTINGS_NAV_GROUPS: readonly SettingsSectionId[][] = [
-  ['general', 'appearance'],
+  ['general', 'shortcuts', 'appearance'],
   ['devices', 'speech'],
   ['agent', 'api']
 ]
@@ -18,6 +25,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     id: 'general',
     label: 'General',
     path: '/settings/general'
+  },
+  {
+    id: 'shortcuts',
+    label: 'Shortcuts',
+    path: '/settings/shortcuts'
   },
   {
     id: 'appearance',

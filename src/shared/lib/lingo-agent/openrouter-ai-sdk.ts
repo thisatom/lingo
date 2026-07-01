@@ -12,18 +12,15 @@ import {
   completionMessagesToModelMessages,
   type CompletionMessage
 } from '@/shared/lib/lingo-agent/completion-messages'
+import type { AiSdkToolChoice } from '@/shared/lib/lingo-agent/openrouter-ai-sdk-types'
 import { stripAssistantStreamSafeMarkup } from '@/shared/lib/strip-assistant-role-markup'
+
+export type { AiSdkToolChoice } from '@/shared/lib/lingo-agent/openrouter-ai-sdk-types'
 
 export type OpenRouterFetch = (
   input: RequestInfo | URL,
   init?: RequestInit
 ) => Promise<Response>
-
-export type AiSdkToolChoice =
-  | 'auto'
-  | 'required'
-  | 'none'
-  | { type: 'tool'; toolName: string }
 
 export type AiSdkStreamParams = {
   apiKey: string

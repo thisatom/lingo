@@ -20,7 +20,7 @@ export const userMessageShellClass = cn(
 )
 
 /** Text body inside {@link userMessageShellClass} — no own border. */
-export const userMessageBodyClass = 'relative px-3 py-1.5'
+export const userMessageBodyClass = 'relative px-3 py-1'
 
 /** @deprecated Use {@link userMessageShellClass} */
 export const userMessageBubbleClass = userMessageShellClass

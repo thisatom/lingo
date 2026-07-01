@@ -16,7 +16,7 @@ describe('translateMarkdownPreservingStructure', () => {
       'Visit [Docs](https://example.com) for more.'
     ].join('\n')
 
-    const translate = vi.fn(async (text: string) => {
+    const translate = vi.fn(async (texts: string[]) => {
       const map: Record<string, string> = {
         Hello: 'Привет',
         world: 'мир',
@@ -25,7 +25,7 @@ describe('translateMarkdownPreservingStructure', () => {
         Docs: 'Документация',
         'for more.': 'подробнее.'
       }
-      return map[text.trim()] ?? text
+      return texts.map((text) => map[text.trim()] ?? text)
     })
 
     const result = await translateMarkdownPreservingStructure(source, translate)
@@ -40,18 +40,19 @@ describe('translateMarkdownPreservingStructure', () => {
     expect(result).toContain('const x = 1')
     expect(result).toContain('[Документация](https://example.com)')
     expect(result).not.toContain('Hello')
+    expect(translate.mock.calls.length).toBeGreaterThanOrEqual(1)
   })
 
   it('keeps GFM table structure', async () => {
     const source = '| Name | Value |\n| --- | --- |\n| Hello | **42** |'
-    const translate = vi.fn(async (text: string) => {
+    const translate = vi.fn(async (texts: string[]) => {
       const map: Record<string, string> = {
         Name: 'Имя',
         Value: 'Значение',
         Hello: 'Привет',
         '42': '42'
       }
-      return map[text.trim()] ?? text
+      return texts.map((text) => map[text.trim()] ?? text)
     })
 
     const result = await translateMarkdownPreservingStructure(source, translate)
@@ -65,7 +66,7 @@ describe('translateMarkdownPreservingStructure', () => {
 
   it('leaves math segments unchanged', async () => {
     const source = 'Inline \\(x^2\\) and block:\n\n$$\\frac{a}{b}$$'
-    const translate = vi.fn(async (text: string) => `<<${text}>>`)
+    const translate = vi.fn(async (texts: string[]) => texts.map((text) => `<<${text}>>`))
 
     const result = await translateMarkdownPreservingStructure(source, translate)
 

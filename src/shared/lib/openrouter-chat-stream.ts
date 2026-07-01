@@ -48,10 +48,11 @@ import {
 import { localeForPracticeLanguage, type LocalWebSearchResult } from '@/shared/lib/local-web-search'
 import { performLocalWebSearch } from '@/shared/lib/local-web-search'
 import { shouldTryExternalWebSearch } from '@/shared/lib/web-search-pipeline'
-import { streamChatCompletionViaAiSdk, type AiSdkToolChoice } from '@/shared/lib/lingo-agent/openrouter-ai-sdk'
+import type { ToolSet } from 'ai'
+import type { AiSdkToolChoice } from '@/shared/lib/lingo-agent/openrouter-ai-sdk-types'
 import { streamCompletionViaLegacySse } from '@/shared/lib/lingo-agent/legacy-sse-stream'
 import { shouldUseAiSdkStreamForRequest } from '@/shared/lib/lingo-agent/stream-config'
-import { webSearchTools, WEB_SEARCH_TOOL_NAME } from '@/shared/lib/lingo-agent/web-search-tool'
+import { WEB_SEARCH_TOOL_NAME } from '@/shared/lib/lingo-agent/web-search-constants'
 import {
   isLocalWebSearchFailure,
   SEARCH_FALLBACK_NOTICE
@@ -76,7 +77,7 @@ type SendEvent = (event: ChatStreamEvent) => void
 type PromptMode = 'research' | 'practice' | 'vision' | 'general'
 
 type AiSdkStreamExtras = {
-  tools?: Parameters<typeof streamChatCompletionViaAiSdk>[0]['tools']
+  tools?: ToolSet
   toolChoice?: AiSdkToolChoice
   maxToolSteps?: number
 }
@@ -380,6 +381,7 @@ async function fetchCompletionStreamingViaAiSdk(
   fetchImpl: OpenRouterFetch,
   aiSdkExtras?: AiSdkStreamExtras
 ): Promise<CompletionResult> {
+  const { streamChatCompletionViaAiSdk } = await import('@/shared/lib/lingo-agent/openrouter-ai-sdk')
   const custom = isCustomBackend(request)
   const baseUrl = custom
     ? chatCompletionsUrl(request).replace(/\/chat\/completions\/?$/, '')
@@ -719,6 +721,7 @@ async function completeWithLocalWebSearchViaAiSdkTool(
   signal: AbortSignal | undefined,
   fetchImpl: OpenRouterFetch
 ): Promise<void> {
+  const { webSearchTools } = await import('@/shared/lib/lingo-agent/web-search-tool')
   send({ type: 'searching' })
 
   const searchLocale = localeForPracticeLanguage(practiceLanguage)

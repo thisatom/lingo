@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Settings } from '@/shared/ui/icons'
 import { SidebarFilterMenu } from '@/features/sidebar-customize/ui/SidebarFilterMenu'
+import { shortcutTooltipFor } from '@/features/keyboard-shortcuts/ui/ShortcutKeys'
 import { useSettingsStore } from '@/entities/settings/model/store'
 import { getInitials } from '@/shared/lib/user'
 import { APP_RADIUS_8_CLASS } from '@/shared/lib/layout'
@@ -28,7 +29,13 @@ export function SidebarUserFooter({ insetClassName }: { insetClassName?: string 
         <p className="min-w-0 flex-1 truncate text-sm leading-normal text-sidebar-foreground">{displayName}</p>
         <div className="flex shrink-0 items-center gap-0.5">
           {!isSettings && <SidebarFilterMenu />}
-          <TooltipWrap label="Settings">
+          <TooltipWrap
+            label={
+              isSettings
+                ? 'Back to chats'
+                : shortcutTooltipFor('openSettings', 'Settings')
+            }
+          >
           <Button
             variant="ghost"
             size="icon-sm"

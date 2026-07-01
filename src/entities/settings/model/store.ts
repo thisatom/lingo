@@ -45,6 +45,8 @@ import {
 } from '@/shared/lib/appearance'
 import { isAppTheme } from '@/shared/lib/theme'
 import type { AppTheme } from '@/shared/types/app-theme'
+import type { ShortcutBinding, ShortcutId } from '@/shared/lib/keyboard-shortcuts/types'
+import { sanitizeKeyboardShortcutOverrides } from '@/shared/lib/keyboard-shortcuts/validate'
 
 export type {
   AppTheme,
@@ -116,6 +118,8 @@ interface SettingsState {
   checkpointReturnConfirmEnabled: boolean
   /** First-run setup wizard completed. */
   onboardingCompleted: boolean
+  /** User overrides for keyboard shortcuts (binding only). */
+  keyboardShortcutOverrides: Partial<Record<ShortcutId, ShortcutBinding>>
   setPracticeLanguage: (lang: string) => void
   setLlmBackend: (backend: LlmBackend) => void
   setCustomApiBaseUrl: (baseUrl: string) => void
@@ -154,6 +158,8 @@ interface SettingsState {
   setSidebarChatSort: (sort: SidebarChatSort) => void
   setCheckpointReturnConfirmEnabled: (enabled: boolean) => void
   setOnboardingCompleted: (completed: boolean) => void
+  setKeyboardShortcutOverride: (id: ShortcutId, binding: ShortcutBinding | null) => void
+  resetKeyboardShortcuts: () => void
   resetSettings: () => void
 }
 
@@ -197,6 +203,7 @@ type PersistedSettings = Pick<
   | 'sidebarChatSort'
   | 'checkpointReturnConfirmEnabled'
   | 'onboardingCompleted'
+  | 'keyboardShortcutOverrides'
 >
 
 const DEFAULT_SETTINGS: Omit<
@@ -239,6 +246,8 @@ const DEFAULT_SETTINGS: Omit<
   | 'setSidebarChatSort'
   | 'setCheckpointReturnConfirmEnabled'
   | 'setOnboardingCompleted'
+  | 'setKeyboardShortcutOverride'
+  | 'resetKeyboardShortcuts'
   | 'resetSettings'
 > = {
   practiceLanguage: 'en',
@@ -278,7 +287,8 @@ const DEFAULT_SETTINGS: Omit<
   sidebarShowDateGroups: true,
   sidebarChatSort: 'updated-desc',
   checkpointReturnConfirmEnabled: true,
-  onboardingCompleted: false
+  onboardingCompleted: false,
+  keyboardShortcutOverrides: {}
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -397,11 +407,22 @@ export const useSettingsStore = create<SettingsState>()(
       setCheckpointReturnConfirmEnabled: (checkpointReturnConfirmEnabled) =>
         set({ checkpointReturnConfirmEnabled }),
       setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
+      setKeyboardShortcutOverride: (id, binding) =>
+        set((state) => {
+          const next = { ...state.keyboardShortcutOverrides }
+          if (binding == null) {
+            delete next[id]
+          } else {
+            next[id] = binding
+          }
+          return { keyboardShortcutOverrides: next }
+        }),
+      resetKeyboardShortcuts: () => set({ keyboardShortcutOverrides: {} }),
       resetSettings: () => set({ ...DEFAULT_SETTINGS })
     }),
     {
       name: 'lingo-settings',
-      version: 26,
+      version: 27,
       partialize: (state): PersistedSettings => ({
         practiceLanguage: state.practiceLanguage,
         llmBackend: state.llmBackend,
@@ -440,7 +461,8 @@ export const useSettingsStore = create<SettingsState>()(
         sidebarShowDateGroups: state.sidebarShowDateGroups,
         sidebarChatSort: state.sidebarChatSort,
         checkpointReturnConfirmEnabled: state.checkpointReturnConfirmEnabled,
-        onboardingCompleted: state.onboardingCompleted
+        onboardingCompleted: state.onboardingCompleted,
+        keyboardShortcutOverrides: state.keyboardShortcutOverrides ?? {}
       }),
       migrate: (persisted, version) => {
         let state = (persisted ?? {}) as Record<string, unknown>
@@ -596,6 +618,14 @@ export const useSettingsStore = create<SettingsState>()(
             codeTextScale: isTextScale(state.codeTextScale)
               ? state.codeTextScale
               : DEFAULT_APPEARANCE.codeTextScale
+          }
+        }
+        if (version < 27) {
+          state = {
+            ...state,
+            keyboardShortcutOverrides: sanitizeKeyboardShortcutOverrides(
+              state.keyboardShortcutOverrides
+            )
           }
         }
         if (version < 26) {
@@ -768,6 +798,9 @@ export const useSettingsStore = create<SettingsState>()(
               ? saved.onboardingCompleted
               : undefined,
             current.onboardingCompleted
+          ),
+          keyboardShortcutOverrides: sanitizeKeyboardShortcutOverrides(
+            saved.keyboardShortcutOverrides ?? current.keyboardShortcutOverrides
           )
         }
       }

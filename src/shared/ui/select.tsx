@@ -116,7 +116,6 @@ function SelectContent({
           <SelectPrimitive.Viewport
             className={cn(
               menuContentSpacingClass,
-              'overflow-hidden',
               position === "popper" &&
                 "w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
             )}

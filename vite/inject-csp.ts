@@ -36,7 +36,7 @@ export function injectContentSecurityPolicy(): Plugin {
             : 'production'
         const policy = buildContentSecurityPolicy(profile, mode, {
           websearchOrigin: profile === 'web-main' ? parseWebsearchOrigin() : null,
-          viteHmr: profile === 'electron-main' ? false : undefined
+          viteHmr: false
         })
 
         const escaped = policy.replace(/"/g, '&quot;')

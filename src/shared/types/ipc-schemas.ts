@@ -7,7 +7,8 @@ import type {
   SecretProviderId,
   SttTranscribeRequest,
   TtsSynthesizeRequest,
-  TranslateTextRequest
+  TranslateTextRequest,
+  TranslateTextBatchRequest
 } from '@/shared/types/ipc'
 import { SECRET_PROVIDER_IDS } from '@/shared/types/secret-providers'
 
@@ -93,6 +94,12 @@ export const translateTextRequestSchema = z.object({
   to: z.string().min(2).max(32)
 })
 
+export const translateTextBatchRequestSchema = z.object({
+  texts: z.array(z.string().max(5_000)).min(1).max(120),
+  from: z.string().max(32).optional(),
+  to: z.string().min(2).max(32)
+})
+
 export const linkPreviewUrlSchema = z.string().trim().min(1).max(8_192)
 
 export const streamChannelSchema = z
@@ -123,6 +130,10 @@ export function parseTtsSynthesizeRequest(input: unknown): TtsSynthesizeRequest 
 
 export function parseTranslateTextRequest(input: unknown): TranslateTextRequest {
   return parseOrThrow(translateTextRequestSchema, input, 'translate request')
+}
+
+export function parseTranslateTextBatchRequest(input: unknown): TranslateTextBatchRequest {
+  return parseOrThrow(translateTextBatchRequestSchema, input, 'translate batch request')
 }
 
 export function parseLinkPreviewUrl(input: unknown): string {

@@ -9,9 +9,8 @@ import {
 import { fetchWebLinkPreview } from '@/shared/api/web-link-preview'
 import { transcribeWebAudio } from '@/shared/api/web-stt'
 import { synthesizeWebSpeech } from '@/shared/api/web-tts'
-import { translateTextWeb } from '@/shared/api/web-translate'
+import { translateTextWeb, translateTextBatchWeb } from '@/shared/api/web-translate'
 import { openRouterConfig } from '@/shared/config/openrouter'
-import { streamOpenRouterChat } from '@/shared/lib/openrouter-chat-stream'
 import type {
   AppUpdateCheckResult,
   AppUpdateInfo,
@@ -39,49 +38,52 @@ function createWebChatStream(
   const abortController = new AbortController()
   let streamError: Error | null = null
 
-  const done = streamOpenRouterChat(
-    request,
-    (event) => {
-      switch (event.type) {
-        case 'searching':
-          handlers.onSearching?.()
-          break
-        case 'search-fallback':
-          handlers.onSearchFallback?.(event)
-          break
-        case 'search-targets':
-          handlers.onSearchTargets?.(event)
-          break
-        case 'search-visiting':
-          handlers.onSearchVisiting?.(event)
-          break
-        case 'thinking-delta':
-          handlers.onThinkingDelta?.(event)
-          break
-        case 'text-delta':
-          handlers.onTextDelta?.(event)
-          break
-        case 'done':
-          handlers.onDone?.(event)
-          break
-        case 'error':
-          streamError = new Error(event.message)
-          handlers.onError?.(event)
-          break
-      }
-    },
-    () =>
-      request.llmBackend === 'custom'
-        ? getWebSecret('custom-llm')
-        : getWebSecret('openrouter'),
-    {
-      defaultModel:
-        typeof import.meta !== 'undefined' && import.meta.env?.VITE_LINGO_OPENROUTER_MODEL
-          ? String(import.meta.env.VITE_LINGO_OPENROUTER_MODEL)
-          : openRouterConfig.defaultModel
-    },
-    abortController.signal
-  )
+  const done = import('@/shared/lib/openrouter-chat-stream')
+    .then(({ streamOpenRouterChat }) =>
+      streamOpenRouterChat(
+        request,
+        (event) => {
+          switch (event.type) {
+            case 'searching':
+              handlers.onSearching?.()
+              break
+            case 'search-fallback':
+              handlers.onSearchFallback?.(event)
+              break
+            case 'search-targets':
+              handlers.onSearchTargets?.(event)
+              break
+            case 'search-visiting':
+              handlers.onSearchVisiting?.(event)
+              break
+            case 'thinking-delta':
+              handlers.onThinkingDelta?.(event)
+              break
+            case 'text-delta':
+              handlers.onTextDelta?.(event)
+              break
+            case 'done':
+              handlers.onDone?.(event)
+              break
+            case 'error':
+              streamError = new Error(event.message)
+              handlers.onError?.(event)
+              break
+          }
+        },
+        () =>
+          request.llmBackend === 'custom'
+            ? getWebSecret('custom-llm')
+            : getWebSecret('openrouter'),
+        {
+          defaultModel:
+            typeof import.meta !== 'undefined' && import.meta.env?.VITE_LINGO_OPENROUTER_MODEL
+              ? String(import.meta.env.VITE_LINGO_OPENROUTER_MODEL)
+              : openRouterConfig.defaultModel
+        },
+        abortController.signal
+      )
+    )
     .then(() => {
       if (streamError) throw streamError
     })
@@ -123,7 +125,8 @@ export function createBrowserLingoApi(): LingoApi {
       synthesize: (request: TtsSynthesizeRequest) => synthesizeWebSpeech(request)
     },
     translate: {
-      text: (request: TranslateTextRequest) => translateTextWeb(request)
+      text: (request: TranslateTextRequest) => translateTextWeb(request),
+      texts: (request) => translateTextBatchWeb(request)
     },
     link: {
       preview: (url: string) => fetchWebLinkPreview(url)

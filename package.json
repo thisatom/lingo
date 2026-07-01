@@ -1,6 +1,6 @@
 {
   "name": "lingo",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Practice conversational speech in different languages",
   "main": "./out/main/index.js",
   "type": "module",
@@ -50,7 +50,6 @@
     "google-translate-api-x": "^10.7.3",
     "gsap": "^3.15.0",
     "highlight.js": "^11.11.1",
-    "jsdom": "^29.1.1",
     "katex": "^0.16.47",
     "keytar": "^7.9.0",
     "lucide-react": "^0.511.0",
@@ -82,7 +81,6 @@
     "@electron/rebuild": "^4.0.4",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.1.7",
-    "@types/jsdom": "^28.0.3",
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",

@@ -1,4 +1,4 @@
-import { ArrowLeft, ColorMode, Cpu, Mic, Settings, Volume2, WandSparkles } from '@/shared/ui/icons'
+import { ArrowLeft, ColorMode, Cpu, Keyboard, Mic, Settings, Volume2, WandSparkles } from '@/shared/ui/icons'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -23,6 +23,7 @@ const navIconClass = cn('size-4 shrink-0 opacity-70 !translate-y-0')
 
 const iconBySection: Record<SettingsSectionId, ReactNode> = {
   general: <Settings className={navIconClass} />,
+  shortcuts: <Keyboard className={navIconClass} />,
   appearance: <ColorMode className={navIconClass} />,
   devices: <Mic className={navIconClass} />,
   speech: <Volume2 className={navIconClass} />,

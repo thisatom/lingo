@@ -33,8 +33,8 @@ export const composerPanelSearchInputClass = cn(
   'dark:bg-secondary'
 )
 
-/** Textarea scroll region — never shrink below one input line. */
-export const composerTextareaScrollClass = 'max-h-40 min-h-11 w-full shrink-0'
+/** Textarea scroll region — height follows content up to max-h-40. */
+export const composerTextareaScrollClass = 'max-h-40 min-h-0 w-full shrink-0'
 
 export function composerStackPanelHeaderClass(listCollapsed: boolean): string {
   return cn('px-3', listCollapsed ? 'py-1.5' : 'py-2', !listCollapsed && 'border-b border-separator')

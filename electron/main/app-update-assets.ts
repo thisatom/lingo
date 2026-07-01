@@ -22,14 +22,41 @@ export function pickMacAsset(assets: GitHubAsset[], arch = process.arch): GitHub
   return matchArch(zips.filter((asset) => /mac/i.test(asset.name))) ?? matchArch(zips)
 }
 
-export function pickLinuxAsset(assets: GitHubAsset[]): GitHubAsset | null {
-  const appImages = assets.filter((asset) => /\.AppImage$/i.test(asset.name))
-  const appImage =
-    appImages.find((asset) => /linux|x64/i.test(asset.name)) ?? appImages[0] ?? null
-  if (appImage) return appImage
+export type LinuxInstallFormat = 'appimage' | 'deb' | 'unknown'
 
+export function detectLinuxInstallFormat(): LinuxInstallFormat {
+  if (process.env.APPIMAGE) return 'appimage'
+  if (/\.AppImage$/i.test(process.execPath)) return 'appimage'
+
+  const execPath = process.execPath
+  if (
+    execPath.startsWith('/usr/') ||
+    execPath.startsWith('/opt/') ||
+    execPath.includes('/snap/')
+  ) {
+    return 'deb'
+  }
+
+  return 'unknown'
+}
+
+function pickLinuxAppImageAsset(assets: GitHubAsset[]): GitHubAsset | null {
+  const appImages = assets.filter((asset) => /\.AppImage$/i.test(asset.name))
+  return appImages.find((asset) => /linux|x64/i.test(asset.name)) ?? appImages[0] ?? null
+}
+
+function pickLinuxDebAsset(assets: GitHubAsset[]): GitHubAsset | null {
   const debs = assets.filter((asset) => /\.deb$/i.test(asset.name))
   return debs.find((asset) => /linux|x64/i.test(asset.name)) ?? debs[0] ?? null
+}
+
+export function pickLinuxAsset(assets: GitHubAsset[]): GitHubAsset | null {
+  const format = detectLinuxInstallFormat()
+  if (format === 'deb') {
+    return pickLinuxDebAsset(assets) ?? pickLinuxAppImageAsset(assets)
+  }
+
+  return pickLinuxAppImageAsset(assets) ?? pickLinuxDebAsset(assets)
 }
 
 export function pickAssetForPlatform(

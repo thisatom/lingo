@@ -146,15 +146,13 @@ function CommandList({
 }) {
   if (variant === 'palette') {
     return (
-      <div className={cn(commandPaletteListClass, className)}>
-        <CustomScrollArea variant="palette" className="absolute inset-0 min-h-0">
-          <CommandPrimitive.List
-            data-slot="command-list"
-            className="overflow-x-hidden overflow-y-visible p-1 pb-2"
-            {...props}
-          />
-        </CustomScrollArea>
-      </div>
+      <CustomScrollArea variant="palette" className={cn(commandPaletteListClass, className)}>
+        <CommandPrimitive.List
+          data-slot="command-list"
+          className="overflow-x-hidden overflow-y-visible p-1 pb-2"
+          {...props}
+        />
+      </CustomScrollArea>
     )
   }
 

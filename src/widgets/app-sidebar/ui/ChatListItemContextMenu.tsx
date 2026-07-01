@@ -17,6 +17,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger
 } from '@/shared/ui/context-menu'
+import { ShortcutKeys, useResolvedShortcut } from '@/features/keyboard-shortcuts/ui/ShortcutKeys'
+import type { ShortcutId } from '@/shared/lib/keyboard-shortcuts/types'
 import { ChatRenameDialog } from './ChatRenameDialog'
 
 interface ChatListItemContextMenuProps {
@@ -28,16 +30,21 @@ interface ChatListItemContextMenuProps {
 function MenuRow({
   icon: Icon,
   label,
-  onSelect
+  onSelect,
+  shortcutId
 }: {
   icon: ComponentType<{ className?: string }>
   label: string
   onSelect: () => void
+  shortcutId?: ShortcutId
 }) {
+  const shortcut = shortcutId ? useResolvedShortcut(shortcutId) : null
+
   return (
     <ContextMenuItem className={sidebarMenuItemClass} onSelect={onSelect}>
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 whitespace-nowrap">{label}</span>
+      {shortcut ? <ShortcutKeys shortcut={shortcut} className="ml-2 shrink-0 opacity-70" /> : null}
     </ContextMenuItem>
   )
 }
@@ -86,6 +93,7 @@ export function ChatListItemContextMenu({
           <MenuRow
             icon={Archive}
             label={archived ? 'Unarchive' : 'Archive'}
+            shortcutId={archived ? undefined : 'archiveChat'}
             onSelect={onArchive}
           />
         </ContextMenuContent>

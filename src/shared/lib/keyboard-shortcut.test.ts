@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isArchiveChatShortcut,
   isChatSearchShortcut,
   isComposerModeTextShortcut,
-  isNewChatShortcut
+  isNewChatShortcut,
+  isOpenSettingsShortcut,
+  isVoiceInputShortcut
 } from './keyboard-shortcut'
 
 function keyEvent(code: string, init: Partial<KeyboardEvent> = {}): KeyboardEvent {
@@ -28,5 +31,17 @@ describe('keyboard-shortcut', () => {
         keyEvent('KeyT', { ctrlKey: true, shiftKey: true, key: 'е' })
       )
     ).toBe(true)
+  })
+
+  it('matches Ctrl+, for settings', () => {
+    expect(isOpenSettingsShortcut(keyEvent('Comma', { ctrlKey: true }))).toBe(true)
+  })
+
+  it('matches Ctrl+Shift+E for archive', () => {
+    expect(isArchiveChatShortcut(keyEvent('KeyE', { ctrlKey: true, shiftKey: true }))).toBe(true)
+  })
+
+  it('matches Ctrl+M for voice input', () => {
+    expect(isVoiceInputShortcut(keyEvent('KeyM', { ctrlKey: true }))).toBe(true)
   })
 })

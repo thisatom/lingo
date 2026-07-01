@@ -37,6 +37,15 @@ describe('content-security-policy', () => {
     expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/)
   })
 
+  it('web dev uses strict script-src when vite HMR is disabled', () => {
+    const csp = buildContentSecurityPolicy('web-main', 'development', {
+      websearchOrigin: 'http://localhost:3001',
+      viteHmr: false
+    })
+    expect(csp).not.toContain('unsafe-eval')
+    expect(csp).toContain('unsafe-inline')
+  })
+
   it('web prod includes openrouter', () => {
     const csp = buildContentSecurityPolicy('web-main', 'production', {
       websearchOrigin: 'http://localhost:3001'

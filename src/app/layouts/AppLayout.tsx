@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useChatsStore } from '@/entities/chat/model/store'
 import { useSidebarPanel } from '@/app/layouts/hooks/use-sidebar-panel'
 import { sidebarWidthCss, sidebarPanelConstraintCss } from '@/app/layouts/lib/sidebar-layout-storage'
@@ -9,10 +9,8 @@ import { AppSidebar } from '@/widgets/app-sidebar/ui/AppSidebar'
 import { useAppearanceSync } from '@/app/hooks/use-appearance-sync'
 import { useThemeSync } from '@/app/hooks/use-theme-sync'
 import { useWindowTitle } from '@/app/hooks/use-window-title'
-import { useNewChatHotkey } from '@/features/chat/model/useNewChatHotkey'
-import { useChatSearchHotkey } from '@/features/chat-search/model/useChatSearchHotkey'
+import { useGlobalKeyboardShortcuts } from '@/features/keyboard-shortcuts/model/useGlobalKeyboardShortcuts'
 import { ChatSearchDialog } from '@/features/chat-search/ui/ChatSearchDialog'
-import { useSettingsSearchHotkey } from '@/features/settings-search/model/useSettingsSearchHotkey'
 import { SettingsSearchDialog } from '@/features/settings-search/ui/SettingsSearchDialog'
 import { useAppReady } from '@/shared/lib/hooks/use-app-ready'
 import { useIsMobile } from '@/shared/lib/hooks/use-mobile'
@@ -27,7 +25,7 @@ export function AppLayout() {
   useThemeSync()
   useAppearanceSync()
   useWindowTitle()
-  useNewChatHotkey()
+  const navigate = useNavigate()
   const appReady = useAppReady()
   const location = useLocation()
   const isSettingsRoute = location.pathname.startsWith('/settings')
@@ -52,8 +50,14 @@ export function AppLayout() {
 
   const openChatSearch = useCallback(() => setChatSearchOpen(true), [])
   const openSettingsSearch = useCallback(() => setSettingsSearchOpen(true), [])
-  useChatSearchHotkey(openChatSearch, !isSettingsRoute)
-  useSettingsSearchHotkey(openSettingsSearch, isSettingsRoute)
+
+  useGlobalKeyboardShortcuts({
+    isSettingsRoute,
+    openChatSearch,
+    openSettingsSearch,
+    toggleSidebarPanel,
+    navigate
+  })
 
   useEffect(() => {
     if (useChatsStore.persist.hasHydrated()) {

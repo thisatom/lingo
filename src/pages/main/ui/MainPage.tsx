@@ -4,7 +4,7 @@ import { useAiChat } from '@/features/ai-chat/model/useAiChat'
 import { useLlmChatReady } from '@/features/ai-chat/model/useLlmChatReady'
 import { useChatContextUsage } from '@/features/chat-context/model/useChatContextUsage'
 import { mergeComposerAttachments } from '@/features/chat-attachments/lib/merge-composer-attachments'
-import { useChatComposerModeHotkey } from '@/features/chat-composer/model/useChatComposerModeHotkey'
+import { useRegisterShortcutHandler } from '@/features/keyboard-shortcuts/model/shortcut-handlers'
 import { useVoiceInput } from '@/features/voice-input/model/useVoiceInput'
 import { useLiveConversationLoop } from '@/features/voice-input/model/useLiveConversationLoop'
 import {
@@ -115,8 +115,6 @@ export function MainPage() {
     messages,
     activeModelId
   )
-
-  useChatComposerModeHotkey()
 
   const setDraft = useCallback(
     (value: string) => {
@@ -369,6 +367,23 @@ export function MainPage() {
     stopAgentSpeechSession,
     voice
   ])
+
+  useRegisterShortcutHandler('voiceInput', onVoicePress, llmChatReady)
+
+  useRegisterShortcutHandler(
+    'stopAgent',
+    () => {
+      if (
+        voice.isRecording ||
+        voice.isBusy ||
+        agentBusy ||
+        liveConversation.isLiveConversationActive
+      ) {
+        stopAgentSpeechSession()
+      }
+    },
+    true
+  )
 
   const onVoiceCancel = useCallback(() => {
     if (chatComposerMode === 'conversation' && liveConversation.isLiveConversationActive) {

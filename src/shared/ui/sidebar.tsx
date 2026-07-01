@@ -4,7 +4,6 @@ import { PanelLeftIcon } from "@/shared/ui/icons"
 import { Slot } from "radix-ui"
 
 import { useIsMobile } from "@/shared/lib/hooks/use-mobile"
-import { isSidebarToggleShortcut } from '@/shared/lib/keyboard-shortcut'
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
@@ -91,17 +90,7 @@ function SidebarProvider({
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
   }, [isMobile, setOpen, setOpenMobile])
 
-  // Adds a keyboard shortcut to toggle the sidebar.
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isSidebarToggleShortcut(event)) return
-      event.preventDefault()
-      toggleSidebar()
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [toggleSidebar])
+  // Sidebar panel hide/show is handled in AppLayout (ResizableSidebarContext + Ctrl+B).
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.

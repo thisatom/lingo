@@ -82,7 +82,8 @@ function electronMainCsp(mode: CspMode, options: { viteHmr?: boolean } = {}): st
 }
 
 /** Browser build — renderer calls OpenRouter, link preview, optional custom LLM base URLs. */
-function webMainCsp(mode: CspMode, websearchOrigin: string | null): string {
+function webMainCsp(mode: CspMode, websearchOrigin: string | null, options: { viteHmr?: boolean } = {}): string {
+  const allowViteEval = mode === 'development' && options.viteHmr !== false
   const connectBase = [
     "'self'",
     ...OPENROUTER,
@@ -97,7 +98,9 @@ function webMainCsp(mode: CspMode, websearchOrigin: string | null): string {
 
   return joinDirectives([
     directive('default-src', ["'self'"]),
-    mode === 'development' ? devScriptSrc(["'self'"]) : directive('script-src', ["'self'"]),
+    mode === 'development'
+      ? devScriptSrc(["'self'"], { allowEval: allowViteEval })
+      : directive('script-src', ["'self'"]),
     directive('worker-src', ["'self'", 'blob:']),
     directive('style-src', ["'self'", "'unsafe-inline'"]),
     directive('font-src', ["'self'", 'data:']),
@@ -123,7 +126,7 @@ export function buildContentSecurityPolicy(
     case 'electron-main':
       return electronMainCsp(mode, { viteHmr: options.viteHmr })
     case 'web-main':
-      return webMainCsp(mode, options.websearchOrigin ?? null)
+      return webMainCsp(mode, options.websearchOrigin ?? null, { viteHmr: options.viteHmr })
     default:
       return electronMainCsp(mode, { viteHmr: options.viteHmr })
   }

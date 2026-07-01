@@ -1,4 +1,5 @@
 import { Mic, Square } from '@/shared/ui/icons'
+import type { ReactNode } from 'react'
 import { Button, type ButtonProps } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 import { TooltipWrap } from '@/shared/ui/tooltip-wrap'
@@ -13,6 +14,8 @@ interface VoiceRecordButtonProps {
   className?: string
   variant?: 'secondary' | 'ghost' | 'destructive'
   label?: string
+  /** Tooltip content — string or rich node (e.g. with shortcut keys). */
+  tooltip?: ReactNode
   highlight?: boolean
   /** `toggle`: tap to start / tap to stop (conversation loop). `hold`: push-to-talk. */
   interactionMode?: VoiceInteractionMode
@@ -27,6 +30,7 @@ export function VoiceRecordButton({
   className,
   variant,
   label: labelOverride,
+  tooltip,
   highlight = false,
   interactionMode = 'hold',
   size = 'icon'
@@ -85,7 +89,7 @@ export function VoiceRecordButton({
   )
 
   return (
-    <TooltipWrap label={label}>
+    <TooltipWrap label={tooltip ?? label}>
       {disabled ? <span className="inline-flex">{button}</span> : button}
     </TooltipWrap>
   )

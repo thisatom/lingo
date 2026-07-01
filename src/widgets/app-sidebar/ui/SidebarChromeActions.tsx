@@ -1,23 +1,13 @@
-import type { ReactNode } from 'react'
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useResizableSidebar } from '@/app/context/resizable-sidebar-context'
 import { EMPTY_CHAT_HISTORY, useChatsStore } from '@/entities/chat/model/store'
 import { chatRoutePath } from '@/features/chat/lib/chat-route'
-import { Kbd, KbdGroup } from '@/shared/ui/kbd'
+import { shortcutTooltipFor } from '@/features/keyboard-shortcuts/ui/ShortcutKeys'
 import { NewChat, PanelLeftClose, PanelLeftOpen, Search, ArrowLeft, ArrowRight } from '@/shared/ui/icons'
 import { cn } from '@/shared/lib/utils'
 import { TooltipIconButton } from '@/shared/ui/tooltip-wrap'
 import { sidebarChromeIconButtonClass } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
-
-function shortcutTooltip(label: string, keys: ReactNode) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      <span>{label}</span>
-      {keys}
-    </span>
-  )
-}
 
 const iconButtonClass = cn(sidebarChromeIconButtonClass, 'size-[30px] shrink-0')
 
@@ -30,7 +20,11 @@ export function SidebarChromeHideToggle({ className }: { className?: string }) {
       variant="ghost"
       size="icon-sm"
       className={cn(iconButtonClass, className)}
-      tooltip={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+      tooltip={
+        sidebarCollapsed
+          ? shortcutTooltipFor('toggleSidebar', 'Show sidebar')
+          : shortcutTooltipFor('toggleSidebar', 'Hide sidebar')
+      }
       aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
       onClick={toggleSidebarPanel}
     >
@@ -63,13 +57,7 @@ export function SidebarChromePrimaryActions({ className }: { className?: string 
         size="icon-sm"
         className={iconButtonClass}
         aria-label="Search chats"
-        tooltip={shortcutTooltip(
-          'Search chats',
-          <KbdGroup className="opacity-95" aria-hidden>
-            <Kbd>Ctrl</Kbd>
-            <Kbd>K</Kbd>
-          </KbdGroup>
-        )}
+        tooltip={shortcutTooltipFor('chatSearch', 'Search chats')}
         onClick={openChatSearch}
       >
         <Search className="size-4 shrink-0" />
@@ -80,13 +68,7 @@ export function SidebarChromePrimaryActions({ className }: { className?: string 
         size="icon-sm"
         className={iconButtonClass}
         aria-label="New chat"
-        tooltip={shortcutTooltip(
-          'New chat',
-          <KbdGroup className="opacity-95" aria-hidden>
-            <Kbd>Ctrl</Kbd>
-            <Kbd>N</Kbd>
-          </KbdGroup>
-        )}
+        tooltip={shortcutTooltipFor('newChat', 'New chat')}
         onClick={handleNewChat}
       >
         <NewChat className="size-4 shrink-0" />
@@ -107,13 +89,7 @@ export function SettingsSidebarChromePrimaryActions({ className }: { className?:
         size="icon-sm"
         className={iconButtonClass}
         aria-label="Search settings"
-        tooltip={shortcutTooltip(
-          'Search settings',
-          <KbdGroup className="opacity-95" aria-hidden>
-            <Kbd>Ctrl</Kbd>
-            <Kbd>K</Kbd>
-          </KbdGroup>
-        )}
+        tooltip={shortcutTooltipFor('settingsSearch', 'Search settings')}
         onClick={openSettingsSearch}
       >
         <Search className="size-4 shrink-0" />

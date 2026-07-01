@@ -24,6 +24,8 @@ import {
   sidebarTextFadeClass,
   sidebarRowHeightClass
 } from '@/widgets/app-sidebar/lib/sidebar-chat-styles'
+import { shortcutTooltipFor } from '@/features/keyboard-shortcuts/ui/ShortcutKeys'
+import { ChatPreviewHover } from '@/features/chat-preview/ui/ChatPreviewHover'
 import { ChatListItemContextMenu } from './ChatListItemContextMenu'
 import { ChatSidebarIndicator } from './ChatSidebarIndicator'
 
@@ -73,29 +75,31 @@ export function ChatListItem({
             isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
           )}
         >
-          <SidebarMenuButton
-            isActive={isActive}
-            className={cn(
-              sidebarRowHeightClass,
-              'flex w-full items-center gap-1.5 !px-0 !py-0',
-              sidebarChatRowActionsPaddingClass,
-              sidebarChatTextClass,
-              'rounded-lg bg-transparent hover:bg-transparent active:bg-transparent',
-              sidebarChatActiveTextClass
-            )}
-            onClick={onOpen}
-          >
-            <ChatSidebarIndicator
-              pinned={pinned}
-              hasError={hasError}
-              hasUnreadReply={hasUnreadReply}
-              agentActive={agentActive}
-            />
-            <span className={sidebarChatTitleFadeClass}>
-              <span className={sidebarTextFadeClass}>{chat.title}</span>
-              <span className={sidebarChatTitleScrimClass} aria-hidden />
-            </span>
-          </SidebarMenuButton>
+          <ChatPreviewHover chat={chat}>
+            <SidebarMenuButton
+              isActive={isActive}
+              className={cn(
+                sidebarRowHeightClass,
+                'flex w-full min-w-0 items-center gap-1.5 !px-0 !py-0',
+                sidebarChatRowActionsPaddingClass,
+                sidebarChatTextClass,
+                'rounded-lg bg-transparent hover:bg-transparent active:bg-transparent',
+                sidebarChatActiveTextClass
+              )}
+              onClick={onOpen}
+            >
+              <ChatSidebarIndicator
+                pinned={pinned}
+                hasError={hasError}
+                hasUnreadReply={hasUnreadReply}
+                agentActive={agentActive}
+              />
+              <span className={sidebarChatTitleFadeClass}>
+                <span className={sidebarTextFadeClass}>{chat.title}</span>
+                <span className={sidebarChatTitleScrimClass} aria-hidden />
+              </span>
+            </SidebarMenuButton>
+          </ChatPreviewHover>
 
           <TooltipIconButton
             variant="ghost"
@@ -125,7 +129,11 @@ export function ChatListItem({
               data-chat-row-action=""
               triggerClassName={cn(rowActionTriggerClass, 'right-[30px]')}
               className={sidebarChatDeleteButtonClass}
-              tooltip={archived ? 'Unarchive chat' : 'Archive chat'}
+              tooltip={
+                archived
+                  ? 'Unarchive chat'
+                  : shortcutTooltipFor('archiveChat', 'Archive chat')
+              }
               aria-label={archived ? 'Unarchive chat' : 'Archive chat'}
               onClick={(e) => {
                 e.stopPropagation()

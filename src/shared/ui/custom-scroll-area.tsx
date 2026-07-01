@@ -24,6 +24,7 @@ const AT_BOTTOM_THRESHOLD_PX = CHAT_SCROLL_BOTTOM_THRESHOLD_PX
 const EDGE_FADE_THRESHOLD_PX = 6
 const EDGE_FADE_HEIGHT_PX = 28
 const SIDEBAR_SCROLLBAR_LANE_PX = 10
+const MENU_SCROLLBAR_LANE_PX = 10
 
 type ScrollVariant = 'chat' | 'sidebar' | 'menu' | 'thinking' | 'settings' | 'palette'
 
@@ -64,11 +65,12 @@ const VARIANT_CONFIG: Record<
   },
   menu: {
     zIndex: 50,
-    thumbIdleOpacity: 0.38,
+    thumbIdleOpacity: 0.72,
     thumbHoverOpacity: 0.82,
     scrollbarWidth: 5,
     scrollbarRight: 2,
-    edgeFades: false
+    edgeFades: false,
+    revealOnContainerHover: false
   },
   /** Nested in chat turns — must stay below sticky question headers. */
   thinking: {
@@ -179,13 +181,14 @@ export function CustomScrollArea({
 
   const isMenu = variant === 'menu'
   const isThinking = variant === 'thinking'
-  const isNestedPanel = isMenu || isThinking
+  const isPalette = variant === 'palette'
+  const isNestedPanel = isMenu || isThinking || isPalette
   const isChat = variant === 'chat'
   const isSidebar = variant === 'sidebar'
-  const isPalette = variant === 'palette'
   const revealOnContainerHover = config.revealOnContainerHover !== false
   const alwaysShowScrollbar = config.alwaysShowScrollbar === true
   const edgeFadeHeightPx = config.edgeFadeHeightPx ?? EDGE_FADE_HEIGHT_PX
+  const showScrollbarHoverLane = (isSidebar || isMenu) && metrics.canScroll
 
   const thumbOpacity =
     !metrics.canScroll || (!scrollbarVisible && !thumbHovered && !alwaysShowScrollbar)
@@ -507,19 +510,25 @@ export function CustomScrollArea({
       ref={rootRef}
       className={cn(
         'relative min-h-0',
-        isNestedPanel || isPalette
+        isNestedPanel
           ? cn('overflow-hidden', className)
           : cn('h-full min-h-0', className)
       )}
       onMouseEnter={revealOnContainerHover ? revealScrollbar : undefined}
-      onMouseLeave={revealOnContainerHover ? scheduleHideScrollbar : undefined}
+      onMouseLeave={
+        isNestedPanel
+          ? scheduleHideScrollbar
+          : revealOnContainerHover
+            ? scheduleHideScrollbar
+            : undefined
+      }
     >
       <div
         ref={viewportRef}
         data-scroll-viewport=""
         className={cn(
           'min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          isNestedPanel || isPalette ? 'h-full min-h-0' : 'h-full min-h-0'
+          isNestedPanel ? cn(className) : 'h-full min-h-0'
         )}
         style={
           config.viewportPaddingRight
@@ -559,11 +568,11 @@ export function CustomScrollArea({
         </div>
       ) : null}
 
-      {isSidebar && metrics.canScroll ? (
+      {showScrollbarHoverLane ? (
         <div
           aria-hidden
           className="absolute top-0 bottom-0 z-[39]"
-          style={{ right: 0, width: SIDEBAR_SCROLLBAR_LANE_PX }}
+          style={{ right: 0, width: isMenu ? MENU_SCROLLBAR_LANE_PX : SIDEBAR_SCROLLBAR_LANE_PX }}
           onMouseEnter={revealScrollbar}
           onMouseLeave={scheduleHideScrollbar}
         />

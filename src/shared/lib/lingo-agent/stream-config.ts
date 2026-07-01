@@ -13,8 +13,13 @@ function isVitestRun(): boolean {
   return typeof process !== 'undefined' && process.env.VITEST === 'true'
 }
 
-/** AI SDK stream path: on in app by default; legacy SSE in Vitest unless env forces SDK. */
+function isWebRenderer(): boolean {
+  return typeof import.meta !== 'undefined' && import.meta.env?.VITE_LINGO_PLATFORM === 'web'
+}
+
+/** AI SDK stream path: on in desktop by default; legacy SSE in Vitest and web (strict CSP, no eval). */
 export function isAiSdkStreamEnabled(): boolean {
+  if (isWebRenderer()) return false
   const override = readEnvFlag()
   if (override !== undefined) return override
   return !isVitestRun()

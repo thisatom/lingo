@@ -5,6 +5,7 @@ describe('filterSettingsSections', () => {
   it('returns all sections for empty query', () => {
     expect(filterSettingsSections('').map((section) => section.id)).toEqual([
       'general',
+      'shortcuts',
       'appearance',
       'devices',
       'speech',

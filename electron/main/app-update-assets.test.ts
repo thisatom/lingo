@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
+  detectLinuxInstallFormat,
   isLinuxAppImage,
   isLinuxDeb,
   isMacZip,
@@ -41,9 +42,27 @@ describe('pickMacAsset', () => {
 })
 
 describe('pickLinuxAsset', () => {
-  it('prefers AppImage over deb', () => {
+  it('prefers AppImage over deb for portable installs', () => {
+    vi.stubEnv('APPIMAGE', '')
+    const execPathSpy = vi.spyOn(process, 'execPath', 'get').mockReturnValue('/home/user/Lingo.AppImage')
+
     const assets = [asset('Lingo-1.0.0-linux-x64.deb'), asset('Lingo-1.0.0-linux-x64.AppImage')]
     expect(pickLinuxAsset(assets)?.name).toBe('Lingo-1.0.0-linux-x64.AppImage')
+
+    execPathSpy.mockRestore()
+    vi.unstubAllEnvs()
+  })
+
+  it('prefers deb when running from a system install path', () => {
+    vi.stubEnv('APPIMAGE', '')
+    const execPathSpy = vi.spyOn(process, 'execPath', 'get').mockReturnValue('/usr/bin/lingo')
+    expect(detectLinuxInstallFormat()).toBe('deb')
+
+    const assets = [asset('Lingo-1.0.0-linux-x64.deb'), asset('Lingo-1.0.0-linux-x64.AppImage')]
+    expect(pickLinuxAsset(assets)?.name).toBe('Lingo-1.0.0-linux-x64.deb')
+
+    execPathSpy.mockRestore()
+    vi.unstubAllEnvs()
   })
 })
 

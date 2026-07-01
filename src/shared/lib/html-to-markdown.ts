@@ -44,33 +44,24 @@ function markdownFromBrowserHtml(html: string, maxChars: number, pageUrl?: strin
   return trimMarkdown(md, maxChars)
 }
 
-async function markdownFromNodeHtml(html: string, maxChars: number, pageUrl?: string): Promise<string> {
-  const { JSDOM } = await import('jsdom')
-  const dom = new JSDOM(html, { url: pageUrl ?? 'https://example.com/' })
-  const md = readabilityMarkdown(dom.window.document, createTurndown())
-  return trimMarkdown(md, maxChars)
-}
-
 /**
  * HTML → LLM-friendly Markdown (Readability article extract + Turndown).
- * Works in browser (DOMParser) and Node/Electron main (jsdom).
+ * Requires DOM APIs (`DOMParser`) — available in browser and Electron renderer.
  */
 export async function extractMarkdownFromHtml(
   html: string,
   maxChars = 4000,
   pageUrl?: string
 ): Promise<string> {
+  if (typeof DOMParser === 'undefined') {
+    throw new Error('extractMarkdownFromHtml requires DOMParser (browser or Electron renderer)')
+  }
+
   const withoutNoise = html
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
 
-  let markdown: string
-  if (typeof DOMParser !== 'undefined') {
-    markdown = markdownFromBrowserHtml(withoutNoise, maxChars, pageUrl)
-  } else {
-    markdown = await markdownFromNodeHtml(withoutNoise, maxChars, pageUrl)
-  }
-
+  const markdown = markdownFromBrowserHtml(withoutNoise, maxChars, pageUrl)
   return markdown.trim()
 }

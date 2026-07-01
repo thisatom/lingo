@@ -38,6 +38,7 @@ export const EyeOff = icon('eye-closed')
 export const FileText = icon('file-text')
 export const Filter = icon('list-filter')
 export const Globe = icon('globe')
+export const Keyboard = icon('keyboard')
 
 /** Translate / language — stroke icon (no dedicated codicon). */
 export function Languages({ className, ...props }: SVGProps<SVGSVGElement>) {
