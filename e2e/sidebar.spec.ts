@@ -9,7 +9,7 @@ test.describe('Sidebar chat list', () => {
 
   test('creates a new chat from the sidebar', async ({ page }) => {
     await page.getByRole('button', { name: 'New chat' }).click()
-    await expect(page).toHaveURL(/#\/c\//)
+    await expect(page).toHaveURL(/\/c\//)
     await expect(page.getByTestId('chat-composer-input')).toBeVisible()
   })
 

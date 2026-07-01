@@ -6,7 +6,7 @@ test.describe('Settings sidebar', () => {
     await seedWebAppState(page)
     await gotoMainChat(page)
     await page.getByRole('link', { name: 'Settings' }).click()
-    await expect(page).toHaveURL(/#\/settings\/general/)
+    await expect(page).toHaveURL(/\/settings\/general/)
   })
 
   test('nav labels are fully readable (no text fade mask)', async ({ page }) => {
@@ -23,11 +23,11 @@ test.describe('Settings sidebar', () => {
 
   test('switches settings sections from sidebar', async ({ page }) => {
     await page.getByRole('link', { name: 'Agent' }).click()
-    await expect(page).toHaveURL(/#\/settings\/agent/)
+    await expect(page).toHaveURL(/\/settings\/agent/)
     await expect(page.getByRole('heading', { name: 'Agent' })).toBeVisible()
 
     await page.getByRole('link', { name: 'API' }).click()
-    await expect(page).toHaveURL(/#\/settings\/api/)
+    await expect(page).toHaveURL(/\/settings\/api/)
     await expect(page.getByRole('heading', { name: 'API' })).toBeVisible()
   })
 })

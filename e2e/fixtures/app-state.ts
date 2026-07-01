@@ -121,6 +121,6 @@ export async function seedWebAppState(page: Page, options: SeedOptions = {}): Pr
 }
 
 export async function gotoMainChat(page: Page): Promise<void> {
-  await page.goto(`/#/c/${encodeURIComponent(E2E_CHAT_ID)}`)
+  await page.goto(`/c/${encodeURIComponent(E2E_CHAT_ID)}`)
   await page.getByTestId('chat-composer-input').waitFor({ state: 'visible' })
 }

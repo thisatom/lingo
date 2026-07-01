@@ -4,7 +4,18 @@ import type { Plugin } from 'vite'
 
 const WEB_HTML = '/index.web.html'
 
-/** Dev/preview: serve the web shell (CSP + `lingo-web` class) at `/`. */
+/** Vite asset / module paths must not be rewritten to the web HTML shell. */
+export function shouldRewritePathToWebHtml(pathname: string): boolean {
+  if (!pathname || pathname === WEB_HTML) return false
+  if (pathname.startsWith('/@vite') || pathname.startsWith('/@fs') || pathname.startsWith('/@id')) {
+    return false
+  }
+  if (pathname.startsWith('/src/') || pathname.startsWith('/node_modules/')) return false
+  if (pathname !== '/index.html' && /\.[a-zA-Z0-9]+$/.test(pathname)) return false
+  return true
+}
+
+/** Dev/preview: serve the web shell (CSP + `lingo-web` class) for all SPA routes. */
 function rewriteRootToWebHtml(): (req: import('http').IncomingMessage, _res: import('http').ServerResponse, next: () => void) => void {
   return (req, _res, next) => {
     const raw = req.url ?? ''
@@ -12,7 +23,7 @@ function rewriteRootToWebHtml(): (req: import('http').IncomingMessage, _res: imp
     const pathname = q === -1 ? raw : raw.slice(0, q)
     const query = q === -1 ? '' : raw.slice(q)
 
-    if (pathname === '/' || pathname === '/index.html') {
+    if (shouldRewritePathToWebHtml(pathname)) {
       req.url = WEB_HTML + query
     }
     next()

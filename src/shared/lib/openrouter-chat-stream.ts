@@ -1213,7 +1213,9 @@ export async function streamOpenRouterChat(
   options?: OpenRouterStreamOptions,
   signal?: AbortSignal
 ): Promise<void> {
-  const fetchImpl = options?.fetchImpl ?? fetch
+  const fetchImpl =
+    options?.fetchImpl ??
+    ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init))
   const apiKey = (await getApiKey()) ?? ''
   const custom = isCustomBackend(request)
   if (!apiKey.trim() && !custom) {
